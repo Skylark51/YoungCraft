@@ -84,6 +84,7 @@ using namespace youngcraft;
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void projectLibraryOpensOnDemand();
     void additionalInteractionRequests();
     void directGeometryToolsAndFixedCore();
     void optimizationGraphWindow();
@@ -3313,6 +3314,23 @@ void SmokeTest::orbitalStudyControlsAndRendering() {
     w.m_documentTabs->setCurrentIndex(old);QVERIFY(w.m_view==oldView);QCOMPARE(w.m_analysis->currentTab(),6);
     QTRY_VERIFY_WITH_TIMEOUT(oldView->m_positiveSurfaceVertexCount>0 && oldView->m_negativeSurfaceVertexCount>0,10000);QVERIFY(oldView->style().showNegativeSurface);
     if(!capture.isEmpty()){QTest::qWait(100);QVERIFY(oldView->image().save(capture+".fmo.png"));}
+}
+
+
+void SmokeTest::projectLibraryOpensOnDemand() {
+    MainWindow window;
+    window.show();
+    QAction *action = window.findChild<QAction *>(QStringLiteral("ProjectLibraryAction"));
+    QVERIFY(action != nullptr);
+    QVERIFY(window.findChild<QDialog *>(QStringLiteral("ProjectLibraryDialog")) == nullptr);
+    bool appeared = false;
+    QTimer::singleShot(0, &window, [&]() {
+        QDialog *dialog = window.findChild<QDialog *>(QStringLiteral("ProjectLibraryDialog"));
+        appeared = dialog && dialog->isVisible();
+        if (dialog) dialog->accept();
+    });
+    action->trigger();
+    QVERIFY(appeared);
 }
 
 int main(int argc, char **argv) {
