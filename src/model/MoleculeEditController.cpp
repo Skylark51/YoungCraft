@@ -25,6 +25,35 @@ QSet<int> MoleculeEditController::side(const Molecule &m, int start, int a, int 
     return result;
 }
 void SelectionModel::connected(const Molecule &m, int start) { clear(); atoms = MoleculeEditController::side(m,start,-1,-1); }
+bool MoleculeEditController::rotatableBranch(const Molecule &m, int picked, QSet<int> &branch,
+                                             QVector3D &pivot, QVector3D &axis) {
+    branch.clear();
+    if (picked < 0 || picked >= m.atoms.size()) return false;
+    int root=picked;
+    // A hydrogen click chooses the attached heavy group (e.g. CH3), not one H.
+    if(m.atoms[root].atomicNumber==1){
+        for(const Bond &bond:m.bonds){
+            const int n=bond.first==root?bond.second:bond.second==root?bond.first:-1;
+            if(n>=0&&m.atoms[n].atomicNumber!=1){root=n;break;}
+        }
+    }
+    int parent=-1;
+    QSet<int> candidate;
+    for(const Bond &bond:m.bonds){
+        const int neighbor=bond.first==root?bond.second:bond.second==root?bond.first:-1;
+        if(neighbor<0||m.atoms[neighbor].atomicNumber==1)continue;
+        QSet<int> sideAtoms=side(m,root,root,neighbor);
+        if(sideAtoms.contains(neighbor))continue; // closed ring; no safe cut
+        if(parent<0||sideAtoms.size()<candidate.size()){parent=neighbor;candidate=sideAtoms;}
+    }
+    if(parent<0)return false;
+    const QVector3D direction=m.atoms[root].position-m.atoms[parent].position;
+    if(direction.lengthSquared()<1e-8f)return false;
+    branch=candidate;
+    pivot=m.atoms[parent].position;
+    axis=direction.normalized();
+    return true;
+}
 bool MoleculeEditController::validate(const Molecule &m, QString *error) {
     auto fail = [&](const QString &s) { if (error) *error = s; return false; };
     QSet<quint64> pairs;

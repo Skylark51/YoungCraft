@@ -93,7 +93,15 @@ void MainWindow::createMenus() {
     add(edit, QStringLiteral("금속–리간드–산소 조합..."), {}, [this] { buildLabComplex(); });
     add(edit, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleSelectedBond(); });
     edit->addSeparator();
-    add(edit, QStringLiteral("전체 선택"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(), {})); });
+    add(edit, QStringLiteral("전체 선택"), QKeySequence::SelectAll, [this] {
+        if (isTextInputFocused() || !m_view) return;
+        QSet<int> visible;
+        const auto &molecule=m_view->molecule();
+        for (int i=0;i<molecule.atoms.size();++i)
+            if (molecule.atoms[i].visible && (m_view->style().showHydrogen || molecule.atoms[i].atomicNumber!=1))
+                visible.insert(i);
+        applyAtomSelection(visible);
+    })->setObjectName(QStringLiteral("SelectAllVisibleAtoms"));
     auto *flexible = edit->addMenu(QStringLiteral("유연한 선택"));
     for (const auto &entry : {qMakePair(QStringLiteral("수소만 선택"), 1), qMakePair(QStringLiteral("수소 이외 원자 선택"), -1)})
         add(flexible, entry.first, {}, [this, entry] { QSet<int> ids; const auto &atoms=m_view->molecule().atoms; for(int i=0;i<atoms.size();++i) if(entry.second==1 ? atoms[i].atomicNumber==1 : atoms[i].atomicNumber!=1) ids.insert(i); applyAtomSelection(ids); });

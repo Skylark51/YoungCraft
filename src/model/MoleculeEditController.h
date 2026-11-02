@@ -26,6 +26,8 @@ public:
     static void transform(Molecule &m, const QSet<int> &ids, const QVector3D &translation,
                           const QVector3D &rotation, const QVector3D &center);
     static QSet<int> side(const Molecule &m, int start, int a, int b);
+    static bool rotatableBranch(const Molecule &m, int picked, QSet<int> &branch,
+                                QVector3D &pivot, QVector3D &axis);
     static bool bondGeometry(Molecule &m, int a, int b, int kind, double value,
                              bool opposite, QString *error = nullptr);
 };

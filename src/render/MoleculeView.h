@@ -59,7 +59,7 @@ public:
         if (m_previewOverlay) m_previewOverlay->update();
     }
     void setAtomDragMode(bool enabled) { m_atomDragMode = enabled; if(!enabled)m_transformMode=0; }
-    // 0 selected atoms, 1/2 connected fragment translate/rotate, 3/4 entire molecule translate/rotate.
+    // 0 selected atoms; 1 attached-branch angle; 2 attached-branch torsion; 3/4 clicked component translate/rotate.
     void setTransformMode(int mode) { m_transformMode=mode; }
     int transformMode() const { return m_transformMode; }
     bool drawingArmed() const { return m_drawingArmed; }
@@ -195,7 +195,7 @@ private:
     int m_hoverAtom=-1, m_hoverBond=-1;
     double m_drawOrder=0, m_previewOrder=1;
     bool m_rectangle=false, m_groupDrag=false;
-    QVector3D m_groupTranslation, m_groupCenter;
+    QVector3D m_groupTranslation, m_groupCenter, m_groupAxis{1,0,0};
     QQuaternion m_groupRotation;
     int m_transformMode=0;
     bool m_insertPreview=false;

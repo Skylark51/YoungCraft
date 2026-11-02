@@ -137,11 +137,21 @@ void MoleculeView::mousePressEvent(QMouseEvent *event) {
     m_groupDrag=false;m_groupTranslation={};m_groupRotation={};m_rectangle=false;m_centricDrag=false;m_centricRejected=false;
     if(m_dragAtom>=0){
         m_dragStartPosition=m_molecule.atoms[m_dragAtom].position;
-        if(m_transformMode>=3){m_selection.clear();for(int i=0;i<m_molecule.atoms.size();++i)m_selection.atoms.insert(i);}
-        else if(m_transformMode==1||m_transformMode==2)m_selection.connected(m_molecule,m_dragAtom);
-        else if(!m_selection.atoms.contains(m_dragAtom))m_selection.click(m_dragAtom,false,false);
-        m_groupCenter={};for(int i:m_selection.atoms)m_groupCenter+=m_molecule.atoms[i].position;
-        m_groupCenter/=qMax(1,int(m_selection.atoms.size()));m_groupDrag=true;
+        if(m_transformMode==1||m_transformMode==2){
+            QSet<int> branch;
+            QVector3D pivot,axis;
+            if(MoleculeEditController::rotatableBranch(m_molecule,m_dragAtom,branch,pivot,axis)){
+                m_selection.clear();m_selection.atoms=branch;
+                m_groupCenter=pivot;m_groupAxis=axis;m_groupDrag=true;
+            }
+        }else{
+            if(m_transformMode>=3)m_selection.connected(m_molecule,m_dragAtom);
+            else if(!m_selection.atoms.contains(m_dragAtom))m_selection.click(m_dragAtom,false,false);
+            m_groupCenter={};
+            for(int i:m_selection.atoms)m_groupCenter+=m_molecule.atoms[i].position;
+            m_groupCenter/=qMax(1,int(m_selection.atoms.size()));
+            m_groupDrag=true;
+        }
     }
     if(m_bondCentric&&m_activeBond>=0&&m_activeBond<m_molecule.bonds.size()&&atom>=0){
         auto b=m_molecule.bonds[m_activeBond];if(atom==b.first||atom==b.second){
@@ -192,10 +202,14 @@ void MoleculeView::mouseMoveEvent(QMouseEvent *event) {
     if((event->buttons()&Qt::LeftButton)&&(event->pos()-m_pressMouse).manhattanLength()>3&&!m_centricDrag){
         if(m_drawingMode&&m_drawingArmed&&(m_drawStartAtom>=0||m_drawFromCanvas)&&!m_insertPreview&&!(event->modifiers()&(Qt::ControlModifier|Qt::ShiftModifier)))updateDrawingPreview(event->pos(),event->modifiers());
         else if(m_groupDrag){
-            if(m_transformMode==2||m_transformMode==4){
+            if(m_transformMode==1||m_transformMode==2||m_transformMode==4){
                 const QPoint total=event->pos()-m_pressMouse;
-                const auto cameraRotation=QQuaternion::fromEulerAngles(total.y()*0.55f,total.x()*0.55f,0);
-                m_groupRotation=(m_rotation.conjugated()*cameraRotation*m_rotation).normalized();
+                if(m_transformMode==2)
+                    m_groupRotation=QQuaternion::fromAxisAndAngle(m_groupAxis,total.x()*0.75f);
+                else{
+                    const auto cameraRotation=QQuaternion::fromEulerAngles(total.y()*0.55f,total.x()*0.55f,0);
+                    m_groupRotation=(m_rotation.conjugated()*cameraRotation*m_rotation).normalized();
+                }
             }else m_groupTranslation=pointOnDrawingPlane(event->pos(),m_dragStartPosition)-m_dragStartPosition;
         }
         else if(pickAtom(m_pressMouse)<0&&!m_insertPreview)m_rectangle=true;
@@ -212,7 +226,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
     }
     else if(m_centricDrag&&m_dragging){auto b=m_molecule.bonds[m_activeBond];emit bondManipulated(b.first,b.second,m_centricKind,m_centricValue,event->modifiers()&Qt::AltModifier);}
     else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){auto a=m_molecule.atoms[i];if(!a.visible||(!m_style.showHydrogen&&a.atomicNumber==1))continue;auto p=project(a.position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}}
-    else if(m_groupDrag&&m_dragging){if(m_transformMode==2||m_transformMode==4)emit groupRotated(m_groupRotation,m_groupCenter);else emit groupMoved(m_groupTranslation);}
+    else if(m_groupDrag&&m_dragging){if(m_transformMode==1||m_transformMode==2||m_transformMode==4)emit groupRotated(m_groupRotation,m_groupCenter);else emit groupMoved(m_groupTranslation);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::RightButton&&!m_dragging){if(m_chainDrawing&&m_chainAtom>=0)endDrawingChain();else emit deleteRequested(atom,bond);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::LeftButton&&!add&&!toggle){
         int site=pickSite(event->pos());
