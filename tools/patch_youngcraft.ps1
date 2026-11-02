@@ -90,8 +90,7 @@ if(-not $CleanupOnly){
             Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue
             $download=''
             $archive=''
-            $CleanupOnly=$true
-            Log 'No optimized release ZIP is published yet. Cleaning known legacy files only; application executable stays unchanged.'
+            throw 'YoungCraft 최신 배포 ZIP을 다운로드하지 못했습니다. 프로그램 업데이트가 적용되지 않았습니다. GitHub Releases 상태와 인터넷 연결을 확인하세요.'
         }
     }
 }
