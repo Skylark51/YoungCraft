@@ -1,7 +1,7 @@
 name: Build YoungCraft Patch EXE
 on:
   push:
-    branches: [codex/optimize-portable-patcher]
+    branches: [main, codex/optimize-portable-patcher]
     paths:
       - tools/patch_youngcraft.ps1
       - tools/YoungcraftPatcher.cs
