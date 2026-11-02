@@ -30,4 +30,4 @@ The Windows Actions workflow parses the PowerShell code, performs a disposable-i
 
 The Actions integration test uses placeholder executables. Before releasing a package, run tools/verify_portable_xtb.ps1 and GUI smoke tests on a Windows system without external Python/RDKit/xTB on PATH. Compare compressed ZIP size against the prior version.
 
-Until an optimized ZIP has been built or published as a GitHub release asset, running the patcher without an adjacent ZIP automatically performs cleanup only. It reports that the application binary has not been updated.
+The automated Windows portable-release workflow builds Youngcraft-portable.zip and publishes it as the latest GitHub Release asset after compilation and CTest succeed. With that release available, download only **release/Youngcraft-Patch.exe**, close Youngcraft, and double-click the EXE. It discovers the installation and downloads the ZIP without a separate manual download. If the ZIP is unavailable, the EXE reports failure without changing the installed application. For manual cleanup, run the PowerShell source with -CleanupOnly.
