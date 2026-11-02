@@ -92,7 +92,7 @@ try {
     $fileRecords = @(
         Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
             [ordered]@{
-                path = $_.FullName.Substring($stage.Length + 1).Replace('\\', '/')
+                path = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
                 size = $_.Length
             }
