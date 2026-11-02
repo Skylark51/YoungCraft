@@ -42,3 +42,6 @@ __pycache__/
 /baseline.txt
 /mechanism-test-build-*.txt
 /mechanism-tests-*.txt
+
+# Reviewed updater binary is versioned explicitly
+!/release/Youngcraft-Patch.exe

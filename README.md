@@ -44,6 +44,14 @@ MM opt는 원자별 형식 전하를 MMFF/UFF에 전달하여 하전 구조도 �
 
 2026-10-19 수정: 우측 상단 Theme 선택기(5종), 중성 조명과 CPK 원소색을 사용하는 새 Studio 기본값, 얇은 결합과 작은 수소, 영어 에너지 축, 비어 있는 최적화 그래프 숨김을 적용했습니다. 원자 두 개를 클릭하고 **Scan 접근 배치...**를 누르면 지정 거리에서 분자 조각을 마주 보게 배치하며, 내부 구조 유지와 실행 취소를 지원합니다. 전체 Scan 생성이나 내부 좌표 최적화는 별도 작업입니다. 구조 출처·조합 방식·검증 기록: [2026-10-19 변경 내역](docs/UPDATE_20261019.md).
 
+## 용량 최적화 배포 및 패치
+
+Windows에서 `tools/package_portable.ps1`을 실행하면 xTB의 실행 데이터와 필수 라이선스만 포함한 `Youngcraft-portable.zip`을 생성합니다. 기본 fragment는 Qt 리소스에 이미 포함되므로 외부 복사본을 추가하지 않습니다. ZIP에는 파일별 SHA-256이 기록된 `package-manifest.json`이 포함됩니다.
+
+`release/Youngcraft-Patch.exe`를 실행하면 기존 Youngcraft 설치 폴더를 자동으로 검색합니다. 패처 옆에 `Youngcraft-portable.zip`이 있으면 그 파일을 사용하고, 없으면 GitHub 최신 릴리스에서 다운로드합니다. Youngcraft를 종료한 상태에서 실행해야 하며, ZIP 해시 검증 후 적용하고 이전 배포의 중복 xTB 소스 아카이브와 기본 fragment 복사본, 구버전 실행 파일 백업을 정리합니다. 사용자 `lab_fragments`와 `youngcraft-server.json`은 보존합니다. 실패 시 이전 파일을 복구합니다.
+
+현재 GitHub 저장소에는 최적화된 ZIP 릴리스가 없습니다. ZIP을 찾을 수 없으면 패처는 구버전 잔재 정리만 수행하며 실행 파일은 유지합니다. 프로그램 자체를 업데이트하려면 최적화된 ZIP을 EXE 옆에 두거나 GitHub Releases에 게시해야 합니다. 상세 내용은 [패치 및 검증](docs/PORTABLE_PATCHING.md)을 참고하세요.
+
 ## 빌드
 
 Qt 6.4 이상, CMake 3.24 이상, Ninja, C++20 컴파일러가 필요합니다.
