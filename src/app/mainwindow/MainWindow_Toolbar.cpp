@@ -137,6 +137,13 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     case 19: {p.drawRoundedRect(QRectF(1.5,4,29,24),3,3);QFont font=p.font();font.setFamily(QStringLiteral("Segoe UI"));font.setBold(true);font.setPixelSize(12);p.setFont(font);p.drawText(QRectF(1,4,30,24),Qt::AlignCenter,QStringLiteral("XYZ"));break;}
     case 22: p.save();p.translate(16,16);for(int a:{0,60,120}){p.save();p.rotate(a);p.drawEllipse(QRectF(-13,-5,26,10));p.restore();}p.setBrush(ink);p.drawEllipse(QPointF(0,0),2,2);p.restore();break;
     case 21: p.drawRoundedRect(QRectF(5,2,22,28),2,2);p.drawLine(10,9,22,9);p.drawLine(10,15,22,15);p.drawLine(10,21,18,21);break;
+    case 24: { // A reference book and reaction-path nodes.
+        p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(16,4,16,28);
+        p.drawLine(7,10,12,10);p.drawLine(7,15,12,15);
+        p.drawPolyline(QPolygonF{{19,22},{23,12},{27,18}});
+        p.drawEllipse(QPointF(19,22),1,1);p.drawEllipse(QPointF(23,12),1,1);
+        p.drawEllipse(QPointF(27,18),1,1);break;
+    }
     case 20: {p.drawEllipse(QPointF(11,16),8,8);QFont font=p.font();font.setBold(true);font.setPixelSize(15);p.setFont(font);p.drawText(QRectF(16,1,15,18),Qt::AlignCenter,QStringLiteral("#"));break;}
     default: p.drawRoundedRect(QRectF(3,8,17,10),5,5);p.drawRoundedRect(QRectF(12,15,17,10),5,5);p.drawLine(12,16,20,16);break;
     }
@@ -150,7 +157,7 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     tint.end();
     icon.addPixmap(checked,QIcon::Normal,QIcon::On);
     icon.addPixmap(checked,QIcon::Active,QIcon::On);
-    const QStringList captions={QStringLiteral("새 구조"),QStringLiteral("열기"),QStringLiteral("그리기"),"MM opt",QStringLiteral("복사"),QStringLiteral("캡처"),QStringLiteral("H 숨김"),QStringLiteral("H 표시"),QStringLiteral("중앙"),QStringLiteral("뷰"),QStringLiteral("동기화"),QStringLiteral("패널"),"OPT","FREQ","SCAN","IRC","TD-DFT","Atoms","Orbitals","XYZ",QStringLiteral("원자 번호"),"Output","QM opt",QStringLiteral("탐색")};
+    const QStringList captions={QStringLiteral("새 구조"),QStringLiteral("열기"),QStringLiteral("그리기"),"MM opt",QStringLiteral("복사"),QStringLiteral("캡처"),QStringLiteral("H 숨김"),QStringLiteral("H 표시"),QStringLiteral("중앙"),QStringLiteral("뷰"),QStringLiteral("동기화"),QStringLiteral("패널"),"OPT","FREQ","SCAN","IRC","TD-DFT","Atoms","Orbitals","XYZ",QStringLiteral("원자 번호"),"Output","QM opt",QStringLiteral("탐색"),QStringLiteral("프로젝트")};
     const QMap<int,QString> shortcuts={{0,"Ctrl+N"},{1,"Ctrl+O"},{3,"Ctrl+Alt+O"},{4,"Ctrl+I"},{5,"Ctrl+Alt+I"}};
     return captionedIcon(icon,captions.value(id),shortcuts.value(id));
 }
@@ -173,6 +180,13 @@ void MainWindow::createToolBar() {
     };
     add(QStringLiteral("새 구조"), [this] { newDrawingDocument(); });
     add(QStringLiteral("열기"), [this] { openFile(); });
+    // SI project library: user-invoked, never shown on application startup.
+    auto *projects=toolbar->addAction(actionIcon(24),QStringLiteral("프로젝트 · Reaction Pathway"));
+    projects->setObjectName(QStringLiteral("ProjectLibraryAction"));
+    projects->setProperty("toolbarIconId",24);
+    projects->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+P")));
+    projects->setToolTip(QStringLiteral("프로젝트 서지관리 · Reaction Pathway (Ctrl+Shift+P)"));
+    connect(projects,&QAction::triggered,this,&MainWindow::openProjectLibrary);
     add(QStringLiteral("구조 그리기"), [this] {
         if (!m_currentFile.isEmpty()) newDrawingDocument(m_view->molecule());
         else setDrawingMode(!m_drawingMode);
