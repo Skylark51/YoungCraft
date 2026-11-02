@@ -9,6 +9,7 @@ on:
       - 'CMakeLists.txt'
       - 'tools/package_portable.ps1'
       - 'tools/build_mm_runtime.ps1'
+      - 'tools/build_editor_release.ps1'
       - '.github/workflows/portable-release.yml'
   workflow_dispatch:
 
@@ -68,6 +69,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Parser regression tests failed' }
           ctest --test-dir build-current -C Release --output-on-failure -R 'model_atoms_bonds|molecular_editor'
           if ($LASTEXITCODE -ne 0) { throw 'Model/editor regression tests failed' }
+      # Match the local PowerShell/Ninja/MSVC build that developers run.
+      - name: Verify local MSVC Ninja release build
+        shell: pwsh
+        run: |
+          & ./tools/build_editor_release.ps1 -QtRoot "$env:QT_ROOT_DIR" -BuildDir build-editor-ci
+          if ($LASTEXITCODE -ne 0) { throw 'Local Ninja release compilation failed' }
       - name: Package optimized portable ZIP
         shell: powershell
         run: |
