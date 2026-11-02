@@ -86,6 +86,12 @@ void EditorTest::attachedFragmentRotation(){
     ring.setBond(0,1,1);ring.setBond(1,2,1);ring.setBond(2,0,1);
     QVERIFY(!MoleculeEditController::rotatableBranch(ring,0,branch,pivot,axis));
     QVERIFY(branch.isEmpty());
+    Molecule doubleBond=m;
+    doubleBond.bonds[0].order=2.0;
+    QVERIFY(!MoleculeEditController::rotatableBranch(doubleBond,1,branch,pivot,axis));
+    Molecule coordination=m;
+    coordination.bonds[0].coordination=true;
+    QVERIFY(!MoleculeEditController::rotatableBranch(coordination,1,branch,pivot,axis));
 }
 void EditorTest::templates(){
     const QVector<int> counts{1,2,3,4,4,5,5,6,6,7,8};for(int i=0;i<counts.size();++i){auto dirs=FragmentLibrary::directions(i);QCOMPARE(dirs.size(),counts[i]);for(auto d:dirs)QVERIFY(qAbs(d.length()-1)<1e-6);}
