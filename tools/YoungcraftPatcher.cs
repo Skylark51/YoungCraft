@@ -12,6 +12,7 @@ internal static class YoungcraftPatcher
     private static int Main()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), "Youngcraft-Patch-" + Guid.NewGuid().ToString("N") + ".ps1");
+        Console.WriteLine("[YoungCraft Patch] Project Library / Reaction Pathway update");
         int exitCode = 1;
         try
         {
