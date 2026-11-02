@@ -1,5 +1,9 @@
 # Youngcraft
 
+## 연구 프로젝트 라이브러리 / Reaction Pathway
+
+상단 도구 모음의 **프로젝트** 아이콘(단축키 **Ctrl+Shift+P**)에서 연구 프로젝트를 등록하고 Gaussian 출력 파일을 반응 단계별로 정리할 수 있습니다. 시작할 때 자동으로 열리지 않습니다. Reactant/TS/Intermediate/Product의 순서를 조절하고, 기준점과 전자 에너지 또는 Gibbs 에너지를 선택해 상대 에너지 프로파일과 SI용 CSV를 생성합니다. 프로젝트는 별도의 `.ycproject` 파일에 저장됩니다. [사용 안내](docs/PROJECT_LIBRARY.md).
+
 Gaussian 결과를 빠르게 탐색하는 Windows x64용 경량 분자구조 뷰어/계산화학 분석기입니다.
 
 ## 현재 지원
