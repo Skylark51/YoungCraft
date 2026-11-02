@@ -30,4 +30,4 @@ The Windows Actions workflow parses the PowerShell code, performs a disposable-i
 
 The Actions integration test uses placeholder executables. Before releasing a package, run tools/verify_portable_xtb.ps1 and GUI smoke tests on a Windows system without external Python/RDKit/xTB on PATH. Compare compressed ZIP size against the prior version.
 
-Until an optimized ZIP has been built or published as a GitHub release asset, running the patcher without an adjacent ZIP reports the missing package and leaves the existing installation untouched.
+Until an optimized ZIP has been built or published as a GitHub release asset, running the patcher without an adjacent ZIP automatically performs cleanup only. It reports that the application binary has not been updated.
