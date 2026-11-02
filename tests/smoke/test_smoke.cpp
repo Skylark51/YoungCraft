@@ -87,6 +87,7 @@ private slots:
     void projectLibraryOpensOnDemand();
     void additionalInteractionRequests();
     void directGeometryToolsAndFixedCore();
+    void selectAllAndFragmentRotation();
     void optimizationGraphWindow();
     void patternTemplatesWorkflow();
     void patternViewportContinuity();
@@ -212,12 +213,39 @@ void SmokeTest::directGeometryToolsAndFixedCore(){
         auto *tool=w.findChild<QAction *>(QString("GeometryDragTool%1").arg(mode));QVERIFY(tool);tool->trigger();QCOMPARE(view->transformMode(),mode);
         const Molecule before=view->molecule();QPoint start=point(1),end=start+QPoint(45,27);
         QTest::mousePress(view,Qt::LeftButton,Qt::NoModifier,start);QTest::mouseMove(view,end,20);QTest::mouseRelease(view,Qt::LeftButton,Qt::NoModifier,end);
-        QVERIFY((view->molecule().atoms[1].position-before.atoms[1].position).length()>0.01);
-        if(mode==1||mode==2)QCOMPARE(view->molecule().atoms[2].position,before.atoms[2].position);
+        if(mode==0||mode>=3)
+            QVERIFY((view->molecule().atoms[1].position-before.atoms[1].position).length()>0.01);
+        else QCOMPARE(view->molecule().atoms[1].position,before.atoms[1].position);
+        QCOMPARE(view->molecule().atoms[2].position,before.atoms[2].position);
         if(mode>0)QVERIFY(std::abs(GeometryEditor::distance(view->molecule(),0,1)-GeometryEditor::distance(before,0,1))<0.00001);
         w.undoDrawingEdit();
     }
     if(!qEnvironmentVariableIsEmpty("YOUNGCRAFT_EDIT_PREVIEW"))w.grab().save(qEnvironmentVariable("YOUNGCRAFT_EDIT_PREVIEW")+".tools.png");
+}
+void SmokeTest::selectAllAndFragmentRotation(){
+    MainWindow w;w.resize(1500,900);w.show();
+    Molecule m;
+    m.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{1.54f,0,0}},
+             {3,1,"H",{2.0f,1,0}},{4,1,"H",{2.0f,-0.5f,0.9f}},
+             {5,1,"H",{2.0f,-0.5f,-0.9f}},{6,8,"O",{6,0,0}}};
+    m.setBond(0,1,1);for(int i=2;i<=4;++i)m.setBond(1,i,1);
+    w.newDrawingDocument(m);w.setDrawingMode(false);
+    MoleculeView *view=w.m_view;view->bestView();QTest::qWait(80);
+    auto *selectAll=w.findChild<QAction *>("SelectAllVisibleAtoms");QVERIFY(selectAll);
+    QCOMPARE(selectAll->shortcut(),QKeySequence::SelectAll);
+    view->setFocus();QTest::keyClick(view,Qt::Key_A,Qt::ControlModifier);
+    QTRY_COMPARE(view->selection().atoms.size(),6);
+    auto point=[&](int i){auto p=view->project(view->molecule().atoms[i].position,view->viewProjection());return QPoint(qRound(p.x()),qRound(p.y()));};
+    auto *torsion=w.findChild<QAction *>("GeometryDragTool2");QVERIFY(torsion);torsion->trigger();
+    const auto before=view->molecule();
+    const QPoint start=point(1),end=start+QPoint(75,0);
+    QTest::mousePress(view,Qt::LeftButton,Qt::NoModifier,start);
+    QTest::mouseMove(view,end,20);
+    QTest::mouseRelease(view,Qt::LeftButton,Qt::NoModifier,end);
+    QCOMPARE(view->molecule().atoms[0].position,before.atoms[0].position);
+    QCOMPARE(view->molecule().atoms[5].position,before.atoms[5].position);
+    QVERIFY((view->molecule().atoms[2].position-before.atoms[2].position).length()>0.05f);
+    QCOMPARE(view->selection().atoms,QSet<int>({1,2,3,4}));
 }
 void SmokeTest::optimizationGraphWindow(){
     AnalysisPanel panel;panel.resize(400,700);panel.show();CalculationData data;

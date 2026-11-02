@@ -62,12 +62,12 @@ jobs:
       - name: Compile and run CTest
         shell: pwsh
         run: |
-          cmake --build build-current --config Release --parallel 4 --target Youngcraft test_parser test_model
+          cmake --build build-current --config Release --parallel 4 --target Youngcraft test_parser test_model test_editor
           if ($LASTEXITCODE -ne 0) { throw 'C++ application compilation failed' }
           ctest --test-dir build-current -C Release --output-on-failure -R parser_gaussian
           if ($LASTEXITCODE -ne 0) { throw 'Parser regression tests failed' }
-          ctest --test-dir build-current -C Release --output-on-failure -R model_atoms_bonds
-          if ($LASTEXITCODE -ne 0) { throw 'Model regression tests failed' }
+          ctest --test-dir build-current -C Release --output-on-failure -R 'model_atoms_bonds|molecular_editor'
+          if ($LASTEXITCODE -ne 0) { throw 'Model/editor regression tests failed' }
       - name: Package optimized portable ZIP
         shell: powershell
         run: |

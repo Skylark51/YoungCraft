@@ -15,6 +15,7 @@ private slots:
     void chargedHydrogens();
     void snappingAndAutomatic();
     void selectionAndRigidBody();
+    void attachedFragmentRotation();
     void templates();
     void fragmentsAndLigands();
     void bondCentric();
@@ -56,6 +57,35 @@ void EditorTest::selectionAndRigidBody(){
     Molecule m;DrawState s;for(int i=0;i<4;++i)MoleculeEditController::addAtom(m,{float(i),0,0},s);m.setBond(0,1,1);m.setBond(1,2,1);
     SelectionModel selection;selection.click(0,false,false);selection.click(1,true,false);QCOMPARE(selection.atoms.size(),2);selection.click(0,false,true);QVERIFY(!selection.atoms.contains(0));selection.connected(m,0);QCOMPARE(selection.atoms.size(),3);QVERIFY(!selection.atoms.contains(3));
     auto before=m;MoleculeEditController::transform(m,selection.atoms,{3,2,1},{40,50,60},{1,0,0});QVERIFY(qAbs(GeometryEditor::distance(m,0,2)-2)<1e-5);QCOMPARE(m.atoms[3].position,before.atoms[3].position);
+}
+void EditorTest::attachedFragmentRotation(){
+    Molecule m;
+    m.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{1.54f,0,0}},
+             {3,1,"H",{2,1,0}},{4,1,"H",{2,-0.5f,0.86f}},
+             {5,1,"H",{2,-0.5f,-0.86f}},{6,8,"O",{6,0,0}}};
+    m.setBond(0,1,1);for(int h=2;h<=4;++h)m.setBond(1,h,1);
+    QSet<int> branch;
+    QVector3D pivot,axis;
+    QVERIFY(MoleculeEditController::rotatableBranch(m,1,branch,pivot,axis));
+    QCOMPARE(branch,QSet<int>({1,2,3,4}));
+    QCOMPARE(pivot,m.atoms[0].position);
+    QVERIFY((axis-QVector3D(1,0,0)).length()<1e-5f);
+    QSet<int> hydrogenBranch;
+    QVector3D hydrogenPivot,hydrogenAxis;
+    QVERIFY(MoleculeEditController::rotatableBranch(m,2,hydrogenBranch,hydrogenPivot,hydrogenAxis));
+    QCOMPARE(hydrogenBranch,branch);
+    const Molecule before=m;
+    const auto rotation=QQuaternion::fromAxisAndAngle(axis,90.0f);
+    for(int i:branch)m.atoms[i].position=pivot+rotation.rotatedVector(m.atoms[i].position-pivot);
+    QVERIFY((m.atoms[2].position-before.atoms[2].position).length()>0.1f);
+    QCOMPARE(m.atoms[0].position,before.atoms[0].position);
+    QCOMPARE(m.atoms[5].position,before.atoms[5].position);
+    QVERIFY(qAbs(GeometryEditor::distance(m,0,1)-GeometryEditor::distance(before,0,1))<1e-5);
+    Molecule ring;
+    ring.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{1,0,0}},{3,6,"C",{0.5f,1,0}}};
+    ring.setBond(0,1,1);ring.setBond(1,2,1);ring.setBond(2,0,1);
+    QVERIFY(!MoleculeEditController::rotatableBranch(ring,0,branch,pivot,axis));
+    QVERIFY(branch.isEmpty());
 }
 void EditorTest::templates(){
     const QVector<int> counts{1,2,3,4,4,5,5,6,6,7,8};for(int i=0;i<counts.size();++i){auto dirs=FragmentLibrary::directions(i);QCOMPARE(dirs.size(),counts[i]);for(auto d:dirs)QVERIFY(qAbs(d.length()-1)<1e-6);}
