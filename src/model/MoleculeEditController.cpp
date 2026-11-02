@@ -41,7 +41,9 @@ bool MoleculeEditController::rotatableBranch(const Molecule &m, int picked, QSet
     QSet<int> candidate;
     for(const Bond &bond:m.bonds){
         const int neighbor=bond.first==root?bond.second:bond.second==root?bond.first:-1;
-        if(neighbor<0||m.atoms[neighbor].atomicNumber==1)continue;
+        // Rotation of multiple, aromatic, or coordination bonds is not a free torsion.
+        if(neighbor<0||m.atoms[neighbor].atomicNumber==1||
+           bond.coordination||std::abs(bond.order-1.0)>1e-6)continue;
         QSet<int> sideAtoms=side(m,root,root,neighbor);
         if(sideAtoms.contains(neighbor))continue; // closed ring; no safe cut
         if(parent<0||sideAtoms.size()<candidate.size()){parent=neighbor;candidate=sideAtoms;}
