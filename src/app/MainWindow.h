@@ -81,6 +81,7 @@ private slots:
     void copyImage();
     void openReactionCapture();
     void openMultiCapture();
+    void openProjectLibrary();
     void saveImage();
     void exportAnimation();
     void copyAnimation();
