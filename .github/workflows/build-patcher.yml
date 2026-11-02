@@ -21,8 +21,11 @@ jobs:
         run: |
           $tokens = $null
           $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/tools/patch_youngcraft.ps1", [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count) { $errors | Format-List; throw "PowerShell parser errors" }
+          foreach ($path in @("tools/patch_youngcraft.ps1", "tools/package_portable.ps1")) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile("$PWD/$path", [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { $errors | Format-List; throw "PowerShell parser errors: $path" }
+          }
       - name: Integration test on disposable mock installation
         shell: powershell
         run: |
@@ -66,6 +69,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path release | Out-Null
           & $compiler /nologo /target:exe /optimize+ /out:release\Youngcraft-Patch.exe /resource:tools\patch_youngcraft.ps1,YoungcraftPatchScript tools\YoungcraftPatcher.cs
           if ($LASTEXITCODE -ne 0) { throw 'Patcher compilation failed' }
+      - name: Run embedded EXE against test installation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'Youngcraft-fixture'
+          $target = Join-Path $root 'old install'
+          Copy-Item -LiteralPath 'release/Youngcraft-Patch.exe' -Destination (Join-Path $target 'Youngcraft-Patch.exe')
+          Copy-Item -LiteralPath (Join-Path $root 'Youngcraft-portable.zip') -Destination (Join-Path $target 'Youngcraft-portable.zip')
+          $process = Start-Process -FilePath (Join-Path $target 'Youngcraft-Patch.exe') -PassThru -Wait -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Embedded EXE smoke test failed: $($process.ExitCode)" }
+          Write-Host 'Embedded EXE smoke test passed.'
       - name: Commit EXE into source branch
         shell: powershell
         run: |
