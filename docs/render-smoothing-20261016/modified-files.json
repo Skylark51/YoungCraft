@@ -1,0 +1,10 @@
+[
+  "src/render/MoleculeView.h",
+  "src/render/moleculeview/MoleculeView_GL.cpp",
+  "src/render/moleculeview/MoleculeView_AtomsBonds.cpp",
+  "src/render/moleculeview/MoleculeView_Scene.cpp",
+  "src/render/moleculeview/MoleculeView_Shadows.cpp",
+  "src/render/moleculeview/MoleculeShaders.inc",
+  "tools/render_quality_preview.cpp",
+  "tests/smoke/test_smoke.cpp"
+]

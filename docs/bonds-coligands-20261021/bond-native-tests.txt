@@ -1,0 +1,14 @@
+********* Start testing of SmokeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SmokeTest::initTestCase()
+PASS   : SmokeTest::selectedBondShortcutAndColigandDialog()
+PASS   : SmokeTest::editorPreservesCalculationFrames()
+PASS   : SmokeTest::editorInputTransactionsAndSelection()
+PASS   : SmokeTest::editorFragmentUndoAndKeyboard()
+PASS   : SmokeTest::mmChunkRegression()
+PASS   : SmokeTest::mmPauseResumeStopConverge()
+PASS   : SmokeTest::labLigandBrowserBuildsSelectedMetal()
+PASS   : SmokeTest::atomClicksMeasureDistanceAngleAndDihedral()
+PASS   : SmokeTest::cleanupTestCase()
+Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 4182ms
+********* Finished testing of SmokeTest *********

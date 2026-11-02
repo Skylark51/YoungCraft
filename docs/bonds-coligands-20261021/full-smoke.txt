@@ -1,0 +1,855 @@
+********* Start testing of SmokeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SmokeTest::initTestCase()
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::selectedBondShortcutAndColigandDialog() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::selectedBondShortcutAndColigandDialog()
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::labLigandBrowserBuildsSelectedMetal() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::labLigandBrowserBuildsSelectedMetal()
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::continuousSketchClicksStrokeRingAndUndo() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::continuousSketchClicksStrokeRingAndUndo()
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::themesEmptySidebarAndScanApproach() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::themesEmptySidebarAndScanApproach()
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic) QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic)
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective) QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective)
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::topPanelToolbarFollowsDocuments() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::topPanelToolbarFollowsDocuments()
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::scanVisibilityAndSquareViewport()
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftSelectionAndClipboard() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::chemcraftSelectionAndClipboard()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::chemcraftGeneratedDialogsAndExtraction() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::chemcraftGeneratedDialogsAndExtraction()
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mainWindowStartsWithKoreanUi() This plugin does not support propagateSizeHints()
+PASS   : SmokeTest::mainWindowStartsWithKoreanUi()
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::loadsGaussianFixtureWithoutBlocking() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::loadsGaussianFixtureWithoutBlocking()
+QWARN  : SmokeTest::moleculeViewKeepsManualBond() QOpenGLWidget is not supported on this platform.
+PASS   : SmokeTest::moleculeViewKeepsManualBond()
+QWARN  : SmokeTest::rendersShadowAndTransparentCapture() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::rendersShadowAndTransparentCapture() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersShadowAndTransparentCapture() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::rendersShadowAndTransparentCapture() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersShadowAndTransparentCapture() QOpenGLWidget: Failed to create context
+SKIP   : SmokeTest::rendersShadowAndTransparentCapture() offscreen platform did not provide an OpenGL context
+R:/tests/smoke/test_smoke.cpp(964) : failure location
+SKIP   : SmokeTest::supersamplingSmoothsDiagonalEdges() Requires OpenGL
+R:/tests/smoke/test_smoke.cpp(879) : failure location
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() QOpenGLWidget: Failed to create context
+SKIP   : SmokeTest::copiesMoleculeWithTransparentBackground() No OpenGL context
+R:/tests/smoke/test_smoke.cpp(987) : failure location
+QWARN  : SmokeTest::rendersOutwardFacesAndMolecularDepth() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::rendersOutwardFacesAndMolecularDepth() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersOutwardFacesAndMolecularDepth() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::rendersOutwardFacesAndMolecularDepth() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersOutwardFacesAndMolecularDepth() QOpenGLWidget: Failed to create context
+SKIP   : SmokeTest::rendersOutwardFacesAndMolecularDepth() No OpenGL context
+R:/tests/smoke/test_smoke.cpp(1060) : failure location
+QWARN  : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() QOpenGLWidget: Failed to create context
+SKIP   : SmokeTest::rendersContinuousBondsAndCleanSphereShadows() No OpenGL context
+R:/tests/smoke/test_smoke.cpp(1104) : failure location
+QWARN  : SmokeTest::presetsApplyFromMenuAndEditor() QOpenGLWidget is not supported on this platform.
+PASS   : SmokeTest::presetsApplyFromMenuAndEditor()
+QWARN  : SmokeTest::exposesAnalysisPanelRestoreAction() QOpenGLWidget is not supported on this platform.
+PASS   : SmokeTest::exposesAnalysisPanelRestoreAction()
+PASS   : SmokeTest::exposesKoreanFrequencyControls()
+PASS   : SmokeTest::styleEditorAdjustsAtomAndBondSizes()
+PASS   : SmokeTest::frequencyAnimationEmitsDisplacedCoordinates()
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates()
+QWARN  : SmokeTest::geometryMeasureBarWorks() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::geometryMeasureBarWorks() QOpenGLWidget is not supported on this platform.
+PASS   : SmokeTest::geometryMeasureBarWorks()
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QINFO  : SmokeTest::documentsAreIndependent() Async completion order: C:/Users/UNIST/AppData/Local/Temp/youngcraft-small-EibIYL.out then C:/Users/UNIST/AppData/Local/Temp/youngcraft-large-wGEelp.out
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::documentsAreIndependent() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::documentsAreIndependent() This plugin does not support propagateSizeHints()
+PASS   : SmokeTest::documentsAreIndependent()
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::optimizationGraphSynchronizes() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::optimizationGraphSynchronizes() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::optimizationGraphSynchronizes()
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::scanWithoutGeometryIsSelectable() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::scanWithoutGeometryIsSelectable()
+SKIP   : SmokeTest::realScanGuiInputs() Set YOUNGCRAFT_SCAN_INPUT_DIR for real-file GUI validation
+R:/tests/smoke/test_smoke.cpp(1443) : failure location
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::drawingModeCreatesAtomsAndBonds() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::drawingModeCreatesAtomsAndBonds()
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::toolbarDrawKeepsWindowOpen() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::toolbarDrawKeepsWindowOpen()
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo()
+SKIP   : SmokeTest::mmStopTerminatesWorker() No RDKit development fallback
+R:/tests/smoke/test_smoke.cpp(555) : failure location
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmChunkRegression() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmChunkRegression() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::mmChunkRegression()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::mmPauseResumeStopConverge() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::mmPauseResumeStopConverge() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::mmPauseResumeStopConverge()
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::xtbGeometryActions() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::xtbGeometryActions() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::xtbGeometryActions()
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::crystalModesSwitchStructures() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::crystalModesSwitchStructures() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::crystalModesSwitchStructures()
+QWARN  : SmokeTest::styleEditorPreviewsImmediately() QOpenGLWidget is not supported on this platform.
+FAIL!  : SmokeTest::styleEditorPreviewsImmediately() Compared values are not the same
+   Actual   (view.style().background): #ff000000
+   Expected (QColor(29, 37, 54))     : #ff1d2536
+R:/tests/smoke/test_smoke.cpp(543) : failure location
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorInputTransactionsAndSelection() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::editorInputTransactionsAndSelection()
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorPreservesCalculationFrames() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorPreservesCalculationFrames() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::editorPreservesCalculationFrames()
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::editorFragmentUndoAndKeyboard() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::editorFragmentUndoAndKeyboard()
+SKIP   : SmokeTest::editorVisualPreview() OpenGL visual verification runs on Windows platform
+R:/tests/smoke/test_smoke.cpp(1517) : failure location
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support propagateSizeHints()
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget is not supported on this platform.
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() This plugin does not support createPlatformOpenGLContext!
+QWARN  : SmokeTest::atomNumbersToolbarLabelsEveryAtom() QOpenGLWidget: Failed to create context
+PASS   : SmokeTest::atomNumbersToolbarLabelsEveryAtom()
+SKIP   : SmokeTest::atomClicksMeasureDistanceAngleAndDihedral() Picking requires a Windows OpenGL viewport
+R:/tests/smoke/test_smoke.cpp(369) : failure location
+PASS   : SmokeTest::cleanupTestCase()
+Totals: 36 passed, 1 failed, 9 skipped, 0 blacklisted, 6231ms
+********* Finished testing of SmokeTest *********

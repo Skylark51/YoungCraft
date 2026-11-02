@@ -1,0 +1,307 @@
+--- before/src/app/MainWindow.h
++++ src/app/MainWindow.h
+@@ -146,6 +146,13 @@
+     void deleteSelection();
+     void changeSelectionElement();
+     void manipulateSelection();
++    QSet<int> selectedStructureAtoms() const;
++    void applyAtomSelection(const QSet<int> &ids);
++    void copyStructureFragment();
++    void pasteStructureFragment();
++    void extractStructureFragments();
++    void showZMatrix();
++    void createGaussianInput();
+     void openFragmentBrowser();
+     void insertCoordinationDialog();
+     bool consumeInsertion(int target, const QVector3D &position, const QVector3D &direction = {1,0,0});
+--- before/src/app/mainwindow/MainWindow_Menus.cpp
++++ src/app/mainwindow/MainWindow_Menus.cpp
+@@ -1,6 +1,8 @@
+ #include "app/MainWindow.h"
+ 
+ #include "analysis/AnalysisEngine.h"
++#include "model/StructureTools.h"
++#include <QInputDialog>
+ #include "app/ParseWorker.h"
+ #include "animation/AnimationController.h"
+ #include "export/ImageExporter.h"
+@@ -81,23 +83,31 @@
+     edit->addSeparator();
+     add(edit, QStringLiteral("새 구조 그리기"), {}, [this] { newDrawingDocument(); });
+     add(edit, QStringLiteral("원자 추가"), {}, [this] { if (!m_drawingMode) newDrawingDocument(m_view->molecule()); else setStatus(QStringLiteral("빈 곳을 클릭하여 원자를 추가하세요.")); });
+-    add(edit, QStringLiteral("조각(fragment) 추가"), {}, [this] { openFragmentBrowser(); });
+-    add(edit, QStringLiteral("실험실 착물 조합 + MM..."), {}, [this] { buildLabComplex(); });
++    add(edit, QStringLiteral("조각(fragment) 추가"), {}, [this] { openFragmentBrowser(); });
++    add(edit, QStringLiteral("실험실 착물 조합 + MM..."), {}, [this] { buildLabComplex(); });
+     add(edit, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleBondEditMode(); });
+     edit->addSeparator();
+-    add(edit, QStringLiteral("전체 선택"), {}, [this] { m_view->selection().clear(); for(int i=0;i<m_view->molecule().atoms.size();++i)m_view->selection().atoms.insert(i);m_view->update(); });
+-    add(edit, QStringLiteral("유연한 선택"), {}, [this] { setStatus(QStringLiteral("유연한 선택 모드")); });
+-    add(edit, QStringLiteral("선택 해제"), {}, [this] { m_view->selection().clear(); m_view->setSelectedAtom(-1); m_view->update(); });
+-    add(edit, QStringLiteral("선택 확장"), {}, [this] { setStatus(QStringLiteral("선택 확장: 결합 이웃 선택")); });
+-    add(edit, QStringLiteral("선택 반전"), {}, [this] { setStatus(QStringLiteral("선택 반전")); });
++    add(edit, QStringLiteral("전체 선택"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(), {})); });
++    auto *flexible = edit->addMenu(QStringLiteral("유연한 선택"));
++    for (const auto &entry : {qMakePair(QStringLiteral("수소만 선택"), 1), qMakePair(QStringLiteral("수소 이외 원자 선택"), -1)})
++        add(flexible, entry.first, {}, [this, entry] { QSet<int> ids; const auto &atoms=m_view->molecule().atoms; for(int i=0;i<atoms.size();++i) if(entry.second==1 ? atoms[i].atomicNumber==1 : atoms[i].atomicNumber!=1) ids.insert(i); applyAtomSelection(ids); });
++    add(flexible, QStringLiteral("원소로 선택..."), {}, [this] {
++        QStringList elements;for(const auto &a:m_view->molecule().atoms)if(!elements.contains(a.element))elements<<a.element;
++        if(elements.isEmpty())return;bool ok=false;auto element=QInputDialog::getItem(this,QStringLiteral("원소로 선택"),QStringLiteral("원소"),elements,0,false,&ok);if(!ok)return;
++        QSet<int> ids;for(int i=0;i<m_view->molecule().atoms.size();++i)if(m_view->molecule().atoms[i].element==element)ids.insert(i);applyAtomSelection(ids);
++    });
++    add(edit, QStringLiteral("선택 해제"), {}, [this] { applyAtomSelection({}); });
++    add(edit, QStringLiteral("선택 확장"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms())); });
++    add(edit, QStringLiteral("선택 반전"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(),selectedStructureAtoms())); });
+     add(edit, QStringLiteral("선택 원자 일괄 작업"), {}, [this] { changeSelectionElement(); });
+     add(edit, QStringLiteral("기본 편집기 옵션"), {}, [this] { openStyleEditor(); });
+     add(edit, QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가"), {}, [this] { setStatus(QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가")); });
+-    add(edit, QStringLiteral("선택 조각 복사/붙여넣기"), {}, [this] { setStatus(QStringLiteral("선택 조각을 클립보드로 복사/붙여넣기")); });
++    add(edit, QStringLiteral("선택 조각 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
++    add(edit, QStringLiteral("분자 조각 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
+     add(edit, QStringLiteral("선택 원자 중심에 더미 원자 추가"), {}, [this] { setStatus(QStringLiteral("더미 원자 추가")); });
+     add(edit, QStringLiteral("선택 분자 조각 중첩"), {}, [this] { setStatus(QStringLiteral("선택 분자 조각 중첩")); });
+     add(edit, QStringLiteral("두 그룹 결합"), {}, [this] { setStatus(QStringLiteral("두 그룹 결합")); });
+-    add(edit, QStringLiteral("선택 원자에 결합된 원자 전체 선택"), {}, [this] { setStatus(QStringLiteral("결합된 원자 전체 선택")); });
++    add(edit, QStringLiteral("선택 원자에 결합된 원자 전체 선택"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms(),true)); });
+     add(edit, QStringLiteral("선택 삭제"), QKeySequence(QStringLiteral("Delete")), [this] { if(!isTextInputFocused())deleteSelection(); });
+     edit->addSeparator();
+     add(edit, QStringLiteral("벡터/평면 관련 작업"), {}, [this] { setStatus(QStringLiteral("벡터/평면 관련 작업")); });
+@@ -229,17 +239,13 @@
+     add(tools, QStringLiteral("구조 최적화..."), QKeySequence(QStringLiteral("Ctrl+Alt+O")), [this] { startMMOptimization(); });
+     add(tools, QStringLiteral("사용자 지정 기하학 파라미터(거리/각도) 적용"), {}, [this] { if(!m_geometryMode)toggleGeometryMode();else setStatus(QStringLiteral("구조 파라미터 편집: 원자를 순서대로 2–4개 선택하세요.")); });
+     add(tools, QStringLiteral("데이터 탐색기"), {}, [this] { if (m_explorerDock) { m_explorerDock->show(); m_explorerDock->raise(); } });
+-    add(tools, QStringLiteral("Z-matrix 생성"), {}, [this] {
+-        QString z;
+-        for (const Atom &atom : m_data.molecule.atoms) z += QStringLiteral("%1 %2  %3 %4 %5\n").arg(atom.element).arg(atom.index).arg(atom.position.x(), 0, 'f', 5).arg(atom.position.y(), 0, 'f', 5).arg(atom.position.z(), 0, 'f', 5);
+-        showToolMessage(QStringLiteral("Z-matrix 생성"), z.isEmpty() ? QStringLiteral("분자 구조가 없습니다.") : z);
+-    });
++    add(tools, QStringLiteral("Z-matrix 생성"), {}, [this] { showZMatrix(); })->setObjectName("BuildZMatrix");
+     add(tools, QStringLiteral("GED 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("GED 도구 기본 골격")); });
+     add(tools, QStringLiteral("결정학 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("결정학 도구 기본 골격")); });
+     add(tools, QStringLiteral("애니메이션 생성"), {}, [this] { exportAnimation(); });
+     add(tools, QStringLiteral("데이터 요약"), {}, [this] { showToolMessage(QStringLiteral("데이터 요약"), AnalysisEngine::summary(m_data)); });
+-    add(tools, QStringLiteral("계산 입력파일 구역 생성"), {}, [this] { showToolMessage(QStringLiteral("계산 입력파일 구역 생성"), m_data.route.isEmpty() ? QStringLiteral("계산 경로 구역이 없습니다.") : m_data.route); });
+-    add(tools, QStringLiteral("분자 조각 추출기"), {}, [this] { setStatus(QStringLiteral("분자 조각 추출기")); });
++    add(tools, QStringLiteral("계산 입력파일 구역 생성"), {}, [this] { createGaussianInput(); });
++    add(tools, QStringLiteral("분자 조각 추출기"), {}, [this] { extractStructureFragments(); });
+     add(tools, QStringLiteral("오비탈"), {}, [this] { m_explorerDock->show(); m_analysis->setCurrentTab(6); setStatus(QStringLiteral("오비탈 목록을 Context Sidebar에 표시합니다")); });
+     tools->addSeparator();
+     add(tools, QStringLiteral("구조 비교"), {}, [this] { setStatus(QStringLiteral("구조 비교")); });
+--- before/src/app/mainwindow/MainWindow_Window.cpp
++++ src/app/mainwindow/MainWindow_Window.cpp
+@@ -34,6 +34,7 @@
+ #include <QSpinBox>
+ #include <QStatusBar>
+ #include <QTextEdit>
++#include <QPlainTextEdit>
+ #include <QThread>
+ #include <QToolBar>
+ #include <QTreeWidget>
+@@ -54,7 +55,7 @@
+ 
+ bool MainWindow::isTextInputFocused() const {
+     QWidget *widget = QApplication::focusWidget();
+-    return qobject_cast<QLineEdit *>(widget) || qobject_cast<QTextEdit *>(widget) ||
++    return qobject_cast<QLineEdit *>(widget) || qobject_cast<QTextEdit *>(widget) || qobject_cast<QPlainTextEdit *>(widget) ||
+            qobject_cast<QAbstractSpinBox *>(widget);
+ }
+ 
+--- before/CMakeLists.txt
++++ CMakeLists.txt
+@@ -14,6 +14,7 @@
+ set(YOUNGCRAFT_CORE_SOURCES
+     src/compute/XtbRunner.cpp
+     src/compute/XtbRunner.h
++    src/model/StructureTools.cpp
+     src/model/MoleculeEditController.cpp
+     src/model/FragmentLibrary.cpp
+     src/model/Molecule.cpp
+@@ -50,6 +51,7 @@
+     src/app/main.cpp
+     src/app/MainWindow.cpp
+     src/app/mainwindow/MainWindow_Ui.cpp
++    src/app/mainwindow/MainWindow_Chemcraft.cpp
+     src/app/mainwindow/MainWindow_Menus.cpp
+     src/app/mainwindow/MainWindow_Toolbar.cpp
+     src/app/mainwindow/MainWindow_File.cpp
+@@ -60,8 +62,8 @@
+     src/app/mainwindow/MainWindow_Bonds.cpp
+     src/app/mainwindow/MainWindow_Window.cpp
+     src/app/mainwindow/MainWindow_Geometry.cpp
+-    src/app/mainwindow/MainWindow_Xtb.cpp
+-    src/app/mainwindow/MainWindow_LabComplex.cpp
++    src/app/mainwindow/MainWindow_Xtb.cpp
++    src/app/mainwindow/MainWindow_LabComplex.cpp
+     src/ui/XtbDialog.cpp
+     src/ui/XtbDialog.h
+     src/app/mainwindow/MainWindow_Editor.cpp
+@@ -135,6 +137,14 @@
+     target_compile_options(render_quality_preview PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+ endif()
+ if(BUILD_TESTING)
++    qt_add_executable(test_structure_tools tests/model/test_structure_tools.cpp)
++    target_link_libraries(test_structure_tools PRIVATE youngcraft_core Qt6::Test)
++    target_compile_options(test_structure_tools PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
++    add_test(NAME structure_tools COMMAND test_structure_tools)
++    if(WIN32)
++        add_custom_command(TARGET test_structure_tools POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
++            $<TARGET_RUNTIME_DLLS:test_structure_tools> $<TARGET_FILE_DIR:test_structure_tools> COMMAND_EXPAND_LISTS VERBATIM)
++    endif()
+     qt_add_executable(test_structure tests/structure/test_structure.cpp)
+     target_link_libraries(test_structure PRIVATE youngcraft_core Qt6::Test)
+     add_test(NAME structure_files COMMAND test_structure)
+@@ -154,6 +164,7 @@
+     qt_add_executable(test_smoke tests/smoke/test_smoke.cpp
+         src/app/MainWindow.cpp
+     src/app/mainwindow/MainWindow_Ui.cpp
++    src/app/mainwindow/MainWindow_Chemcraft.cpp
+     src/app/mainwindow/MainWindow_Menus.cpp
+     src/app/mainwindow/MainWindow_Toolbar.cpp
+     src/app/mainwindow/MainWindow_File.cpp
+@@ -163,10 +174,10 @@
+     src/app/mainwindow/MainWindow_Export.cpp
+     src/app/mainwindow/MainWindow_Bonds.cpp
+     src/app/mainwindow/MainWindow_Window.cpp
+-    src/app/mainwindow/MainWindow_Geometry.cpp
+-    src/app/mainwindow/MainWindow_Xtb.cpp
+-    src/app/mainwindow/MainWindow_LabComplex.cpp
+-    src/ui/XtbDialog.cpp
++    src/app/mainwindow/MainWindow_Geometry.cpp
++    src/app/mainwindow/MainWindow_Xtb.cpp
++    src/app/mainwindow/MainWindow_LabComplex.cpp
++    src/ui/XtbDialog.cpp
+     src/ui/XtbDialog.h
+     src/app/mainwindow/MainWindow_Editor.cpp
+     resources/fragments.qrc
+--- before/README.md
++++ README.md
+@@ -1,59 +1,70 @@
+-# Youngcraft
+-
+-Gaussian 결과를 빠르게 탐색하는 Windows x64용 경량 분자구조 뷰어/계산화학 분석기입니다.
+-
+-## 현재 지원
+-
+-- Gaussian `.out` / `.log` / `.gjf` / `.com`: 구조, 최적화 프레임, SCF energy, force/convergence 값, frequency·허수 진동·normal mode, Mulliken charge/spin, dipole, TD-DFT 상태·전이, MO energy, NBO/PCM 존재 여부
+-- `.xyz` / multi-XYZ trajectory
+-- `.cube`: 원자와 volumetric grid 읽기
+-- `.fchk` / `.fch`: 구조와 MO energy/occupation metadata 읽기. 등가면 격자는 `.cube`가 필요합니다.
+-- 구조 파일 `.cif` / `.mmcif` / `.cmf`, `.mol` / `.sdf` / `.sd` / `.mdl`, `.mol2`, `.pdb` / `.ent`, `.res` / `.ins`, `.cssr` 열기. CIF는 비대칭 단위·단위격자·2×2×2 Packing과 격자선 표시를 지원합니다.
+-- Youngcraft Studio 기본 스타일, 원소별 색상·크기와 결합·조명 설정의 즉시 미리보기
+-- ball-and-stick / stick / CPK / space-filling, 카메라 회전·zoom·pan·picking·라벨, PNG/JPEG/clipboard, GIF 및 ffmpeg가 설치된 경우 MP4
+-- 편집 > 새 구조 그리기: 원소와 결합 차수를 선택해 원자를 배치하고, 기존 원자에서 드래그하며 결합을 미리 볼 수 있습니다. Alt를 누르면 기본 결합 길이 스냅이 해제됩니다. `Ctrl+D`는 원자 이동 모드입니다.
+-- 도구 > Geometry optimization (`Ctrl+Alt+O`): Auto/MMFF94/MMFF94s/UFF를 선택하고 실제 좌표·에너지·gradient·그래프를 보며 일시정지·재개·중단할 수 있습니다. 시작 구조 복원도 지원합니다.
+-
+-MMFF/UFF 작업자는 파라미터화할 수 없는 구조와 전이금속 배위결합을 오류로 보고합니다. 실험실 착물 조합은 별도로 포함된 xTB 실행 파일의 GFN-FF 분자역학을 사용합니다.
+-
+-## 실험실 착물 조합
+-
+-**편집 > 실험실 착물 조합 + MM...**에서 금속(Fe/Mn), 12-MTP(Me3-TPADP), eta2-peroxo를 선택하고 **조합하고 MM 계산**을 누릅니다. 새 구조 탭을 만들고 GFN-FF 계산을 자동 실행하며, 수렴한 경우에만 결과를 자동 적용합니다. 중단/실패/미수렴은 완료로 표시하지 않습니다. 계산 화면에서 좌표를 확인하고 XYZ로 저장할 수 있습니다.
+-
+-초기 fragment는 사용자가 제공한 Mn(III)–12-MTP–peroxo Gaussian 구조에서 추출했습니다. Cyclohexanone은 제외합니다. MTP 주개 N 4개와 peroxo O 2개의 배위 연결을 유지하며, 기본값은 금속(III)/총전하 +1입니다. 총전하와 후속 양자계산용 multiplicity는 조합 화면에서 수정할 수 있습니다. GFN-FF 자체는 스핀 상태를 계산하지 않습니다.
+-
+-조합 계산의 기본값은 참고 구조의 금속–주개 원자 거리와 O–O 거리를 유지하는 조화 restraint입니다. Fe로 금속을 바꾸어도 시작 거리는 Mn 참고 구조에서 가져오므로, 생성 결과는 DFT 시작 구조용 후보입니다. 자유 최적화가 필요하면 계산 화면에서 거리 유지 체크를 해제하고 다시 계산합니다.
+-
+-실험실 fragment는 실행 파일 옆의 `lab_fragments/ligands`와 `lab_fragments/adducts`에 CJSON으로 저장합니다. 새 ligand는 같은 형식의 파일을 추가해 등록할 수 있습니다. 기준 금속은 원소 0의 dummy로 표현하고, dummy와 연결된 원자를 주개 원자로 지정합니다. 함께 조합할 fragment는 같은 기준 금속 좌표계를 사용해야 합니다. 원본 추출 기록과 검증 결과는 `docs/LAB_COMPLEXES.md`에 있습니다.
+-
+-## 빌드
+-
+-Qt 6.4 이상, CMake 3.24 이상, Ninja, C++20 컴파일러가 필요합니다.
+-
+-```powershell
+-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+-cmake --build build
+-ctest --test-dir build --output-on-failure
+-```
+-
+-Windows portable 배포물은 Release 빌드 후 아래 스크립트로 만듭니다. 이 스크립트는 PyInstaller `--onedir`로 RDKit/Python이 포함된 `mm_runtime/YoungcraftMM.exe`를 생성해 포함합니다. 배포본의 MM 기능에는 사용자 PC의 Python, RDKit, 인터넷이 필요하지 않습니다. 빌드 PC에는 `python -m pip install -r tools/requirements-mm.txt`가 필요합니다.
+-
+-```powershell
+-powershell -ExecutionPolicy Bypass -File tools/package_portable.ps1
+-```
+-
+-완성물은 `dist\Youngcraft.exe`, `dist\mm_runtime\YoungcraftMM.exe`와 루트의 `Youngcraft-portable.zip`입니다. 배포 폴더에서 `Youngcraft.exe`를 직접 실행하거나 ZIP을 원하는 폴더에 풀어 실행합니다.
+-
+-구조 파일 파싱에 포함된 Gemmi와 PEGTL의 라이선스는 배포본의 `licenses` 폴더에 있습니다.
+-
+-## 단축키
+-
+-상단 도구 모음의 **원자 번호** 버튼을 누르면 모든 표시 원자의 구 중심에 번호를 표시합니다. 다시 누르면 숨깁니다. 번호는 좌표/원자 표와 동일하며, 구 크기에 맞춰 축소하고 밝은 글씨와 어두운 외곽선으로 표시합니다. **보기 > 원자/결합 라벨 > 원자 번호** 메뉴에서도 같은 기능을 사용할 수 있습니다. 숨긴 원자와 수소는 해당 표시 설정을 켜면 번호도 함께 나타납니다.
+-
+-일반 보기에서 원자를 순서대로 클릭하면 뷰 아래에 **2개: 거리(Å), 3개: 각도(°), 4개: 이면각(°)**이 표시됩니다. 각도의 꼭짓점은 두 번째 원자, 이면각의 중심 결합은 두 번째–세 번째 원자입니다. 선택 번호와 기존 측정값도 함께 표시하며, 프레임/진동으로 좌표가 바뀌면 값을 갱신합니다. 선택한 원자를 다시 클릭하면 그 원자만 선택 취소되며 남은 클릭 순서에 따라 측정값을 다시 계산합니다. 취소한 원자를 다시 선택하면 순서의 마지막에 추가됩니다. 네 개 선택 뒤 새 원자를 클릭하면 다음 측정을 시작합니다. 빈 배경이나 **측정 초기화** 버튼으로 초기화합니다. 일직선 배치 등 계산할 수 없는 이면각은 ‘정의 불가’로 표시합니다. 측정은 계산 구조와 프레임을 수정하지 않으며 탭마다 선택을 유지합니다.
+-
+-`Ctrl+O` 열기, `Ctrl+S` 그림 저장, `Ctrl+I` 이미지 복사, `Ctrl+B` 결합 편집 모드, `Ctrl+D` 원자 드래그 모드, `Enter` 최적 보기, `Space` 중앙 정렬, `Num5` 회전 중심 갱신, `P` 애니메이션 재생/일시정지, 좌우 화살표 프레임/진동 이동.
+-
+-**이미지 복사**(메뉴·도구 모음·`Ctrl+I`)는 화면 배경색과 관계없이 투명 배경으로 복사합니다. 클립보드에는 알파 채널을 유지한 이미지와 PNG 형식을 함께 제공합니다.
+-
+-큰 출력 파일은 worker thread에서 한 줄씩 읽습니다. Gaussian 출력만으로 grid를 계산할 수 없는 경우에는 `.fchk` 또는 `.cube`를 명시적으로 요구합니다.
++# Youngcraft
++
++Gaussian 결과를 빠르게 탐색하는 Windows x64용 경량 분자구조 뷰어/계산화학 분석기입니다.
++
++## 현재 지원
++
++- Gaussian `.out` / `.log` / `.gjf` / `.com`: 구조, 최적화 프레임, SCF energy, force/convergence 값, frequency·허수 진동·normal mode, Mulliken charge/spin, dipole, TD-DFT 상태·전이, MO energy, NBO/PCM 존재 여부
++- `.xyz` / multi-XYZ trajectory
++- `.cube`: 원자와 volumetric grid 읽기
++- `.fchk` / `.fch`: 구조와 MO energy/occupation metadata 읽기. 등가면 격자는 `.cube`가 필요합니다.
++- 구조 파일 `.cif` / `.mmcif` / `.cmf`, `.mol` / `.sdf` / `.sd` / `.mdl`, `.mol2`, `.pdb` / `.ent`, `.res` / `.ins`, `.cssr` 열기. CIF는 비대칭 단위·단위격자·2×2×2 Packing과 격자선 표시를 지원합니다.
++- Youngcraft Studio 기본 스타일, 원소별 색상·크기와 결합·조명 설정의 즉시 미리보기
++- ball-and-stick / stick / CPK / space-filling, 카메라 회전·zoom·pan·picking·라벨, PNG/JPEG/clipboard, GIF 및 ffmpeg가 설치된 경우 MP4
++- 편집 > 새 구조 그리기: 원소와 결합 차수를 선택해 원자를 배치하고, 기존 원자에서 드래그하며 결합을 미리 볼 수 있습니다. Alt를 누르면 기본 결합 길이 스냅이 해제됩니다. `Ctrl+D`는 원자 이동 모드입니다.
++- 도구 > Geometry optimization (`Ctrl+Alt+O`): Auto/MMFF94/MMFF94s/UFF를 선택하고 실제 좌표·에너지·gradient·그래프를 보며 일시정지·재개·중단할 수 있습니다. 시작 구조 복원도 지원합니다.
++
++MMFF/UFF 작업자는 파라미터화할 수 없는 구조와 전이금속 배위결합을 오류로 보고합니다. 실험실 착물 조합은 별도로 포함된 xTB 실행 파일의 GFN-FF 분자역학을 사용합니다.
++
++## 실험실 착물 조합
++
++**편집 > 실험실 착물 조합 + MM...**에서 금속(Fe/Mn), 12-MTP(Me3-TPADP), eta2-peroxo를 선택하고 **조합하고 MM 계산**을 누릅니다. 새 구조 탭을 만들고 GFN-FF 계산을 자동 실행하며, 수렴한 경우에만 결과를 자동 적용합니다. 중단/실패/미수렴은 완료로 표시하지 않습니다. 계산 화면에서 좌표를 확인하고 XYZ로 저장할 수 있습니다.
++
++초기 fragment는 사용자가 제공한 Mn(III)–12-MTP–peroxo Gaussian 구조에서 추출했습니다. Cyclohexanone은 제외합니다. MTP 주개 N 4개와 peroxo O 2개의 배위 연결을 유지하며, 기본값은 금속(III)/총전하 +1입니다. 총전하와 후속 양자계산용 multiplicity는 조합 화면에서 수정할 수 있습니다. GFN-FF 자체는 스핀 상태를 계산하지 않습니다.
++
++조합 계산의 기본값은 참고 구조의 금속–주개 원자 거리와 O–O 거리를 유지하는 조화 restraint입니다. Fe로 금속을 바꾸어도 시작 거리는 Mn 참고 구조에서 가져오므로, 생성 결과는 DFT 시작 구조용 후보입니다. 자유 최적화가 필요하면 계산 화면에서 거리 유지 체크를 해제하고 다시 계산합니다.
++
++실험실 fragment는 실행 파일 옆의 `lab_fragments/ligands`와 `lab_fragments/adducts`에 CJSON으로 저장합니다. 새 ligand는 같은 형식의 파일을 추가해 등록할 수 있습니다. 기준 금속은 원소 0의 dummy로 표현하고, dummy와 연결된 원자를 주개 원자로 지정합니다. 함께 조합할 fragment는 같은 기준 금속 좌표계를 사용해야 합니다. 원본 추출 기록과 검증 결과는 `docs/LAB_COMPLEXES.md`에 있습니다.
++
++## 빌드
++
++Qt 6.4 이상, CMake 3.24 이상, Ninja, C++20 컴파일러가 필요합니다.
++
++```powershell
++cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
++cmake --build build
++ctest --test-dir build --output-on-failure
++```
++
++Windows portable 배포물은 Release 빌드 후 아래 스크립트로 만듭니다. 이 스크립트는 PyInstaller `--onedir`로 RDKit/Python이 포함된 `mm_runtime/YoungcraftMM.exe`를 생성해 포함합니다. 배포본의 MM 기능에는 사용자 PC의 Python, RDKit, 인터넷이 필요하지 않습니다. 빌드 PC에는 `python -m pip install -r tools/requirements-mm.txt`가 필요합니다.
++
++```powershell
++powershell -ExecutionPolicy Bypass -File tools/package_portable.ps1
++```
++
++완성물은 `dist\Youngcraft.exe`, `dist\mm_runtime\YoungcraftMM.exe`와 루트의 `Youngcraft-portable.zip`입니다. 배포 폴더에서 `Youngcraft.exe`를 직접 실행하거나 ZIP을 원하는 폴더에 풀어 실행합니다.
++
++구조 파일 파싱에 포함된 Gemmi와 PEGTL의 라이선스는 배포본의 `licenses` 폴더에 있습니다.
++
++## 단축키
++
++상단 도구 모음의 **원자 번호** 버튼을 누르면 모든 표시 원자의 구 중심에 번호를 표시합니다. 다시 누르면 숨깁니다. 번호는 좌표/원자 표와 동일하며, 구 크기에 맞춰 축소하고 밝은 글씨와 어두운 외곽선으로 표시합니다. **보기 > 원자/결합 라벨 > 원자 번호** 메뉴에서도 같은 기능을 사용할 수 있습니다. 숨긴 원자와 수소는 해당 표시 설정을 켜면 번호도 함께 나타납니다.
++
++일반 보기에서 원자를 순서대로 클릭하면 뷰 아래에 **2개: 거리(Å), 3개: 각도(°), 4개: 이면각(°)**이 표시됩니다. 각도의 꼭짓점은 두 번째 원자, 이면각의 중심 결합은 두 번째–세 번째 원자입니다. 선택 번호와 기존 측정값도 함께 표시하며, 프레임/진동으로 좌표가 바뀌면 값을 갱신합니다. 선택한 원자를 다시 클릭하면 그 원자만 선택 취소되며 남은 클릭 순서에 따라 측정값을 다시 계산합니다. 취소한 원자를 다시 선택하면 순서의 마지막에 추가됩니다. 네 개 선택 뒤 새 원자를 클릭하면 다음 측정을 시작합니다. 빈 배경이나 **측정 초기화** 버튼으로 초기화합니다. 일직선 배치 등 계산할 수 없는 이면각은 ‘정의 불가’로 표시합니다. 측정은 계산 구조와 프레임을 수정하지 않으며 탭마다 선택을 유지합니다.
++
++`Ctrl+O` 열기, `Ctrl+S` 그림 저장, `Ctrl+I` 이미지 복사, `Ctrl+B` 결합 편집 모드, `Ctrl+D` 원자 드래그 모드, `Enter` 최적 보기, `Space` 중앙 정렬, `Num5` 회전 중심 갱신, `P` 애니메이션 재생/일시정지, 좌우 화살표 프레임/진동 이동.
++
++**이미지 복사**(메뉴·도구 모음·`Ctrl+I`)는 화면 배경색과 관계없이 투명 배경으로 복사합니다. 클립보드에는 알파 채널을 유지한 이미지와 PNG 형식을 함께 제공합니다.
++
++큰 출력 파일은 worker thread에서 한 줄씩 읽습니다. Gaussian 출력만으로 grid를 계산할 수 없는 경우에는 `.fchk` 또는 `.cube`를 명시적으로 요구합니다.
++
++
++## Chemcraft 대응 기능 업그레이드 (2026-10-16)
++
++- **편집 > 선택 확장 / 선택 반전 / 선택 원자에 결합된 원자 전체 선택**: 실제 선택 집합을 변경합니다. 확장은 결합 이웃 한 단계, 전체 선택은 연결된 조각 전체입니다. 유연한 선택에서 수소·비수소·원소별 선택을 지원합니다.
++- **편집 > 선택 조각 복사 / 분자 조각 붙여넣기** (`Ctrl+C`, `Ctrl+V`): 선택 원자와 내부 결합·배위 자리·완전한 haptic contact를 복사합니다. 붙여넣기는 현재 구조 옆에 배치하고 한 번의 실행 취소로 되돌립니다. 클립보드의 텍스트 표현은 XYZ이며, Youngcraft 간에는 전용 형식으로 결합 정보를 유지합니다.
++- **도구 > 분자 조각 추출기**: 결합 및 haptic 연결을 따라 분리된 조각이나 현재 선택을 새 탭으로 추출합니다. 원본 구조는 유지됩니다. 부분 조각의 총전하는 형식 전하 합이며 스핀 다중도는 후속 계산에서 확인해야 합니다.
++- **도구 > Z-matrix 생성**: 앞선 원자를 참조하는 거리·각도·이면각을 생성하고 미리보기·복사·저장을 지원합니다. 기존의 Cartesian 좌표 나열을 교체했습니다. 이면각을 정의할 수 없는 선형 기준 배치는 이유를 표시하며 Cartesian 입력을 사용해야 합니다.
++- **도구 > 계산 입력파일 구역 생성**: 현재 화면 좌표로 Gaussian Cartesian 입력을 생성합니다. 경로·총전하·스핀 다중도를 수정하고 미리보기·복사·GJF 저장을 지원합니다. 추가 구역/체크포인트가 필요한 일부 경로는 거부합니다. 예시 계산 경로는 목적에 맞게 수정해야 합니다.
++
++검증 및 비교 한계: `docs/chemcraft-tools-20261016/README.md`.

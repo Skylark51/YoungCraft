@@ -1,0 +1,72 @@
+{
+  "chemicalJson": 1,
+  "atoms": {
+    "elements": {
+      "number": [
+        0,
+        8,
+        8
+      ]
+    },
+    "coords": {
+      "3d": [
+        0.0,
+        0.0,
+        0.0,
+        1.78694973,
+        0.273210716,
+        -0.57783502,
+        1.061819697,
+        -0.487333543,
+        -1.490265429
+      ]
+    },
+    "formalCharges": [
+      0,
+      -1,
+      -1
+    ]
+  },
+  "bonds": {
+    "connections": {
+      "index": [
+        0,
+        1,
+        0,
+        2,
+        1,
+        2
+      ]
+    },
+    "order": [
+      1,
+      1,
+      1
+    ]
+  },
+  "properties": {
+    "name": "peroxo (side-on, eta2, O2 2-)",
+    "category": "lab-adduct",
+    "totalCharge": -2,
+    "source": {
+      "file": "5-MnIII-12MTP-peroxo-opt-freq.out",
+      "serverPath": "/home/skylark/AfterPhD/SeventhInnoCOREDHJ/5-MnIII-12MTP-peroxo-opt-freq.out",
+      "sha256": "a63e414cb5a0e19e4c16532cb70c52aba8dc8de4dbb8a6f8d43bd57bb9525162",
+      "orientationLine": 503,
+      "geometry": "final Input orientation: in supplied frequency output",
+      "normalTermination": true,
+      "minimumFrequencyCm1": 56.6547,
+      "optimizationCompletedInThisFile": true,
+      "coordinateFrame": "metal-centered; rigidly aligned to existing peroxo fragment axes",
+      "referenceMetal": "Mn(III)",
+      "referenceMultiplicity": 5,
+      "referenceCharge": 1,
+      "templateFrame": "MnIII-peroxo-optimized-20261030"
+    },
+    "originalAtomNumbers": [
+      1,
+      44,
+      45
+    ]
+  }
+}

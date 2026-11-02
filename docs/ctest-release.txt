@@ -1,0 +1,15 @@
+Test project D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-current
+    Start 1: structure_files
+1/5 Test #1: structure_files ..................   Passed    0.09 sec
+    Start 2: parser_gaussian
+2/5 Test #2: parser_gaussian ..................   Passed    0.18 sec
+    Start 3: model_atoms_bonds
+3/5 Test #3: model_atoms_bonds ................   Passed    0.11 sec
+    Start 4: gui_smoke
+4/5 Test #4: gui_smoke ........................   Passed    4.39 sec
+    Start 5: xtb_runner
+5/5 Test #5: xtb_runner .......................   Passed    7.16 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =  12.08 sec

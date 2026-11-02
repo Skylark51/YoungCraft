@@ -1,0 +1,15 @@
+data_number
+_cell.length_a 10
+_cell.length_b 10
+_cell.length_c 10
+_cell.angle_alpha 90
+_cell.angle_beta 90
+_cell.angle_gamma 90
+_space_group.IT_number 2
+loop_
+_atom_site.label_atom_id
+_atom_site.type_symbol
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+Cl2 Cl 1 2 3

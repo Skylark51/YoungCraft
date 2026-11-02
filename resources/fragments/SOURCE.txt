@@ -1,0 +1,5 @@
+Avogadro2 2.0.0 installed resource data, copied 2026-09-30.
+166 functional groups and 76 ligands (CJSON only); no Avogadro binaries.
+Copyright (c) 2022, Open Chemistry. BSD 3-Clause.
+See licenses/Avogadro-fragments-BSD-3-Clause.txt in the distribution.
+Dummy sites are removed by the Youngcraft resource loader before insertion.

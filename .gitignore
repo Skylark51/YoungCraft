@@ -1,0 +1,44 @@
+# Build / packaging outputs
+build*/
+dist/
+*.exe
+*.dll
+*.a
+*.obj
+*.o
+*.manifest
+Youngcraft-portable.zip
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated builds, caches and packaged runtimes
+.build/
+__pycache__/
+*.py[cod]
+*.lib
+*.LIB
+*.zip
+*.Zip
+*.pdb
+*.ilk
+*.exp
+/third_party/xtb-download/
+/generic/
+/imageformats/
+/networkinformation/
+/platforms/
+/styles/
+/tls/
+/Youngcraft_Refactored_Modular/
+
+# Machine-specific server settings and local editing artifacts
+/youngcraft-server.json
+/.orbitals-*.py
+/auto-h-final.txt
+/baseline.txt
+/mechanism-test-build-*.txt
+/mechanism-tests-*.txt

@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/youngcraft">
+    <file alias="icon.png">youngcraft-icon.png</file>
+  </qresource>
+</RCC>

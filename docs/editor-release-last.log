@@ -1,0 +1,22 @@
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Configuring done (0.3s)
+-- Generating done (1.0s)
+-- Build files have been written to: D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-editor-final
+[1/14] Automatic MOC and UIC for target youngcraft_core
+[2/13] Building CXX object CMakeFiles\youngcraft_core.dir\src\model\MoleculeEditController.cpp.obj
+[3/13] Linking CXX static library youngcraft_core.lib
+[4/13] Linking CXX executable test_structure.exe
+[5/13] Linking CXX executable test_parser.exe
+[6/13] Linking CXX executable test_model.exe
+[7/13] Linking CXX executable test_xtb.exe
+[8/13] Linking CXX executable test_smoke.exe
+[9/13] Linking CXX executable "D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\Youngcraft.exe"; Deploying Qt runtime beside Youngcraft.exe
+Warning: Translations will not be available due to the following error.
+
+Cannot open C:/Users/UNIST/Documents/ChatGPT/Youngcraft/qt-sdk/translations/catalogs.json
+
+D:\[10/13] Automatic MOC and UIC for target test_editor
+[11/12] Building CXX object CMakeFiles\test_editor.dir\tests\editor\test_editor.cpp.obj
+[12/12] Linking CXX executable test_editor.exe
+

@@ -1,0 +1,1268 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -97,12 +97,15 @@
+ )
+ target_include_directories(Youngcraft PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+ target_link_libraries(Youngcraft PRIVATE youngcraft_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
++set(YOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}" CACHE PATH "Youngcraft executable output directory")
++get_filename_component(_youngcraft_runtime_output "${YOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY}" ABSOLUTE
++    BASE_DIR "${CMAKE_SOURCE_DIR}")
+ set_target_properties(Youngcraft PROPERTIES
+-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+-    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}"
+-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}"
+-    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}"
+-    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}"
++    RUNTIME_OUTPUT_DIRECTORY "${_youngcraft_runtime_output}"
++    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${_youngcraft_runtime_output}"
++    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${_youngcraft_runtime_output}"
++    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${_youngcraft_runtime_output}"
++    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${_youngcraft_runtime_output}"
+ )
+ if(WIN32 AND TARGET Qt6::windeployqt)
+     add_custom_command(TARGET Youngcraft POST_BUILD
+@@ -122,6 +125,15 @@
+ endif()
+ 
+ include(CTest)
++option(YOUNGCRAFT_BUILD_RENDER_PREVIEW "Build the isolated molecular rendering capture tool" OFF)
++if(YOUNGCRAFT_BUILD_RENDER_PREVIEW)
++    file(GLOB _render_preview_sources CONFIGURE_DEPENDS src/render/moleculeview/*.cpp)
++    qt_add_executable(render_quality_preview tools/render_quality_preview.cpp
++        src/render/MoleculeView.cpp src/render/MoleculeView.h ${_render_preview_sources})
++    target_include_directories(render_quality_preview PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
++    target_link_libraries(render_quality_preview PRIVATE youngcraft_core Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
++    target_compile_options(render_quality_preview PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
++endif()
+ if(BUILD_TESTING)
+     qt_add_executable(test_structure tests/structure/test_structure.cpp)
+     target_link_libraries(test_structure PRIVATE youngcraft_core Qt6::Test)
+@@ -197,6 +209,9 @@
+     # Ensure the executable and tests use this build's Qt ABI even when an old
+     # portable runtime exists or windeployqt cannot handle the SDK's Unicode path.
+     set(_runtime_targets Youngcraft)
++    if(TARGET render_quality_preview)
++        list(APPEND _runtime_targets render_quality_preview)
++    endif()
+     if(BUILD_TESTING)
+         list(APPEND _runtime_targets test_parser test_model test_smoke)
+     endif()
+--- a/src/app/mainwindow/MainWindow_Menus.cpp
++++ b/src/app/mainwindow/MainWindow_Menus.cpp
+@@ -213,9 +213,16 @@
+     });
+ 
+     QMenu *display = menuBar()->addMenu(QStringLiteral("표시 스타일"));
++    display->setObjectName(QStringLiteral("DisplayPresets"));
++    auto *presetGroup = new QActionGroup(display);
+     for (const QString &name : StyleManager::presetNames()) {
+-        add(display, name, {}, [this, name] { choosePreset(name); });
++        auto *action = add(display, name, {}, [this, name] { choosePreset(name); });
++        action->setCheckable(true);
++        presetGroup->addAction(action);
+     }
++    connect(display, &QMenu::aboutToShow, this, [this, display] {
++        for (QAction *action : display->actions()) action->setChecked(action->text() == m_style.name);
++    });
+ 
+     QMenu *tools = menuBar()->addMenu(QStringLiteral("도구"));
+     add(tools, QStringLiteral("빠른 양자화학 계산 (xTB)..."), {}, [this] { startXtbCalculation(); });
+--- a/src/render/MoleculeView.h
++++ b/src/render/MoleculeView.h
+@@ -109,7 +109,7 @@
+ 
+ private:
+ 
+-    void createPrograms();
++    bool createPrograms();
+     void createMeshes();
+     void drawMesh(QOpenGLVertexArrayObject &vao, int vertexCount, const QMatrix4x4 &model,
+                   const QColor &color, bool lighting = true, float opacity = -1.0f);
+@@ -120,7 +120,7 @@
+     void drawVibrationVectors(const QMatrix4x4 &viewProjection);
+     void drawGeometryMeasurements(const QMatrix4x4 &viewProjection);
+     void drawEditorPreview();
+-    void renderShadowMap();
++    void renderShadowMap(const QVector3D &lightDirection);
+     void drawDepthMesh(QOpenGLVertexArrayObject &vao, int vertexCount, const QMatrix4x4 &model);
+     QColor atomRenderColor(const Atom &atom) const;
+     float atomVisualRadius(const Atom &atom) const;
+@@ -197,6 +197,8 @@
+     int m_positiveSurfaceVertexCount = 0;
+     int m_negativeSurfaceVertexCount = 0;
+     bool m_glReady = false;
++    bool m_shadowReady = false;
++    bool m_depthPass = false;
+     std::shared_ptr<const CubeGrid> m_cubeGrid;
+     std::shared_ptr<SurfaceMesh> m_positiveSurface;
+     std::shared_ptr<SurfaceMesh> m_negativeSurface;
+--- a/src/render/moleculeview/MoleculeShaders.inc
++++ b/src/render/moleculeview/MoleculeShaders.inc
+@@ -10,14 +10,12 @@
+ uniform mat4 uLightMvp;
+ out vec3 vNormal;
+ out vec3 vWorld;
+-out float vDepth;
+ out vec4 vLightPosition;
+ void main() {
+     vec4 world = uModel * vec4(aPosition, 1.0);
+     vWorld = world.xyz;
+     vNormal = mat3(transpose(inverse(uModel))) * aNormal;
+     gl_Position = uMvp * vec4(world.xyz, 1.0);
+-    vDepth = gl_Position.z / gl_Position.w * 0.5 + 0.5;
+     vLightPosition = uLightMvp * world;
+ }
+ )GLSL";
+@@ -46,7 +44,11 @@
+ uniform float uMaterialShininess;
+ uniform vec3 uBackground;
+ uniform vec3 uCameraPosition;
+-in float vDepth;
++uniform vec3 uViewDirection;
++uniform vec3 uAmbientUp;
++uniform bool uPerspective;
++uniform vec3 uDepthCenter;
++uniform float uDepthSpan;
+ uniform bool uShadows;
+ uniform float uShadowStrength;
+ uniform sampler2D uShadowMap;
+@@ -54,7 +56,7 @@
+ void main() {
+     float baseLuminance = dot(uColor, vec3(0.2126, 0.7152, 0.0722));
+     vec3 displayColor = mix(vec3(baseLuminance), uColor, uColorSaturation);
+-    vec3 base = pow(max(displayColor, vec3(0.0)), vec3(2.2));
++    vec3 base = pow(clamp(displayColor, 0.0, 1.0), vec3(2.2));
+     vec3 color = base;
+     if (uLighting) {
+         vec3 n = normalize(vNormal);
+@@ -64,27 +66,29 @@
+         if (uShadows) {
+             vec3 projected = vLightPosition.xyz / vLightPosition.w;
+             projected = projected * 0.5 + 0.5;
+-            if (projected.z <= 1.0) {
++            if (projected.z >= 0.0 && projected.z <= 1.0 &&
++                projected.x >= 0.0 && projected.x <= 1.0 &&
++                projected.y >= 0.0 && projected.y <= 1.0) {
+                 float blocked = 0.0;
+                 vec2 texel = 1.0 / vec2(textureSize(uShadowMap, 0));
+-                float bias = max(0.0006, 0.0022 * (1.0 - dot(n, l1)));
+-                for (int x = -1; x <= 1; ++x)
+-                    for (int y = -1; y <= 1; ++y)
++                float bias = max(0.00015, 0.00065 * (1.0 - max(dot(n, l1), 0.0)));
++                for (int x = -2; x <= 2; ++x)
++                    for (int y = -2; y <= 2; ++y)
+                         blocked += projected.z - bias > texture(uShadowMap, projected.xy + vec2(x, y) * texel).r ? 1.0 : 0.0;
+-                visibility = 1.0 - (blocked / 9.0) * uShadowStrength;
++                visibility = 1.0 - (blocked / 25.0) * uShadowStrength;
+             }
+         }
+-        const float secondaryDiffuseWeight = 0.36;
+-        const float secondarySpecularWeight = 0.22;
+-        const float rimStrength = 0.05;
++        const float secondaryDiffuseWeight = 0.28;
++        const float secondarySpecularWeight = 0.12;
+         float keyNdotL = max(dot(n, l1), 0.0);
+         float fillNdotL = max(dot(n, l2), 0.0);
+         float keyDiffuse = keyNdotL * uDiffuse * visibility;
+         float fillDiffuse = uTwoLights ? fillNdotL * uDiffuse * secondaryDiffuseWeight : 0.0;
+-        vec3 viewDir = normalize(uCameraPosition - vWorld);
++        vec3 viewDir = uPerspective ? normalize(uCameraPosition - vWorld) : uViewDirection;
+         float specularPower = max(uShininess * uMaterialShininess, 1.0);
+-        vec3 keyHalfDir = normalize(l1 + viewDir);
+-        vec3 fillHalfDir = normalize(l2 + viewDir);
++        // Avoid undefined normalize(0) for a light exactly opposite the viewer.
++        vec3 keyHalfDir = (l1 + viewDir) / max(length(l1 + viewDir), 0.0001);
++        vec3 fillHalfDir = (l2 + viewDir) / max(length(l2 + viewDir), 0.0001);
+         float keySpecular = keyNdotL > 0.0
+             ? pow(max(dot(n, keyHalfDir), 0.0), specularPower)
+               * uSpecular * uMaterialSpecular * visibility
+@@ -93,23 +97,20 @@
+             ? pow(max(dot(n, fillHalfDir), 0.0), specularPower)
+               * uSpecular * uMaterialSpecular * secondarySpecularWeight
+             : 0.0;
+-        float hemisphere = 0.10 + 0.10 * (n.y * 0.5 + 0.5);
+-        float facing = max(dot(n, viewDir), 0.0);
+-        float edgeVolume = mix(0.80, 1.0, smoothstep(0.04, 0.76, facing));
+-        float rim = pow(1.0 - facing, 3.0) * rimStrength;
+-        vec3 keySpecularColor = mix(base, uLightColor, 0.42);
+-        vec3 fillSpecularColor = mix(base, uSecondLightColor, 0.32);
+-        vec3 rimColor = mix(base, uLightColor, 0.22);
+-        color = base * (uAmbient + hemisphere);
+-        color += base * uLightColor * keyDiffuse;
+-        color += base * uSecondLightColor * fillDiffuse;
+-        color = color * edgeVolume;
+-        color += keySpecularColor * keySpecular;
+-        color += fillSpecularColor * fillSpecular;
+-        color += rimColor * rim;
++        // Ambient follows the user's intensity instead of adding a hidden light floor.
++        float hemisphere = mix(0.60, 1.0, dot(n, uAmbientUp) * 0.5 + 0.5);
++        vec3 keyColor = pow(uLightColor, vec3(2.2));
++        vec3 fillColor = pow(uSecondLightColor, vec3(2.2));
++        color = base * (uAmbient * hemisphere + keyColor * keyDiffuse + fillColor * fillDiffuse);
++        // Neutral dielectric highlights make curvature readable without recoloring atoms.
++        color += keyColor * keySpecular + fillColor * fillSpecular;
+     }
+     color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
+-    if (uDepthCueing) color = mix(color, uBackground, clamp(vDepth * uDepthCueStrength, 0.0, 0.85));
++    if (uDepthCueing) {
++        // Molecular depth in world units, independent of near/far clipping and zoom.
++        float depth = 0.5 - dot(vWorld - uDepthCenter, uViewDirection) / max(uDepthSpan, 0.001);
++        color = mix(color, uBackground, smoothstep(0.15, 1.0, depth) * clamp(uDepthCueStrength, 0.0, 0.85));
++    }
+     fragColor = vec4(color, uOpacity);
+ }
+ )GLSL";
+--- a/src/render/moleculeview/MoleculeView_AtomsBonds.cpp
++++ b/src/render/moleculeview/MoleculeView_AtomsBonds.cpp
+@@ -23,16 +23,14 @@
+     if (m_style.monochrome) color = elementColor(atom.atomicNumber, true);
+     else if (atom.colorOverride.isValid()) color = atom.colorOverride;
+     else color = m_style.elementColors.value(atom.atomicNumber, elementColor(atom.atomicNumber));
+-    if (m_style.background.lightnessF() > 0.78f && color.lightnessF() > 0.72f)
+-        color = color.darker(atom.atomicNumber == 1 ? 128 : 116);
+     return color;
+ }
+ 
+ float MoleculeView::atomVisualRadius(const Atom &atom) const {
+     float radius = m_style.atomScale;
+     if (m_style.displayMode == DisplayMode::SpaceFilling) {
+-        radius = float(vanDerWaalsRadius(atom.atomicNumber)) * 0.72f;
+-    } else {
++        radius = float(vanDerWaalsRadius(atom.atomicNumber)) * m_style.spaceFillingScale;
++    } else if (m_style.displayMode != DisplayMode::Stick) {
+         const float covalent = float(covalentRadius(atom.atomicNumber));
+         float normalized = atom.atomicNumber == 1
+                                ? 0.72f
+@@ -106,10 +104,7 @@
+     const QVector3D axis = vector / length;
+     const QVector3D side = stableBondSideVector(bond, axis);
+     auto bondEndpointColor = [this](const Atom &atom) {
+-        QColor color = atomRenderColor(atom);
+-        if (m_style.background.lightnessF() > 0.78f && color.lightnessF() > 0.72f)
+-            color = color.darker(138);
+-        return color;
++        return atomRenderColor(atom);
+     };
+     QColor firstColor = m_style.bondColor, secondColor = m_style.bondColor;
+     if (m_style.bondColorMode == BondColorMode::EndpointAtoms) {
+@@ -124,17 +119,20 @@
+     const float spacing = m_style.bondRadius * m_style.doubleBondSpacing;
+     const float firstRadius = atomVisualRadius(first);
+     const float secondRadius = atomVisualRadius(second);
++    // Equal-radius tube junctions must meet at the sphere center. Trimming them
++    // like ball-and-stick exposes the uncapped cylinder ends outside the hub.
++    const float endpointInset = m_style.displayMode == DisplayMode::Stick ? 0.0f : 0.72f;
+ 
+     auto component = [&](float offset, bool dashed, float trim) {
+-        const QVector3D start = first.position + axis * firstRadius * 0.72f + side * offset;
+-        const QVector3D end = second.position - axis * secondRadius * 0.72f + side * offset;
++        const QVector3D start = first.position + axis * firstRadius * endpointInset + side * offset;
++        const QVector3D end = second.position - axis * secondRadius * endpointInset + side * offset;
+         if (QVector3D::dotProduct(end - start, axis) <= 0.001f) return;
+         const QVector3D midpoint = (start + end) * 0.5f;
+         drawBondSegment(start, midpoint, m_style.bondRadius, firstColor, dashed, trim);
+         drawBondSegment(midpoint, end, m_style.bondRadius, secondColor, dashed, trim);
+     };
+ 
+-    if (bond.coordination) {
++    if (bond.coordination || !m_style.showBondOrders) {
+         component(0.0f, false, 0.0f);
+     } else if (bond.style == BondStyle::Dashed && qAbs(bond.order - 1.5) > 0.1) {
+         component(0.0f, true, 0.0f);
+--- a/src/render/moleculeview/MoleculeView_GL.cpp
++++ b/src/render/moleculeview/MoleculeView_GL.cpp
+@@ -37,9 +37,11 @@
+             const QVector3D p01(std::cos(phi0) * std::cos(theta1), std::cos(phi0) * std::sin(theta1), std::sin(phi0));
+             const QVector3D p10(std::cos(phi1) * std::cos(theta0), std::cos(phi1) * std::sin(theta0), std::sin(phi1));
+             const QVector3D p11(std::cos(phi1) * std::cos(theta1), std::cos(phi1) * std::sin(theta1), std::sin(phi1));
+-            vertices << MoleculeView::Vertex{p00, p00} << MoleculeView::Vertex{p10, p10.normalized()}
+-                     << MoleculeView::Vertex{p11, p11} << MoleculeView::Vertex{p00, p00}
+-                     << MoleculeView::Vertex{p11, p11} << MoleculeView::Vertex{p01, p01};
++            // Counter-clockwise from outside, consistent with the outward normals.
++            // Reversed winding exposes the far hemisphere when back-face culling is on.
++            vertices << MoleculeView::Vertex{p00, p00} << MoleculeView::Vertex{p11, p11}
++                     << MoleculeView::Vertex{p10, p10} << MoleculeView::Vertex{p00, p00}
++                     << MoleculeView::Vertex{p01, p01} << MoleculeView::Vertex{p11, p11};
+         }
+     }
+     return vertices;
+@@ -74,7 +76,7 @@
+     glCullFace(GL_BACK);
+     glEnable(GL_BLEND);
+     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+-    createPrograms();
++    if (!createPrograms()) return;
+     createMeshes();
+     glGenFramebuffers(1, &m_shadowFbo);
+     glGenTextures(1, &m_shadowTexture);
+@@ -90,6 +92,7 @@
+     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFbo);
+     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowTexture, 0);
+     glDrawBuffer(GL_NONE); glReadBuffer(GL_NONE);
++    m_shadowReady = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+     glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+     uploadSurfaceMeshes();
+     m_glReady = true;
+@@ -101,7 +104,7 @@
+     if (m_previewOverlay) m_previewOverlay->setGeometry(rect());
+ }
+ 
+-void MoleculeView::createPrograms() {
++bool MoleculeView::createPrograms() {
+     m_program = new QOpenGLShaderProgram;
+     m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, kVertexShader);
+     m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, kFragmentShader);
+@@ -114,6 +117,10 @@
+     m_depthProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, kDepthVertexShader);
+     m_depthProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, kDepthFragmentShader);
+     m_depthProgram->link();
++    for (auto *program : {m_program, m_lineProgram, m_depthProgram}) {
++        if (!program->isLinked()) { qWarning() << "Molecular shader failed:" << program->log(); return false; }
++    }
++    return true;
+ }
+ 
+ void MoleculeView::createMeshes() {
+--- a/src/render/moleculeview/MoleculeView_Scene.cpp
++++ b/src/render/moleculeview/MoleculeView_Scene.cpp
+@@ -20,8 +20,20 @@
+ 
+ void MoleculeView::paintGL() {
+     if (!m_glReady) return;
+-    if (m_style.shadows) renderShadowMap();
++    const QQuaternion cameraToWorld = m_rotation.conjugated();
++    const QVector3D viewDirection = cameraToWorld.rotatedVector(QVector3D(0, 0, 1));
++    const auto light = [&](QVector3D direction, const QVector3D &fallback) {
++        if (direction.lengthSquared() < 1e-6f) direction = fallback;
++        direction.normalize();
++        return m_style.cameraRelativeLights ? cameraToWorld.rotatedVector(direction) : direction;
++    };
++    const QVector3D keyLight = light(m_style.lightDirection, QVector3D(-1, 1, 2));
++    const QVector3D fillLight = light(m_style.secondLightDirection, QVector3D(1, 0, 1));
++    if (m_style.shadows && m_shadowReady) renderShadowMap(keyLight);
+     glEnable(GL_DEPTH_TEST);
++    glEnable(GL_CULL_FACE);
++    glCullFace(GL_BACK);
++    glFrontFace(GL_CCW);
+     glDepthFunc(GL_LESS);
+     glDepthMask(GL_TRUE);
+     if (m_style.antiAliasing) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
+@@ -37,8 +49,19 @@
+ 
+     const QMatrix4x4 vp = viewProjection();
+     m_program->bind();
+-    m_program->setUniformValue("uLightDirection", m_style.lightDirection);
+-    m_program->setUniformValue("uSecondLightDirection", m_style.secondLightDirection);
++    m_program->setUniformValue("uLightDirection", keyLight);
++    m_program->setUniformValue("uSecondLightDirection", fillLight);
++    m_program->setUniformValue("uViewDirection", viewDirection);
++    m_program->setUniformValue("uPerspective", m_style.perspective);
++    m_program->setUniformValue("uAmbientUp", m_style.cameraRelativeLights
++        ? cameraToWorld.rotatedVector(QVector3D(0, 1, 0)) : QVector3D(0, 1, 0));
++    float depthExtent = 0.5f;
++    for (const Atom &atom : m_molecule.atoms)
++        if (atom.visible && (m_style.showHydrogen || atom.atomicNumber != 1))
++            depthExtent = qMax(depthExtent, qAbs(QVector3D::dotProduct(atom.position - m_center, viewDirection))
++                                          + atomVisualRadius(atom));
++    m_program->setUniformValue("uDepthCenter", m_center);
++    m_program->setUniformValue("uDepthSpan", 2.0f * depthExtent);
+     m_program->setUniformValue("uLightColor", m_style.lightColor.redF(), m_style.lightColor.greenF(), m_style.lightColor.blueF());
+     m_program->setUniformValue("uSecondLightColor", m_style.secondLightColor.redF(), m_style.secondLightColor.greenF(), m_style.secondLightColor.blueF());
+     m_program->setUniformValue("uAmbient", m_style.ambientIntensity);
+@@ -54,7 +77,7 @@
+     m_program->setUniformValue("uBackground", background.redF(), background.greenF(), background.blueF());
+     const QVector3D cameraPosition = m_target + m_rotation.conjugated().rotatedVector(QVector3D(0, 0, m_distance));
+     m_program->setUniformValue("uCameraPosition", cameraPosition);
+-    m_program->setUniformValue("uShadows", m_style.shadows && m_shadowTexture != 0);
++    m_program->setUniformValue("uShadows", m_style.shadows && m_shadowReady);
+     m_program->setUniformValue("uShadowStrength", m_style.shadowStrength);
+     m_program->setUniformValue("uLightMvp", m_lightViewProjection);
+     m_program->setUniformValue("uShadowMap", 0);
+@@ -146,6 +169,7 @@
+ 
+ void MoleculeView::drawMesh(QOpenGLVertexArrayObject &vao, int vertexCount, const QMatrix4x4 &model,
+                             const QColor &color, bool lighting, float opacity) {
++    if (m_depthPass) { drawDepthMesh(vao, vertexCount, model); return; }
+     const QMatrix4x4 vp = viewProjection();
+     m_program->setUniformValue("uMvp", vp);
+     m_program->setUniformValue("uModel", model);
+--- a/src/render/moleculeview/MoleculeView_Shadows.cpp
++++ b/src/render/moleculeview/MoleculeView_Shadows.cpp
+@@ -27,9 +27,9 @@
+     vao.release();
+ }
+ 
+-void MoleculeView::renderShadowMap() {
+-    if (!m_style.shadows || !m_shadowFbo || !m_depthProgram || m_molecule.atoms.isEmpty()) return;
+-    QVector3D direction = m_style.lightDirection.normalized();
++void MoleculeView::renderShadowMap(const QVector3D &lightDirection) {
++    if (!m_style.shadows || !m_shadowReady || !m_depthProgram || m_molecule.atoms.isEmpty()) return;
++    QVector3D direction = lightDirection.normalized();
+     if (direction.lengthSquared() < 0.1f) direction = QVector3D(1, 1, 1).normalized();
+     const QVector3D eye = m_center + direction * qMax(5.0f, m_radius * 4.0f);
+     QMatrix4x4 lightView; lightView.lookAt(eye, m_center, qAbs(QVector3D::dotProduct(direction, QVector3D(0, 1, 0))) > 0.95f
+@@ -41,30 +41,29 @@
+ 
+     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFbo);
+     glViewport(0, 0, m_shadowMapSize, m_shadowMapSize);
++    glEnable(GL_DEPTH_TEST);
++    glDepthMask(GL_TRUE);
+     glClear(GL_DEPTH_BUFFER_BIT);
+     glDisable(GL_BLEND);
+-    glCullFace(GL_FRONT);
++    glEnable(GL_CULL_FACE);
++    glCullFace(GL_BACK);
++    glEnable(GL_POLYGON_OFFSET_FILL);
++    glPolygonOffset(1.1f, 1.0f);
+     m_depthProgram->bind();
++    m_depthPass = true;
+     if (m_style.displayMode != DisplayMode::SpaceFilling) {
+-        for (const Bond &bond : m_molecule.bonds) {
+-            if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
+-            const Atom &a = m_molecule.atoms[bond.first]; const Atom &b = m_molecule.atoms[bond.second];
+-            if (!a.visible || !b.visible || (!m_style.showHydrogen && (a.atomicNumber == 1 || b.atomicNumber == 1))) continue;
+-            const QVector3D vector = b.position - a.position; const float length = vector.length();
+-            if (length < 0.001f) continue;
+-            QMatrix4x4 model; model.translate((a.position + b.position) * 0.5f);
+-            model.rotate(QQuaternion::rotationTo(QVector3D(0, 0, 1), vector / length));
+-            model.scale(m_style.bondRadius, m_style.bondRadius, length);
+-            drawDepthMesh(m_cylinderVao, m_cylinderVertexCount, model);
+-        }
++        // Share the visible geometry, including multiple, dashed and trimmed bonds.
++        for (const Bond &bond : m_molecule.bonds) drawColoredBond(bond);
+     }
+     for (const Atom &atom : m_molecule.atoms) {
+         if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+         const float radius = atomVisualRadius(atom);
+         QMatrix4x4 model; model.translate(atom.position); model.scale(radius);
+-        drawDepthMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model);
++        drawDepthMesh(m_sphereVao, m_sphereVertexCount, model);
+     }
++    m_depthPass = false;
+     m_depthProgram->release();
++    glDisable(GL_POLYGON_OFFSET_FILL);
+     glCullFace(GL_BACK);
+     glEnable(GL_BLEND);
+     glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+--- a/src/settings/StyleManager.cpp
++++ b/src/settings/StyleManager.cpp
+@@ -1,150 +1,152 @@
+ #include "settings/StyleManager.h"
++#include "model/Molecule.h"
+ 
+ #include <QSettings>
+ 
+ namespace youngcraft {
+ 
+ QStringList StyleManager::presetNames() {
+-    return {QStringLiteral("Youngcraft Studio"), QStringLiteral("Chemcraft-like"),
+-            QStringLiteral("Classic CPK"), QStringLiteral("Publication"), QStringLiteral("Dark"),
+-            QStringLiteral("Chemcraft"), QStringLiteral("기본 1"), QStringLiteral("기본 2"), QStringLiteral("CPK 1 (어두운 배경)"),
+-            QStringLiteral("CPK 2 (흰 배경)"), QStringLiteral("단순"), QStringLiteral("큰 원자"),
+-            QStringLiteral("스틱"), QStringLiteral("얇은 스틱"), QStringLiteral("출판용 1"),
+-            QStringLiteral("출판용 2"), QStringLiteral("출판용 3"), QStringLiteral("2D 스타일 1"),
+-            QStringLiteral("2D 스타일 2"), QStringLiteral("2D 스타일 3"), QStringLiteral("2D 스타일 4"),
+-            QStringLiteral("2D 스타일 5"), QStringLiteral("2D 스타일 6"), QStringLiteral("2D 스타일 7"),
+-            QStringLiteral("빠른 표시"), QStringLiteral("Chemcraft 참조"), QStringLiteral("GaussView 유사 스타일"), QStringLiteral("HyperChem 유사 스타일"),
+-            QStringLiteral("Spartan 유사 스타일 1"), QStringLiteral("Spartan 유사 스타일 2"),
+-            QStringLiteral("likehugo 유사 스타일"), QStringLiteral("혼합 스타일"), QStringLiteral("사용자 지정")};
+-}
+-
+-RenderStyle StyleManager::preset(const QString &name) {
++    return {QStringLiteral("Youngcraft Studio"), QStringLiteral("GaussView 유사 스타일"),
++            QStringLiteral("Ball-and-Stick"), QStringLiteral("CPK / Space-Filling"),
++            QStringLiteral("Stick"), QStringLiteral("Publication"), QStringLiteral("Dark Studio"),
++            QStringLiteral("Chemcraft-like"), QStringLiteral("Flat Illustration"), QStringLiteral("사용자 지정")};
++}
++
++QString StyleManager::canonicalPresetName(const QString &name) {
++    // Old names remain readable without presenting indistinguishable menu entries.
++    static const QMap<QString, QString> aliases = {
++        {QStringLiteral("Chemcraft"), QStringLiteral("Chemcraft-like")},
++        {QStringLiteral("Chemcraft 참조"), QStringLiteral("Chemcraft-like")},
++        {QStringLiteral("Classic CPK"), QStringLiteral("CPK / Space-Filling")},
++        {QStringLiteral("CPK 2 (흰 배경)"), QStringLiteral("CPK / Space-Filling")},
++        {QStringLiteral("큰 원자"), QStringLiteral("CPK / Space-Filling")},
++        {QStringLiteral("Spartan 유사 스타일 2"), QStringLiteral("CPK / Space-Filling")},
++        {QStringLiteral("Dark"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("기본 1"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("기본 2"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("CPK 1 (어두운 배경)"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("HyperChem 유사 스타일"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("likehugo 유사 스타일"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("혼합 스타일"), QStringLiteral("Dark Studio")},
++        {QStringLiteral("Spartan 유사 스타일 1"), QStringLiteral("Ball-and-Stick")},
++        {QStringLiteral("스틱"), QStringLiteral("Stick")},
++        {QStringLiteral("얇은 스틱"), QStringLiteral("Stick")},
++        {QStringLiteral("단순"), QStringLiteral("Flat Illustration")},
++        {QStringLiteral("빠른 표시"), QStringLiteral("Flat Illustration")}
++    };
++    for (int i = 1; i <= 3; ++i)
++        if (name == QStringLiteral("출판용 %1").arg(i)) return QStringLiteral("Publication");
++    for (int i = 1; i <= 7; ++i)
++        if (name == QStringLiteral("2D 스타일 %1").arg(i)) return QStringLiteral("Flat Illustration");
++    return aliases.value(name, name);
++}
++
++RenderStyle StyleManager::preset(const QString &requestedName) {
++    const QString name = canonicalPresetName(requestedName);
++    if (name == QStringLiteral("사용자 지정")) return load();
+     RenderStyle style;
+     style.name = name;
++    // Familiar element hues, lifted toward white for the requested pastel palette.
++    for (int z = 1; z <= 118; ++z) {
++        const QColor c = elementColor(z);
++        style.elementColors.insert(z, QColor(qRound(c.red() * 0.65 + 255 * 0.35),
++                                            qRound(c.green() * 0.65 + 255 * 0.35),
++                                            qRound(c.blue() * 0.65 + 255 * 0.35)));
++    }
++    const QMap<int, QColor> pastel = {{1, QColor(246,248,252)}, {6, QColor(164,181,201)},
++        {7, QColor(130,169,234)}, {8, QColor(240,145,158)}, {9, QColor(146,213,176)},
++        {15, QColor(243,187,145)}, {16, QColor(245,220,145)}, {17, QColor(151,213,171)},
++        {25, QColor(202,164,216)}, {26, QColor(225,171,136)}, {27, QColor(149,182,222)},
++        {29, QColor(219,177,145)}, {30, QColor(167,196,211)}, {35, QColor(209,157,145)},
++        {53, QColor(193,158,221)}};
++    for (auto it = pastel.cbegin(); it != pastel.cend(); ++it) style.elementColors.insert(it.key(), it.value());
+     if (name == QStringLiteral("Youngcraft Studio")) {
+-        style.elementColors = {{1, QColor(239, 241, 244)}, {6, QColor(65, 71, 81)},
+-                               {7, QColor(48, 98, 218)}, {8, QColor(224, 62, 58)},
+-                               {9, QColor(71, 185, 92)}, {17, QColor(54, 167, 72)},
+-                               {35, QColor(142, 55, 48)}, {53, QColor(125, 72, 165)},
+-                               {16, QColor(236, 202, 48)}, {15, QColor(226, 140, 51)}};
+-    } else if (name == QStringLiteral("Chemcraft-like") ||
+-               name == QStringLiteral("Chemcraft") || name == QStringLiteral("Chemcraft 참조")) {
+-        style.background = QColor(246, 247, 249);
+-        style.labelColor = QColor(35, 38, 44);
+-        style.bondColor = QColor(118, 123, 132);
+-        style.displayMode = DisplayMode::BallAndStick;
+-        style.bondColorMode = BondColorMode::EndpointAtoms;
+-        style.atomScale = 0.46f;
+-        style.bondRadius = 0.135f;
+-        style.doubleBondSpacing = 2.50f;
+-        style.ambientIntensity = 0.34f;
+-        style.diffuseIntensity = 0.82f;
+-        style.specularIntensity = 0.34f;
+-        style.shininess = 52.0f;
+-        style.colorSaturation = 0.88f;
+-        style.twoLights = true;
+-        style.secondLightColor = QColor(235, 240, 248);
+-        style.shadows = false;
+-        style.depthCueing = false;
+-        style.perspective = true;
+-        style.perspectiveFov = 32.0f;
+-        style.antiAliasing = true;
+-    } else if (name == QStringLiteral("Classic CPK")) {
+-        style.elementColors.clear();
+-        style.background = QColor(252, 252, 252);
+-        style.atomScale = 0.43f;
+-        style.bondRadius = 0.12f;
++        style.shadows = true;
++        style.shadowStrength = 0.32f;
++    } else if (name == QStringLiteral("GaussView 유사 스타일")) {
++        // Inspired by conventional Gaussian visualization, not an exact reproduction.
++        style.background = QColor(237,240,246);
++        style.elementColors.insert(6, QColor(150,162,181));
++        style.bondColorMode = BondColorMode::Uniform;
++        style.bondColor = QColor(157,167,184);
++        style.atomScale = 0.38f;
++        style.bondRadius = 0.09f;
++        style.doubleBondSpacing = 2.8f;
++        style.ambientIntensity = 0.26f;
++        style.diffuseIntensity = 0.86f;
++        style.specularIntensity = 0.30f;
++        style.shininess = 72.0f;
++        style.twoLights = false;
++        style.perspective = false;
++    } else if (name == QStringLiteral("Ball-and-Stick")) {
++        style.background = QColor(252,253,255);
++        style.atomScale = 0.33f;
++        style.bondRadius = 0.105f;
++        style.ambientIntensity = 0.28f;
++        style.diffuseIntensity = 0.76f;
++        style.specularIntensity = 0.13f;
++        style.shininess = 28.0f;
++    } else if (name == QStringLiteral("CPK / Space-Filling")) {
++        style.displayMode = DisplayMode::SpaceFilling;
++        style.spaceFillingScale = 1.0f;
++        style.background = QColor(245,248,253);
++        style.ambientIntensity = 0.26f;
++        style.specularIntensity = 0.20f;
++        style.shininess = 36.0f;
++        style.shadows = true;
++        style.shadowStrength = 0.30f;
++    } else if (name == QStringLiteral("Stick")) {
++        style.displayMode = DisplayMode::Stick;
++        style.showBondOrders = false;
++        style.background = QColor(241,247,252);
++        style.atomScale = style.bondRadius = 0.16f;
++        style.specularIntensity = 0.22f;
++        style.shininess = 42.0f;
+     } else if (name == QStringLiteral("Publication")) {
+         style.background = Qt::white;
+         style.bondColorMode = BondColorMode::Uniform;
+-        style.bondColor = QColor(82, 86, 92);
+-        style.shadows = false;
+-        style.depthCueing = false;
+-        style.atomScale = 0.42f;
+-    } else if (name == QStringLiteral("Dark")) {
+-        style.background = QColor(21, 26, 36);
+-        style.labelColor = QColor(236, 239, 244);
+-        style.atomScale = 0.46f;
+-        style.elementColors.insert(6, QColor(160, 170, 184));
+-    } else if (name == QStringLiteral("기본 1") || name == QStringLiteral("CPK 1 (어두운 배경)")) {
+-        style.background = QColor(12, 15, 22);
+-        style.labelColor = QColor(235, 240, 248);
+-        style.atomScale = 0.34f;
++        style.bondColor = QColor(133,147,165);
++        style.atomScale = 0.32f;
++        style.bondRadius = 0.07f;
++        style.ambientIntensity = 0.40f;
++        style.diffuseIntensity = 0.62f;
++        style.specularIntensity = 0.08f;
++        style.shininess = 18.0f;
++        style.perspective = false;
++    } else if (name == QStringLiteral("Dark Studio")) {
++        style.background = QColor(29,37,54);
++        style.labelColor = QColor(228,236,247);
++        style.elementColors.insert(6, QColor(185,202,222));
++        style.atomScale = 0.43f;
++        style.bondRadius = 0.12f;
++        style.diffuseIntensity = 0.84f;
++        style.specularIntensity = 0.30f;
++        style.shininess = 56.0f;
++        style.shadows = true;
++        style.shadowStrength = 0.40f;
++        style.depthCueing = true;
++        style.depthCueStrength = 0.14f;
++    } else if (name == QStringLiteral("Chemcraft-like")) {
++        style.background = QColor(250,247,241);
++        style.atomScale = 0.50f;
+         style.bondRadius = 0.10f;
+-        style.ambientIntensity = 0.35f;
+-        style.diffuseIntensity = 0.78f;
+-        style.specularIntensity = 0.35f;
+-        style.shininess = 36.0f;
+-        style.colorSaturation = 1.0f;
+-    } else if (name == QStringLiteral("기본 2")) {
+-        style.background = QColor(32, 36, 44);
+-        style.labelColor = QColor(238, 241, 247);
+-        style.atomScale = 0.38f;
+-        style.bondRadius = 0.11f;
+-    } else if (name == QStringLiteral("CPK 2 (흰 배경)")) {
+-        style.background = QColor(248, 248, 248);
+-        style.labelColor = QColor(30, 30, 35);
+-        style.bondColor = QColor(105, 110, 120);
+-    } else if (name == QStringLiteral("단순")) {
++        style.bondColorMode = BondColorMode::MixedAtoms;
++        style.ambientIntensity = 0.20f;
++        style.specularIntensity = 0.25f;
++        style.shininess = 64.0f;
++        style.shadows = true;
++        style.shadowStrength = 0.22f;
++        style.perspectiveFov = 30.0f;
++    } else if (name == QStringLiteral("Flat Illustration")) {
+         style.displayMode = DisplayMode::Stick;
++        style.background = Qt::white;
++        style.atomScale = 0.12f;
++        style.bondRadius = 0.055f;
++        style.bondColorMode = BondColorMode::Uniform;
++        style.bondColor = QColor(113,128,154);
+         style.lighting = false;
+-        style.atomScale = 0.20f;
+-        style.bondRadius = 0.075f;
+-    } else if (name == QStringLiteral("큰 원자")) {
+-        style.atomScale = 0.34f;
+-        style.bondRadius = 0.12f;
+-    } else if (name == QStringLiteral("스틱")) {
+-        style.displayMode = DisplayMode::Stick;
+-        style.atomScale = 0.23f;
+-        style.bondRadius = 0.105f;
+-    } else if (name == QStringLiteral("얇은 스틱")) {
+-        style.displayMode = DisplayMode::Stick;
+-        style.atomScale = 0.16f;
+-        style.bondRadius = 0.055f;
+-    } else if (name.startsWith(QStringLiteral("출판용"))) {
+-        style.background = Qt::white;
+-        style.labelColor = QColor(25, 25, 25);
+-        style.bondColor = QColor(75, 75, 75);
+-        style.displayMode = DisplayMode::BallAndStick;
+-        style.ambientIntensity = 0.5f;
+-        style.diffuseIntensity = 0.9f;
+-        style.specularIntensity = 0.2f;
+-    } else if (name.startsWith(QStringLiteral("2D 스타일"))) {
+-        style.background = Qt::white;
+-        style.labelColor = QColor(20, 20, 20);
+-        style.bondColor = QColor(20, 20, 20);
+-        style.displayMode = DisplayMode::Stick;
+-        style.atomScale = 0.08f;
+-        style.bondRadius = 0.06f;
+-        style.lighting = false;
++        style.perspective = false;
+         style.showLabels = true;
+-    } else if (name == QStringLiteral("빠른 표시")) {
+-        style.displayMode = DisplayMode::Stick;
+-        style.atomScale = 0.19f;
+-        style.bondRadius = 0.075f;
+-        style.lighting = false;
+-        style.antiAliasing = false;
+-    } else if (name == QStringLiteral("GaussView 유사 스타일")) {
+-        style.background = QColor(235, 235, 235);
+-        style.labelColor = QColor(35, 35, 35);
+-        style.bondColor = QColor(120, 120, 120);
+-    } else if (name == QStringLiteral("HyperChem 유사 스타일")) {
+-        style.background = QColor(18, 35, 49);
+-        style.bondColor = QColor(190, 198, 210);
+-    } else if (name.startsWith(QStringLiteral("Spartan"))) {
+-        style.background = QColor(245, 245, 245);
+-        style.labelColor = QColor(35, 35, 35);
+-        style.displayMode = name.endsWith(QLatin1Char('2')) ? DisplayMode::SpaceFilling : DisplayMode::BallAndStick;
+-    } else if (name == QStringLiteral("likehugo 유사 스타일")) {
+-        style.background = QColor(5, 8, 12);
+-        style.bondColor = QColor(135, 145, 165);
+-        style.atomScale = 0.38f;
+-    } else if (name == QStringLiteral("혼합 스타일")) {
+-        style.background = QColor(22, 24, 29);
+-        style.displayMode = DisplayMode::BallAndStick;
+-        style.showLabels = true;
+-    } else if (name == QStringLiteral("사용자 지정")) {
+-        return load();
+     }
+     return style;
+ }
+@@ -159,6 +161,7 @@
+     settings.setValue(QStringLiteral("displayMode"), int(style.displayMode));
+     settings.setValue(QStringLiteral("bondColorMode"), int(style.bondColorMode));
+     settings.setValue(QStringLiteral("atomScale"), style.atomScale);
++    settings.setValue(QStringLiteral("spaceFillingScale"), style.spaceFillingScale);
+     settings.setValue(QStringLiteral("bondRadius"), style.bondRadius);
+     settings.setValue(QStringLiteral("labelSize"), style.labelSize);
+     settings.setValue(QStringLiteral("opacity"), style.opacity);
+@@ -179,11 +182,13 @@
+     settings.setValue(QStringLiteral("depthCueStrength"), style.depthCueStrength);
+     settings.setValue(QStringLiteral("lighting"), style.lighting);
+     settings.setValue(QStringLiteral("twoLights"), style.twoLights);
++    settings.setValue(QStringLiteral("cameraRelativeLights"), style.cameraRelativeLights);
+     settings.setValue(QStringLiteral("shadows"), style.shadows);
+     settings.setValue(QStringLiteral("depthCueing"), style.depthCueing);
+     settings.setValue(QStringLiteral("antiAliasing"), style.antiAliasing);
+     settings.setValue(QStringLiteral("monochrome"), style.monochrome);
+     settings.setValue(QStringLiteral("showHydrogen"), style.showHydrogen);
++    settings.setValue(QStringLiteral("showBondOrders"), style.showBondOrders);
+     settings.setValue(QStringLiteral("showLabels"), style.showLabels);
+     settings.setValue(QStringLiteral("showProperties"), style.showProperties);
+     settings.setValue(QStringLiteral("showAxes"), style.showAxes);
+@@ -221,15 +226,20 @@
+     QSettings settings;
+     settings.beginGroup(QStringLiteral("style"));
+     const QString storedName = settings.value(QStringLiteral("name"), QStringLiteral("Youngcraft Studio")).toString();
++    const bool hasSavedStyle = settings.contains(QStringLiteral("name"));
+     RenderStyle style = preset(storedName == QStringLiteral("사용자 지정")
+                                    ? QStringLiteral("Youngcraft Studio") : storedName);
+-    style.name = settings.value(QStringLiteral("name"), style.name).toString();
++    style.name = canonicalPresetName(storedName);
++    // Saved colors (including an empty override map) belong to the user's snapshot.
++    if (hasSavedStyle) { style.elementColors.clear(); style.elementRadiusScales.clear(); }
+     style.background = settings.value(QStringLiteral("background"), style.background).value<QColor>();
+     style.bondColor = settings.value(QStringLiteral("bondColor"), style.bondColor).value<QColor>();
+     style.labelColor = settings.value(QStringLiteral("labelColor"), style.labelColor).value<QColor>();
+     style.displayMode = DisplayMode(settings.value(QStringLiteral("displayMode"), int(style.displayMode)).toInt());
+     style.bondColorMode = BondColorMode(settings.value(QStringLiteral("bondColorMode"), int(style.bondColorMode)).toInt());
+     style.atomScale = settings.value(QStringLiteral("atomScale"), style.atomScale).toFloat();
++    style.spaceFillingScale = settings.value(QStringLiteral("spaceFillingScale"),
++        hasSavedStyle ? 0.72f : style.spaceFillingScale).toFloat();
+     style.bondRadius = settings.value(QStringLiteral("bondRadius"), style.bondRadius).toFloat();
+     style.labelSize = settings.value(QStringLiteral("labelSize"), style.labelSize).toFloat();
+     style.opacity = settings.value(QStringLiteral("opacity"), style.opacity).toFloat();
+@@ -250,11 +260,15 @@
+     style.depthCueStrength = settings.value(QStringLiteral("depthCueStrength"), style.depthCueStrength).toFloat();
+     style.lighting = settings.value(QStringLiteral("lighting"), style.lighting).toBool();
+     style.twoLights = settings.value(QStringLiteral("twoLights"), style.twoLights).toBool();
++    style.cameraRelativeLights = settings.value(QStringLiteral("cameraRelativeLights"),
++        hasSavedStyle ? false : style.cameraRelativeLights).toBool();
+     style.shadows = settings.value(QStringLiteral("shadows"), style.shadows).toBool();
+     style.depthCueing = settings.value(QStringLiteral("depthCueing"), style.depthCueing).toBool();
+     style.antiAliasing = settings.value(QStringLiteral("antiAliasing"), style.antiAliasing).toBool();
+     style.monochrome = settings.value(QStringLiteral("monochrome"), style.monochrome).toBool();
+     style.showHydrogen = settings.value(QStringLiteral("showHydrogen"), style.showHydrogen).toBool();
++    style.showBondOrders = settings.value(QStringLiteral("showBondOrders"),
++        hasSavedStyle ? true : style.showBondOrders).toBool();
+     style.showLabels = settings.value(QStringLiteral("showLabels"), style.showLabels).toBool();
+     style.showProperties = settings.value(QStringLiteral("showProperties"), style.showProperties).toBool();
+     style.showAxes = settings.value(QStringLiteral("showAxes"), style.showAxes).toBool();
+--- a/src/settings/StyleManager.h
++++ b/src/settings/StyleManager.h
+@@ -24,7 +24,7 @@
+     QString name = QStringLiteral("Youngcraft Studio");
+     DisplayMode displayMode = DisplayMode::BallAndStick;
+     BondColorMode bondColorMode = BondColorMode::EndpointAtoms;
+-    QColor background = QColor(246, 247, 249);
++    QColor background = QColor(249, 250, 253);
+     QColor bondColor = QColor(160, 166, 178);
+     QColor labelColor = QColor(35, 38, 44);
+     QColor selectionColor = QColor(255, 255, 255);
+@@ -34,11 +34,12 @@
+     float atomBorderWidth = 0.0f;
+     float labelSize = 12.0f;
+     float opacity = 1.0f;
+-    float ambientIntensity = 0.30f;
+-    float diffuseIntensity = 0.82f;
+-    float specularIntensity = 0.30f;
+-    float shininess = 44.0f;
+-    float colorSaturation = 0.96f;
++    float ambientIntensity = 0.23f;
++    float diffuseIntensity = 0.80f;
++    float specularIntensity = 0.24f;
++    float shininess = 48.0f;
++    float colorSaturation = 1.0f;
++    float spaceFillingScale = 0.72f;
+     float doubleBondSpacing = 2.35f;
+     float bondOpacity = 1.0f;
+     float dashLength = 0.22f;
+@@ -50,21 +51,23 @@
+     float vectorThreshold = 0.01f;
+     float recountCutoffScale = 1.25f;
+     float perspectiveFov = 33.0f;
+-    QVector3D lightDirection = QVector3D(1.0f, 1.0f, 1.0f);
+-    QVector3D secondLightDirection = QVector3D(-2.0f, 1.0f, 1.0f);
++    QVector3D lightDirection = QVector3D(-1.0f, 1.3f, 2.0f);
++    QVector3D secondLightDirection = QVector3D(1.5f, 0.3f, 1.0f);
+     QColor lightColor = Qt::white;
+-    QColor secondLightColor = QColor(210, 220, 255);
++    QColor secondLightColor = QColor(235, 242, 255);
+     QColor vectorColor = QColor(255, 195, 45);
+     QMap<int, QColor> elementColors;
+     QMap<int, float> elementRadiusScales;
+     bool lighting = true;
+     bool twoLights = true;
++    bool cameraRelativeLights = true;
+     bool shadows = false;
+     bool monochrome = false;
+     bool depthCueing = false;
+     bool gridOnAtoms = false;
+     bool fixedBorderWidth = false;
+     bool showHydrogen = true;
++    bool showBondOrders = true;
+     bool showLabels = false;
+     bool showProperties = false;
+     bool showAxes = false;
+@@ -86,6 +89,7 @@
+ class StyleManager {
+ public:
+     static QStringList presetNames();
++    static QString canonicalPresetName(const QString &name);
+     static RenderStyle preset(const QString &name);
+     static void save(const RenderStyle &style);
+     static RenderStyle load();
+--- a/src/ui/StyleEditorDialog.cpp
++++ b/src/ui/StyleEditorDialog.cpp
+@@ -74,10 +74,12 @@
+     m_presetCombo = new QComboBox(page);
+     m_presetCombo->setObjectName(QStringLiteral("StylePreset"));
+     m_presetCombo->addItems(StyleManager::presetNames());
+-    m_presetCombo->setCurrentText(m_style.name);
++    const QString canonical = StyleManager::canonicalPresetName(m_style.name);
++    m_presetCombo->setCurrentText(m_presetCombo->findText(canonical) >= 0 ? canonical : QStringLiteral("사용자 지정"));
+     layout->addRow(QStringLiteral("스타일"), m_presetCombo);
+     connect(m_presetCombo, &QComboBox::currentTextChanged, this, [this](const QString &name) {
+-        m_style = StyleManager::preset(name);
++        if (name == QStringLiteral("사용자 지정")) m_style.name = name;
++        else m_style = StyleManager::preset(name);
+         writeControls();
+         emit styleApplied(m_style);
+     });
+@@ -87,12 +89,15 @@
+ void StyleEditorDialog::readControls() {
+     if (m_lighting) m_style.lighting = m_lighting->isChecked();
+     if (m_twoLights) m_style.twoLights = m_twoLights->isChecked();
++    if (m_showBondOrders) m_style.showBondOrders = m_showBondOrders->isChecked();
++    if (m_cameraRelativeLights) m_style.cameraRelativeLights = m_cameraRelativeLights->isChecked();
+     if (m_shadows) m_style.shadows = m_shadows->isChecked();
+     if (m_monochrome) m_style.monochrome = m_monochrome->isChecked();
+     if (m_depthCueing) m_style.depthCueing = m_depthCueing->isChecked();
+     if (m_grid) m_style.gridOnAtoms = m_grid->isChecked();
+     if (m_fixedWidth) m_style.fixedBorderWidth = m_fixedWidth->isChecked();
+     if (m_atomScale) m_style.atomScale = float(m_atomScale->value());
++    if (m_spaceFillingScale) m_style.spaceFillingScale = float(m_spaceFillingScale->value());
+     if (m_bondRadius) m_style.bondRadius = float(m_bondRadius->value());
+     if (m_labelSize) m_style.labelSize = float(m_labelSize->value());
+     if (m_opacity) m_style.opacity = float(m_opacity->value());
+@@ -131,6 +136,11 @@
+         if (widget) widget->setValue(value);
+     };
+     spin(m_atomScale, m_style.atomScale);
++    spin(m_spaceFillingScale, m_style.spaceFillingScale);
++    const bool spaceFilling = m_style.displayMode == DisplayMode::SpaceFilling;
++    if (m_spaceFillingScale) m_spaceFillingScale->setEnabled(spaceFilling);
++    if (m_atomScale) m_atomScale->setEnabled(!spaceFilling);
++    if (m_atomScaleSlider) m_atomScaleSlider->setEnabled(!spaceFilling);
+     spin(m_bondRadius, m_style.bondRadius);
+     spin(m_labelSize, m_style.labelSize);
+     spin(m_opacity, m_style.opacity);
+@@ -170,6 +180,8 @@
+         m_bondColorMode->findData(int(m_style.bondColorMode)));
+     if (m_lighting) m_lighting->setChecked(m_style.lighting);
+     if (m_twoLights) m_twoLights->setChecked(m_style.twoLights);
++    if (m_showBondOrders) m_showBondOrders->setChecked(m_style.showBondOrders);
++    if (m_cameraRelativeLights) m_cameraRelativeLights->setChecked(m_style.cameraRelativeLights);
+     if (m_shadows) m_shadows->setChecked(m_style.shadows);
+     if (m_monochrome) m_monochrome->setChecked(m_style.monochrome);
+     if (m_depthCueing) m_depthCueing->setChecked(m_style.depthCueing);
+--- a/src/ui/StyleEditorDialog.h
++++ b/src/ui/StyleEditorDialog.h
+@@ -60,6 +60,8 @@
+     QComboBox *m_bondColorMode = nullptr;
+     QCheckBox *m_lighting = nullptr;
+     QCheckBox *m_twoLights = nullptr;
++    QCheckBox *m_showBondOrders = nullptr;
++    QCheckBox *m_cameraRelativeLights = nullptr;
+     QCheckBox *m_shadows = nullptr;
+     QCheckBox *m_monochrome = nullptr;
+     QCheckBox *m_depthCueing = nullptr;
+@@ -67,6 +69,7 @@
+     QCheckBox *m_fixedWidth = nullptr;
+     QCheckBox *m_showAxes = nullptr;
+     QDoubleSpinBox *m_atomScale = nullptr;
++    QDoubleSpinBox *m_spaceFillingScale = nullptr;
+     QDoubleSpinBox *m_bondRadius = nullptr;
+     QSlider *m_atomScaleSlider = nullptr;
+     QSlider *m_elementRadiusSlider = nullptr;
+--- a/src/ui/styleeditor/StyleEditor_Atoms.cpp
++++ b/src/ui/styleeditor/StyleEditor_Atoms.cpp
+@@ -40,6 +40,15 @@
+     });
+     m_labelSize = new QDoubleSpinBox; m_labelSize->setRange(6, 40); m_labelSize->setValue(m_style.labelSize);
+     layout->addRow(QStringLiteral("전체 원자 크기"), atomScaleControl);
++    m_spaceFillingScale = new QDoubleSpinBox;
++    m_spaceFillingScale->setObjectName(QStringLiteral("SpaceFillingScale"));
++    m_spaceFillingScale->setRange(0.25, 2.0); m_spaceFillingScale->setSingleStep(0.05);
++    m_spaceFillingScale->setValue(m_style.spaceFillingScale);
++    m_spaceFillingScale->setToolTip(QStringLiteral("CPK / Space-Filling에서 1.0은 원소의 반데르발스 반지름입니다."));
++    layout->addRow(QStringLiteral("공간 채움 크기 (vdW 배율)"), m_spaceFillingScale);
++    const bool spaceFilling = m_style.displayMode == DisplayMode::SpaceFilling;
++    m_spaceFillingScale->setEnabled(spaceFilling);
++    m_atomScale->setEnabled(!spaceFilling); m_atomScaleSlider->setEnabled(!spaceFilling);
+     layout->addRow(QStringLiteral("라벨 크기"), m_labelSize);
+     m_element = new QComboBox;
+     m_element->setObjectName(QStringLiteral("ElementSelector"));
+--- a/src/ui/styleeditor/StyleEditor_Bonds.cpp
++++ b/src/ui/styleeditor/StyleEditor_Bonds.cpp
+@@ -22,6 +22,10 @@
+ QWidget *StyleEditorDialog::makeBondTab() {
+     auto *page = new QWidget;
+     auto *layout = new QFormLayout(page);
++    m_showBondOrders = new QCheckBox(QStringLiteral("다중 결합 차수 표시"));
++    m_showBondOrders->setObjectName(QStringLiteral("ShowBondOrders"));
++    m_showBondOrders->setChecked(m_style.showBondOrders);
++    layout->addRow(m_showBondOrders);
+     m_bondRadius = new QDoubleSpinBox; m_bondRadius->setRange(0.01, 0.8); m_bondRadius->setSingleStep(0.01); m_bondRadius->setValue(m_style.bondRadius);
+     m_bondRadiusSlider = new QSlider(Qt::Horizontal);
+     m_bondRadiusSlider->setObjectName(QStringLiteral("BondRadiusSlider"));
+--- a/src/ui/styleeditor/StyleEditor_Lighting.cpp
++++ b/src/ui/styleeditor/StyleEditor_Lighting.cpp
+@@ -26,6 +26,9 @@
+     auto *lightingLayout = new QFormLayout(lightingGroup);
+     m_lighting = new QCheckBox(QStringLiteral("조명 켜기")); m_lighting->setChecked(m_style.lighting);
+     m_twoLights = new QCheckBox(QStringLiteral("2개 조명 사용")); m_twoLights->setChecked(m_style.twoLights);
++    m_cameraRelativeLights = new QCheckBox(QStringLiteral("카메라를 따라 조명 방향 유지"));
++    m_cameraRelativeLights->setObjectName(QStringLiteral("CameraRelativeLights"));
++    m_cameraRelativeLights->setChecked(m_style.cameraRelativeLights);
+     m_lightX = new QDoubleSpinBox; m_lightY = new QDoubleSpinBox; m_lightZ = new QDoubleSpinBox;
+     for (QDoubleSpinBox *spin : {m_lightX, m_lightY, m_lightZ}) { spin->setRange(-10, 10); spin->setSingleStep(0.1); }
+     m_lightX->setValue(m_style.lightDirection.x()); m_lightY->setValue(m_style.lightDirection.y()); m_lightZ->setValue(m_style.lightDirection.z());
+@@ -52,6 +55,7 @@
+     lightingLayout->addRow(QStringLiteral("입체감"), m_diffuse);
+     lightingLayout->addRow(QStringLiteral("색상 채도"), m_saturation);
+     lightingLayout->addRow(m_lighting); lightingLayout->addRow(m_twoLights);
++    lightingLayout->addRow(m_cameraRelativeLights);
+     auto *direction = new QWidget; auto *directionLayout = new QHBoxLayout(direction); directionLayout->setContentsMargins(0, 0, 0, 0);
+     directionLayout->addWidget(new QLabel(QStringLiteral("X"))); directionLayout->addWidget(m_lightX);
+     directionLayout->addWidget(new QLabel(QStringLiteral("Y"))); directionLayout->addWidget(m_lightY);
+--- a/tests/model/test_model.cpp
++++ b/tests/model/test_model.cpp
+@@ -8,6 +8,8 @@
+ #include "settings/StyleManager.h"
+ 
+ #include <QFile>
++#include <QDataStream>
++#include <QSet>
+ #include <QSettings>
+ #include <QTemporaryDir>
+ #include <QtTest>
+@@ -28,6 +30,7 @@
+     void frequencyCycleIsContinuous();
+     void savesTransparentGif();
+     void persistsRenderOptions();
++    void distinctPresetsPreserveLegacySettings();
+     void editsInternalCoordinates();
+     void periodicTableMappingAndAtomDeletion();
+     void autoHydrogensFollowValenceWithoutRemovingManualHydrogen();
+@@ -236,15 +239,59 @@
+     QVERIFY(bytes.contains(QByteArray("\x21\xf9\x04\x05", 4)));
+ }
+ 
++void ModelTest::distinctPresetsPreserveLegacySettings() {
++    QSet<QByteArray> fingerprints;
++    const auto names = StyleManager::presetNames();
++    QVERIFY(names.contains(QStringLiteral("GaussView 유사 스타일")));
++    for (const QString &name : names) {
++        if (name == QStringLiteral("사용자 지정")) continue;
++        const auto style = StyleManager::preset(name);
++        QByteArray key; QDataStream stream(&key, QIODevice::WriteOnly);
++        stream << int(style.displayMode) << int(style.bondColorMode) << style.background << style.elementColors
++               << style.atomScale << style.spaceFillingScale << style.bondRadius << style.lighting
++               << style.twoLights << style.shadows << style.specularIntensity << style.shininess << style.perspective;
++        QVERIFY2(!fingerprints.contains(key), qPrintable("Duplicate visible preset: " + name));
++        fingerprints.insert(key);
++    }
++    const auto cpk = StyleManager::preset(QStringLiteral("CPK / Space-Filling"));
++    QCOMPARE(cpk.displayMode, DisplayMode::SpaceFilling); QCOMPARE(cpk.spaceFillingScale, 1.0f);
++    QCOMPARE(StyleManager::preset(QStringLiteral("Stick")).displayMode, DisplayMode::Stick);
++    QVERIFY(!StyleManager::preset(QStringLiteral("Stick")).showBondOrders);
++    QCOMPARE(StyleManager::preset(QStringLiteral("GaussView 유사 스타일")).bondColorMode, BondColorMode::Uniform);
++    for (const QString &old : {QStringLiteral("Chemcraft 참조"), QStringLiteral("Classic CPK"), QStringLiteral("Dark"),
++                              QStringLiteral("출판용 3"), QStringLiteral("2D 스타일 7")})
++        QVERIFY(names.contains(StyleManager::preset(old).name));
++    QCoreApplication::setOrganizationName(QStringLiteral("YoungcraftTest"));
++    QCoreApplication::setApplicationName(QStringLiteral("LegacyStyleIsolation"));
++    QSettings settings; settings.clear();
++    settings.setValue("style/name", "Classic CPK");
++    settings.setValue("style/displayMode", int(DisplayMode::BallAndStick));
++    settings.setValue("style/atomScale", 0.67f);
++    settings.setValue("style/elementColors/6", QColor(11,22,33));
++    const auto legacy = StyleManager::load();
++    QCOMPARE(legacy.name, QStringLiteral("CPK / Space-Filling"));
++    QCOMPARE(legacy.displayMode, DisplayMode::BallAndStick);
++    QVERIFY(qAbs(legacy.atomScale-0.67f) < 0.0001f);
++    QCOMPARE(legacy.elementColors.value(6), QColor(11,22,33));
++    QCOMPARE(legacy.elementColors.size(), 1);
++    QVERIFY(!legacy.cameraRelativeLights); QCOMPARE(legacy.spaceFillingScale, 0.72f);
++    settings.remove("style/elementColors");
++    QVERIFY(StyleManager::load().elementColors.isEmpty());
++    settings.clear();
++}
++
+ void ModelTest::persistsRenderOptions() {
+     QCoreApplication::setOrganizationName(QStringLiteral("YoungcraftTest"));
+     QCoreApplication::setApplicationName(QStringLiteral("StyleRoundTrip"));
+     QSettings().clear();
+     RenderStyle style; style.twoLights = false; style.shadows = true; style.shadowStrength = 0.61f;
++    style.cameraRelativeLights = true; style.spaceFillingScale = 0.93f; style.showBondOrders = false;
+     style.depthCueing = true; style.doubleBondSpacing = 3.1f; style.elementColors.insert(6, QColor(90, 90, 90));
+     StyleManager::save(style);
+     const RenderStyle loaded = StyleManager::load();
+     QCOMPARE(loaded.twoLights, false); QCOMPARE(loaded.shadows, true);
++    QCOMPARE(loaded.cameraRelativeLights, true); QVERIFY(qAbs(loaded.spaceFillingScale - 0.93f) < 1e-5f);
++    QCOMPARE(loaded.showBondOrders, false);
+     QVERIFY(qAbs(loaded.shadowStrength - 0.61f) < 1e-5f);
+     QCOMPARE(loaded.depthCueing, true); QCOMPARE(loaded.elementColors.value(6), QColor(90, 90, 90));
+     QSettings().clear();
+--- a/tests/smoke/test_smoke.cpp
++++ b/tests/smoke/test_smoke.cpp
+@@ -10,6 +10,8 @@
+ #include "model/GeometryEditor.h"
+ 
+ #include <QCheckBox>
++#include <QDoubleSpinBox>
++#include <QSettings>
+ #include <QComboBox>
+ #include <QMenuBar>
+ #include <QPlainTextEdit>
+@@ -43,6 +45,8 @@
+     void loadsGaussianFixtureWithoutBlocking();
+     void moleculeViewKeepsManualBond();
+     void rendersShadowAndTransparentCapture();
++    void rendersOutwardFacesAndMolecularDepth();
++    void presetsApplyFromMenuAndEditor();
+     void exposesAnalysisPanelRestoreAction();
+     void exposesKoreanFrequencyControls();
+     void styleEditorAdjustsAtomAndBondSizes();
+@@ -300,9 +304,9 @@
+     QVERIFY(qAbs(view.style().atomScale - 0.62f) < 0.001f);
+     bond->setValue(19);
+     QVERIFY(qAbs(view.style().bondRadius - 0.19f) < 0.001f);
+-    preset->setCurrentText(QStringLiteral("Dark"));
+-    QCOMPARE(view.style().name, QStringLiteral("Dark"));
+-    QCOMPARE(view.style().background, QColor(21, 26, 36));
++    preset->setCurrentText(QStringLiteral("Dark Studio"));
++    QCOMPARE(view.style().name, QStringLiteral("Dark Studio"));
++    QCOMPARE(view.style().background, QColor(29, 37, 54));
+ }
+ 
+ void SmokeTest::mmStopTerminatesWorker() {
+@@ -652,6 +656,93 @@
+     QVERIFY(image.hasAlphaChannel());
+ }
+ 
++void SmokeTest::rendersOutwardFacesAndMolecularDepth() {
++    Molecule molecule;
++    molecule.atoms = {{1, 6, "C", {0,0,0}}};
++    MoleculeView view; view.resize(480, 400);
++    RenderStyle style;
++    style.shadows = false; style.twoLights = false; style.perspective = false;
++    style.lightDirection = {0,0,1}; style.ambientIntensity = 0.08f;
++    style.elementColors.insert(6, QColor(160,180,210));
++    view.setStyle(style); view.setMolecule(molecule); view.show();
++    QTest::qWait(100);
++    if (!view.isValid()) QSKIP("No OpenGL context");
++    QVERIFY(view.m_glReady); QVERIFY(view.m_program->isLinked()); QVERIFY(view.m_shadowReady);
++    view.makeCurrent();
++    const auto checkWinding = [](QOpenGLBuffer &buffer, int count) {
++        QVector<MoleculeView::Vertex> vertices(count);
++        if (!buffer.bind() || !buffer.read(0, vertices.data(), count * int(sizeof(MoleculeView::Vertex)))) return false;
++        buffer.release();
++        for (int i = 0; i < count; i += 3) {
++            const auto &a = vertices[i], &b = vertices[i+1], &c = vertices[i+2];
++            const auto normal = QVector3D::crossProduct(b.position-a.position, c.position-a.position);
++            if (normal.lengthSquared() > 1e-10f && QVector3D::dotProduct(normal, a.normal+b.normal+c.normal) <= 0) return false;
++        }
++        return true;
++    };
++    QVERIFY(checkWinding(view.m_sphereBuffer, view.m_sphereVertexCount));
++    QVERIFY(checkWinding(view.m_sphereMediumBuffer, view.m_sphereMediumVertexCount));
++    QVERIFY(checkWinding(view.m_sphereLowBuffer, view.m_sphereLowVertexCount));
++    view.doneCurrent();
++    const auto sample = [&](const QImage &image, const QVector3D &position) {
++        const auto point = view.project(position, view.viewProjection());
++        return image.pixelColor(qRound(point.x()*view.devicePixelRatioF()), qRound(point.y()*view.devicePixelRatioF()));
++    };
++    const QImage sphere = view.image();
++    const QColor center = sample(sphere, {}), edge = sample(sphere, {0.35f,0,0});
++    QVERIFY2(center.red() > edge.red() + 12, "Front hemisphere should have a visible key highlight and shading gradient");
++    molecule.atoms = {{1,6,"C",{-1,0,1}}, {2,6,"C",{1,0,-1}}};
++    style.lighting = false; style.depthCueing = true; style.depthCueStrength = 0.6f;
++    style.background = Qt::white; style.elementColors.insert(6, QColor(100,150,200));
++    view.setStyle(style); view.setMolecule(molecule);
++    const QImage depth = view.image();
++    const QColor near = sample(depth, molecule.atoms[0].position), far = sample(depth, molecule.atoms[1].position);
++    QVERIFY2(far.red() > near.red() + 30, "Depth cue must separate front and rear atoms rather than washing out the whole molecule");
++    view.m_distance *= 2; view.m_orthoScale *= 1.4f;
++    const QImage zoomed = view.image();
++    QVERIFY(qAbs(sample(zoomed, molecule.atoms[0].position).red() - near.red()) <= 3);
++    QVERIFY(qAbs(sample(zoomed, molecule.atoms[1].position).red() - far.red()) <= 3);
++}
++
++void SmokeTest::presetsApplyFromMenuAndEditor() {
++    const QString previousOrganization = QCoreApplication::organizationName();
++    const QString previousApplication = QCoreApplication::applicationName();
++    QCoreApplication::setOrganizationName("YoungcraftTest");
++    QCoreApplication::setApplicationName("PresetUiIsolation");
++    QSettings().clear();
++    {
++        MainWindow window;
++        auto *menu = window.findChild<QMenu *>("DisplayPresets");
++        QVERIFY(menu);
++        for (const auto &name : {QStringLiteral("GaussView 유사 스타일"), QStringLiteral("CPK / Space-Filling"), QStringLiteral("Dark Studio")}) {
++            QAction *chosen = nullptr;
++            for (auto *action : menu->actions()) if (action->text() == name) chosen = action;
++            QVERIFY(chosen); chosen->trigger();
++            QCOMPARE(window.m_view->style().name, name);
++            QCOMPARE(StyleManager::load().name, name);
++        }
++        StyleEditorDialog editor(window.m_style);
++        connect(&editor, &StyleEditorDialog::styleApplied, window.m_view, &MoleculeView::setStyle);
++        auto *combo = editor.findChild<QComboBox *>("StylePreset");
++        auto *scale = editor.findChild<QDoubleSpinBox *>("SpaceFillingScale");
++        auto *relative = editor.findChild<QCheckBox *>("CameraRelativeLights");
++        QVERIFY(combo); QVERIFY(scale); QVERIFY(relative);
++        combo->setCurrentText(QStringLiteral("CPK / Space-Filling"));
++        QVERIFY(scale->isEnabled()); scale->setValue(0.85);
++        QVERIFY(qAbs(window.m_view->style().spaceFillingScale - 0.85f) < 0.001f);
++        relative->setChecked(false); QVERIFY(!window.m_view->style().cameraRelativeLights);
++        QPushButton *save = nullptr;
++        for (auto *button : editor.findChildren<QPushButton *>()) if (button->text() == QStringLiteral("저장")) save = button;
++        QVERIFY(save); save->click();
++        QVERIFY(qAbs(StyleManager::load().spaceFillingScale - 0.85f) < 0.001f);
++        combo->setCurrentText(QStringLiteral("사용자 지정"));
++        QVERIFY(qAbs(window.m_view->style().spaceFillingScale - 0.85f) < 0.001f);
++    }
++    QSettings().clear();
++    QCoreApplication::setOrganizationName(previousOrganization);
++    QCoreApplication::setApplicationName(previousApplication);
++}
++
+ void SmokeTest::exposesAnalysisPanelRestoreAction() {
+     MainWindow window;
+     QAction *restore = nullptr;
+--- /dev/null
++++ b/tools/render_quality_preview.cpp
+@@ -0,0 +1,80 @@
++// Reproducible screenshots of the real OpenGL renderer. Does not use application settings.
++#include "render/MoleculeView.h"
++#include "model/FragmentLibrary.h"
++#include <QApplication>
++#include <QMouseEvent>
++#include <QDir>
++#include <QFile>
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QOpenGLContext>
++#include <QSurfaceFormat>
++#include <QTimer>
++#include <QTextStream>
++
++using namespace youngcraft;
++
++int main(int argc, char **argv) {
++    QSurfaceFormat format;
++    format.setVersion(3, 3); format.setProfile(QSurfaceFormat::CoreProfile);
++    format.setDepthBufferSize(24); format.setAlphaBufferSize(8); format.setSamples(4);
++    QSurfaceFormat::setDefaultFormat(format);
++    QApplication app(argc, argv);
++    app.setOrganizationName("YoungcraftRenderPreview"); app.setApplicationName("IsolatedCapture");
++    const QStringList args = app.arguments();
++    if (args.size() < 3) return 2; // project directory, output directory
++    QDir output(args[2]); if (!output.mkpath(".")) return 3;
++    Fragment ligand, adduct; QString error;
++    if (!FragmentLibrary::read(QDir(args[1]).filePath("lab_fragments/ligands/12-mtp.cjson"), ligand, &error) ||
++        !FragmentLibrary::read(QDir(args[1]).filePath("lab_fragments/adducts/peroxo-eta2.cjson"), adduct, &error)) {
++        QTextStream(stderr) << error; return 4;
++    }
++    Molecule molecule;
++    molecule.atoms = ligand.atoms; molecule.bonds = ligand.bonds;
++    int metal = ligand.dummyAtoms.value(0, -1);
++    if (metal < 0) return 5;
++    molecule.atoms[metal].atomicNumber = 26; molecule.atoms[metal].element = "Fe";
++    QVector<int> mapping;
++    for (const auto &atom : adduct.atoms) {
++        if (atom.atomicNumber == 0) mapping << metal;
++        else { mapping << molecule.atoms.size(); molecule.atoms << atom; }
++    }
++    for (const auto &bond : adduct.bonds)
++        molecule.setBond(mapping[bond.first], mapping[bond.second], bond.order,
++                         mapping[bond.first] == metal || mapping[bond.second] == metal);
++    for (int i = 0; i < molecule.atoms.size(); ++i) molecule.atoms[i].index = i + 1;
++    for (auto &bond : molecule.bonds)
++        if (bond.first == metal || bond.second == metal) bond.coordination = true;
++    MoleculeView view; view.resize(1000, 800);
++    view.setStyle(StyleManager::preset("Youngcraft Studio")); view.setMolecule(molecule); view.show();
++    int status = 0;
++    QTimer::singleShot(500, &app, [&] {
++        if (!view.isValid()) { status = 6; app.quit(); return; }
++        view.bestView();
++        // Rotate through the real input path; leave the user's clipboard untouched.
++        const QPointF start(30, 30), end(100, 65);
++        QMouseEvent press(QEvent::MouseButtonPress, start, view.mapToGlobal(start.toPoint()),
++                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
++        QMouseEvent move(QEvent::MouseMove, end, view.mapToGlobal(end.toPoint()),
++                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
++        QMouseEvent release(QEvent::MouseButtonRelease, end, view.mapToGlobal(end.toPoint()),
++                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
++        QApplication::sendEvent(&view, &press); QApplication::sendEvent(&view, &move);
++        QApplication::sendEvent(&view, &release);
++        const QStringList names = args.size() > 3 ? QStringList{args[3]} : StyleManager::presetNames();
++        QJsonArray manifest;
++        for (const QString &name : names) {
++            if (name == QStringLiteral("사용자 지정")) continue;
++            view.setStyle(StyleManager::preset(name));
++            const QImage image = view.image(false, true);
++            const QString file = QString("preset-%1.png").arg(manifest.size(), 2, 10, QLatin1Char('0'));
++            if (!image.save(output.filePath(file))) status = 7;
++            manifest.append(QJsonObject{{"name", name}, {"file", file}});
++        }
++        QFile manifestFile(output.filePath("manifest.json"));
++        if (manifestFile.open(QIODevice::WriteOnly)) manifestFile.write(QJsonDocument(manifest).toJson());
++        app.quit();
++    });
++    app.exec(); return status;
++}

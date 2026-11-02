@@ -1,0 +1,26 @@
+Youngcraft xTB portable runtime
+
+Official Windows release: xTB 6.7.1pre (5071a88), 2024-07-23.
+Unmodified executable and Intel OpenMP runtime from:
+https://github.com/grimme-lab/xtb/releases/download/v6.7.1/xtb-6.7.1pre-windows-x86_64.zip
+Upstream ZIP SHA256: 043e578da4a7e114a4d584972959a875e3ffb9f2767a86723b95aa6719d28d9c
+
+xTB is Copyright (C) the xTB contributors, licensed under LGPL-3.0-or-later.
+See licenses/COPYING.LESSER and licenses/COPYING. No warranty is provided.
+Youngcraft invokes this separate executable using XYZ files and QProcess;
+it does not link libxtb. The runtime may be replaced by the user.
+The corresponding xTB source (including build files) is supplied in
+xtb-source-5071a88.tar.gz. Dependency source archives and notices are under sources/.
+Upstream source and build instructions: https://github.com/grimme-lab/xtb/tree/5071a88
+Upstream Windows release notes state dftd4 v3.4.0 and disabled C API tests.
+
+libiomp5md.dll and Intel statically linked compiler/math runtime components
+are redistributable under the Intel Simplified Software License;
+see licenses/Intel-Simplified-License.pdf.
+The original upstream bundled mctc-lib/jsonfortran notice is retained.
+
+Runtime layout: xtb.exe, libiomp5md.dll, share/ parameter files, licenses/.
+No Python/Conda/system xTB installation, global environment modification or
+network access is required at execution time.
+Youngcraft sets thread variables and XTBPATH only in the child environment.
+GFN1/GFN2 SP (+gradient) and optimization are exposed; no spinpol/tblite option.

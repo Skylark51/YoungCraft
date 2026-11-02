@@ -1,0 +1,20 @@
+********* Start testing of ModelTest *********
+Config: Using QtTest library 6.8.3, Qt 6.8.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows 11
+PASS   : ModelTest::initTestCase()
+PASS   : ModelTest::infersBondsAndElements()
+PASS   : ModelTest::buildsPositiveAndNegativeIsosurfaces()
+PASS   : ModelTest::parsesCubeAndSharesGrid()
+PASS   : ModelTest::writesAnimatedGif()
+PASS   : ModelTest::preservesManualBondOrders()
+PASS   : ModelTest::recountsBondsAndPreservesOverrides()
+PASS   : ModelTest::supportsAtomAndElementColorOverrides()
+PASS   : ModelTest::frequencyCycleIsContinuous()
+PASS   : ModelTest::savesTransparentGif()
+PASS   : ModelTest::persistsRenderOptions()
+PASS   : ModelTest::distinctPresetsPreserveLegacySettings()
+PASS   : ModelTest::editsInternalCoordinates()
+PASS   : ModelTest::periodicTableMappingAndAtomDeletion()
+PASS   : ModelTest::autoHydrogensFollowValenceWithoutRemovingManualHydrogen()
+PASS   : ModelTest::cleanupTestCase()
+Totals: 16 passed, 0 failed, 0 skipped, 0 blacklisted, 17ms
+********* Finished testing of ModelTest *********

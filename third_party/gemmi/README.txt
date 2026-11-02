@@ -1,0 +1,1 @@
+Gemmi 0.7.5, https://github.com/project-gemmi/gemmi, MPL-2.0. The bundled PEGTL and fast_float headers retain their own licenses. This source is compiled into Youngcraft; no external runtime is required.

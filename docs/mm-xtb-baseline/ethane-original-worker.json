@@ -1,0 +1,59 @@
+[
+  {
+    "type": "ready",
+    "field": "MMFF94",
+    "iteration": 0,
+    "energy": 36.372440630036124,
+    "delta_energy": 0.0,
+    "rms_gradient": 77.92040837498458,
+    "max_gradient": 154.18379959601893
+  },
+  {
+    "type": "step",
+    "field": "MMFF94",
+    "iteration": 8,
+    "positions": [
+      [
+        0.23739090160181914,
+        6.729328051965562e-11,
+        -0.004806443448043082
+      ],
+      [
+        1.7626090982534877,
+        -2.1320262196502415e-11,
+        0.004806443596294041
+      ]
+    ],
+    "converged": false,
+    "iteration_exact": true,
+    "reason": "running",
+    "energy": -4.63246646924573,
+    "delta_energy": -41.00490709928185,
+    "rms_gradient": 3.173515525243375,
+    "max_gradient": 4.72252699222965
+  },
+  {
+    "type": "done",
+    "field": "MMFF94",
+    "iteration": 48,
+    "positions": [
+      [
+        0.2439710231391658,
+        -9.137355856828848e-08,
+        -0.00012905977326856807
+      ],
+      [
+        1.756028975701574,
+        1.1362926972731145e-07,
+        0.00012905687558575544
+      ]
+    ],
+    "converged": true,
+    "iteration_exact": false,
+    "reason": "converged",
+    "energy": -4.734365293813593,
+    "delta_energy": -0.10189882456786314,
+    "rms_gradient": 4.315247646982842e-06,
+    "max_gradient": 5.61808740403416e-06
+  }
+]

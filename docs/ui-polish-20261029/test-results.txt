@@ -1,0 +1,14 @@
+********* Start testing of SmokeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SmokeTest::initTestCase()
+PASS   : SmokeTest::tddftPublicationSpectrum()
+PASS   : SmokeTest::publicationPlotExports()
+PASS   : SmokeTest::atomVisibilityPreservesViewAndScroll(orthographic)
+PASS   : SmokeTest::atomVisibilityPreservesViewAndScroll(perspective)
+PASS   : SmokeTest::themesEmptySidebarAndScanApproach()
+PASS   : SmokeTest::reactionCaptureHydrogenControls()
+PASS   : SmokeTest::calculationDefaultPanels()
+PASS   : SmokeTest::mainWindowStartsWithKoreanUi()
+PASS   : SmokeTest::cleanupTestCase()
+Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 7511ms
+********* Finished testing of SmokeTest *********

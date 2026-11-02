@@ -1,0 +1,17 @@
+Test project D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-chemcraft-tools
+    Start 1: structure_tools
+1/6 Test #1: structure_tools ..................   Passed    0.02 sec
+    Start 2: structure_files
+2/6 Test #2: structure_files ..................   Passed    0.09 sec
+    Start 3: parser_gaussian
+3/6 Test #3: parser_gaussian ..................   Passed    0.14 sec
+    Start 4: model_atoms_bonds
+4/6 Test #4: model_atoms_bonds ................   Passed    0.06 sec
+    Start 5: xtb_runner
+5/6 Test #5: xtb_runner .......................   Passed    5.97 sec
+    Start 6: molecular_editor
+6/6 Test #6: molecular_editor .................   Passed    0.05 sec
+
+100% tests passed out of 6
+
+Total Test time (real) =   6.44 sec

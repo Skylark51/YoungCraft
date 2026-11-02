@@ -1,0 +1,25 @@
+﻿{
+    "formats":  [
+                    "HTML Format",
+                    "image/gif",
+                    "GIF"
+                ],
+    "htmlLength":  387804,
+    "wordCount":  3,
+    "wordFloatingCount":  0,
+    "wordText":  "///\r\r",
+    "wordWidthsCm":  [
+                         5.002,
+                         5.002,
+                         5.002
+                     ],
+    "wordHeightsCm":  [
+                          4.542,
+                          4.542,
+                          4.542
+                      ],
+    "wordMedia":  [
+                      "/word/media/image1.png",
+                      "/word/media/image2.gif"
+                  ]
+}

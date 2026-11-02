@@ -1,0 +1,25 @@
+﻿{
+    "formats":  [
+                    "HTML Format",
+                    "image/gif",
+                    "GIF"
+                ],
+    "htmlLength":  332479,
+    "pptCount":  3,
+    "pptWidthsCm":  [
+                        10,
+                        10.001,
+                        10
+                    ],
+    "pptTypes":  [
+                     13,
+                     13,
+                     13
+                 ],
+    "pptHeightsCm":  [
+                         9.08,
+                         9.075,
+                         9.08
+                     ],
+    "pptGifRetained":  true
+}

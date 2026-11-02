@@ -1,0 +1,24 @@
+********* Start testing of ModelTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : ModelTest::initTestCase()
+PASS   : ModelTest::reactionCapturePathsAlignmentAndPanels()
+PASS   : ModelTest::infersBondsAndElements()
+PASS   : ModelTest::buildsPositiveAndNegativeIsosurfaces()
+PASS   : ModelTest::parsesCubeAndSharesGrid()
+PASS   : ModelTest::writesAnimatedGif()
+PASS   : ModelTest::decodesGifAcrossDictionaryGrowth()
+PASS   : ModelTest::preservesManualBondOrders()
+PASS   : ModelTest::recountsBondsAndPreservesOverrides()
+PASS   : ModelTest::supportsAtomAndElementColorOverrides()
+PASS   : ModelTest::frequencyCycleIsContinuous()
+PASS   : ModelTest::savesTransparentGif()
+PASS   : ModelTest::cropsTransparentContentAndAnimation()
+PASS   : ModelTest::persistsRenderOptions()
+PASS   : ModelTest::distinctPresetsPreserveLegacySettings()
+PASS   : ModelTest::studioPaletteAndMigration()
+PASS   : ModelTest::editsInternalCoordinates()
+PASS   : ModelTest::periodicTableMappingAndAtomDeletion()
+PASS   : ModelTest::autoHydrogensFollowValenceWithoutRemovingManualHydrogen()
+PASS   : ModelTest::cleanupTestCase()
+Totals: 20 passed, 0 failed, 0 skipped, 0 blacklisted, 59ms
+********* Finished testing of ModelTest *********

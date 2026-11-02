@@ -1,0 +1,134 @@
+ninja: no work to do.
+222 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.7
+222 INFO: Python: 3.12.10
+240 INFO: Platform: Windows-11-10.0.26200-SP0
+240 INFO: Python environment: C:\Users\UNIST\AppData\Local\Programs\Python\Python312
+253 INFO: wrote D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\YoungcraftMM.spec
+253 INFO: Removing temporary files and cleaning cache in C:\Users\UNIST\AppData\Local\pyinstaller
+269 INFO: Module search paths (PYTHONPATH):
+['D:\\�̿���\\������Ʈ ����\\����������Ʈ\\Youngcraft',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312',
+ 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages',
+ 'D:\\�̿���\\������Ʈ ����\\����������Ʈ\\Youngcraft\\tools']
+681 INFO: checking Analysis
+681 INFO: Building Analysis because Analysis-00.toc is non existent
+681 INFO: Looking for Python shared library...
+681 INFO: Using Python shared library: C:\Users\UNIST\AppData\Local\Programs\Python\Python312\python312.dll
+681 INFO: Running Analysis Analysis-00.toc
+681 INFO: Target bytecode optimization level: 0
+681 INFO: Initializing module dependency graph...
+681 INFO: Initializing module graph hook caches...
+715 INFO: Analyzing modules for base_library.zip ...
+1852 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+2202 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+2313 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+2782 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+3522 INFO: Caching module dependency graph...
+3538 INFO: Analyzing D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\tools\mm_optimize.py
+3578 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+3904 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+4127 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+4143 INFO: SetuptoolsInfo: initializing cached setuptools info...
+4952 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5064 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5303 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5699 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5778 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5857 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+6414 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+6940 INFO: Processing pre-find-module-path hook 'hook-tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+6940 INFO: TclTkInfo: initializing cached Tcl/Tk info...
+7241 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+7241 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+7306 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+7732 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+7827 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+7970 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+8081 INFO: Processing module hooks (post-graph stage)...
+8225 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+8256 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+8272 INFO: Performing binary vs. data reclassification (929 entries)
+8509 INFO: Looking for ctypes DLLs
+8525 INFO: Analyzing run-time hooks ...
+8525 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+8525 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+8525 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+8525 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+8551 INFO: Creating base_library.zip...
+8605 INFO: Looking for dynamic libraries
+9161 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\rdkit.libs', 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\numpy.libs']
+9161 INFO: Extra DLL search directories (PATH): []
+10640 INFO: Warnings written to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\warn-YoungcraftMM.txt
+10672 INFO: Graph cross-reference written to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\xref-YoungcraftMM.html
+10738 INFO: checking PYZ
+10738 INFO: Building PYZ because PYZ-00.toc is non existent
+10738 INFO: Building PYZ (ZlibArchive) D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\PYZ-00.pyz
+11133 INFO: Building PYZ (ZlibArchive) D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\PYZ-00.pyz completed successfully.
+11151 INFO: checking PKG
+11151 INFO: Building PKG because PKG-00.toc is non existent
+11151 INFO: Building PKG (CArchive) YoungcraftMM.pkg
+11188 INFO: Building PKG (CArchive) YoungcraftMM.pkg completed successfully.
+11188 INFO: Bootloader C:\Users\UNIST\AppData\Roaming\Python\Python312\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+11188 INFO: checking EXE
+11193 INFO: Building EXE because EXE-00.toc is non existent
+11193 INFO: Building EXE from EXE-00.toc
+11193 INFO: Copying bootloader EXE to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\YoungcraftMM.exe
+11228 INFO: Copying icon to EXE
+11260 INFO: Copying 0 resources to EXE
+11260 INFO: Embedding manifest in EXE
+11285 INFO: Appending PKG archive to EXE
+11338 INFO: Fixing EXE headers
+11530 INFO: Building EXE from EXE-00.toc completed successfully.
+11530 INFO: checking COLLECT
+11530 INFO: Building COLLECT because COLLECT-00.toc is non existent
+11530 INFO: Removing dir D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\YoungcraftMM
+12167 INFO: Building COLLECT COLLECT-00.toc
+17169 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+17169 INFO: Build complete! The results are available in: D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-mm-runtime\YoungcraftMM\YoungcraftMM.exe
+Warning: Translations will not be available due to the following error.
+Cannot open C:/Users/UNIST/Documents/ChatGPT/Youngcraft/qt-sdk/translations/catalogs.json
+C:\Users\UNIST\AppData\Local\Temp\YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a\Youngcraft.exe 64 bit, release executable
+Adding in plugin type generic for module: Qt6Gui
+Adding Qt6Network for qtuiotouchplugin.dll from plugin type: generic
+Adding in plugin type imageformats for module: Qt6Gui
+Adding in plugin type networkinformation for module: Qt6Network
+Adding in plugin type platforms for module: Qt6Gui
+Adding in plugin type styles for module: Qt6Widgets
+Adding in plugin type tls for module: Qt6Network
+Skipping plugin qopensslbackend.dll. Use -force-openssl or specify -openssl-root if you want to use it.
+Direct dependencies: Qt6Core Qt6Gui Qt6OpenGL Qt6OpenGLWidgets Qt6Widgets
+All dependencies   : Qt6Core Qt6Gui Qt6OpenGL Qt6OpenGLWidgets Qt6Widgets
+To be deployed     : Qt6Core Qt6Gui Qt6Network Qt6OpenGL Qt6OpenGLWidgets Qt6Widgets
+Warning: Cannot find any version of the dxcompiler.dll and dxil.dll.
+Warning: Cannot find Visual Studio installation directory, VCINSTALLDIR is not set.
+Updating Qt6Core.dll.
+Updating Qt6Gui.dll.
+Updating Qt6Network.dll.
+Updating Qt6OpenGL.dll.
+Updating Qt6OpenGLWidgets.dll.
+Updating Qt6Widgets.dll.
+Updating D3Dcompiler_47.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/generic.
+Updating qtuiotouchplugin.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/imageformats.
+Updating qgif.dll.
+Updating qico.dll.
+Updating qjpeg.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/networkinformation.
+Updating qnetworklistmanager.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/platforms.
+Updating qwindows.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/styles.
+Updating qmodernwindowsstyle.dll.
+Creating directory C:/Users/UNIST/AppData/Local/Temp/YoungcraftPortable-d68ce8e9f8754e4aa26ffe307dba2b2a/tls.
+Updating qcertonlybackend.dll.
+Updating qschannelbackend.dll.
+portable 완료: D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\dist
+MM worker: D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\dist\mm_runtime\YoungcraftMM.exe
+xTB runtime: D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\dist\xtb_runtime\xtb.exe
+ZIP: D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\Youngcraft-portable.zip

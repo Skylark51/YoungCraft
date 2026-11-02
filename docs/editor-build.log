@@ -1,0 +1,33 @@
+msbuild 버전 17.14.60+43b635718(.NET Framework용)
+
+  1>Automatic MOC and UIC for target mock_mm_worker
+  1>Automatic MOC and UIC for target youngcraft_core
+  1>Automatic MOC and UIC for target mock_xtb
+  youngcraft_core.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\youngcraft_core.lib
+  mock_mm_worker.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\mock_mm_worker.exe
+  mock_xtb.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\mock_xtb.exe
+  1>Automatic MOC and UIC for target Youngcraft
+  1>Automatic MOC and UIC for target test_structure
+  1>Automatic MOC and UIC for target test_model
+  test_structure.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_structure.exe
+  test_model.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_model.exe
+  1>Automatic MOC and UIC for target test_parser
+  Youngcraft.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\Youngcraft.exe
+  Deploying Qt runtime beside Youngcraft.exe				
+  1>Automatic MOC and UIC for target test_smoke
+EXEC : warning : Translations will not be available due to the following error. [D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Youngcraft.vcxproj]
+  test_parser.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_parser.exe
+  D:\
+  Cannot open D:/
+  1>Automatic MOC and UIC for target test_xtb
+  test_smoke.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_smoke.exe
+  2>Automatic RCC for resources/fragments.qrc
+  1>Automatic MOC and UIC for target test_editor
+  Building Custom Rule D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/CMakeLists.txt
+  test_editor.cpp
+  test_xtb.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_xtb.exe
+  mocs_compilation_Release.cpp
+  qrc_fragments_Release.cpp
+  코드를 생성하고 있습니다...
+  test_editor.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_editor.exe
+  Building Custom Rule D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/CMakeLists.txt

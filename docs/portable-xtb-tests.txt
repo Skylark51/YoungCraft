@@ -1,0 +1,17 @@
+********* Start testing of XtbTest *********
+Config: Using QtTest library 6.8.3, Qt 6.8.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows 11
+PASS   : XtbTest::initTestCase()
+PASS   : XtbTest::neutralSP()
+PASS   : XtbTest::chargedSP()
+PASS   : XtbTest::openShellSP()
+PASS   : XtbTest::gfn1ALPB()
+PASS   : XtbTest::allBundledSolvents()
+PASS   : XtbTest::realOptimization()
+PASS   : XtbTest::realLiveNonconvergence()
+PASS   : XtbTest::cleanupTestCase()
+Totals: 9 passed, 0 failed, 0 skipped, 0 blacklisted, 3476ms
+********* Finished testing of XtbTest *********
+Portable MM worker: PASS; iterations: 0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120; external Python unavailable.
+Portable GUI startup: PASS (Windows platform); no external runtime PATH.
+Extraction: C:\Users\UNIST\AppData\Local\Temp\Youngcraft portable 한글 공백 d6eac6c6385e4a47a06400a7b5c25bcb
+PATH: C:\WINDOWS\System32;C:\WINDOWS

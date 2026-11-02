@@ -1,0 +1,20 @@
+{
+  "build": "2026-10-19",
+  "binaries": {
+    "Youngcraft.exe": "335762352c63347436cd70cc37912b4f541eb100d3948392c26c06efe33d8d80",
+    "dist/Youngcraft.exe": "335762352c63347436cd70cc37912b4f541eb100d3948392c26c06efe33d8d80",
+    ".build/update-20261019/app/Youngcraft.exe": "335762352c63347436cd70cc37912b4f541eb100d3948392c26c06efe33d8d80"
+  },
+  "ctest": "7 suites passed",
+  "nativeGui": "5 themes, geometry visibility, approach and undo passed",
+  "portableZip": {
+    "path": "Youngcraft-portable.zip",
+    "sha256": "8951287ec1e32cb45ffc6053bb534783e74bf94f0c9705c9d2cf41bd7e0402ab",
+    "verifiedFiles": 1461
+  },
+  "deferredLigands": [
+    "MPDAP",
+    "CHDAP"
+  ],
+  "provisionalLigand": "TBDAP"
+}

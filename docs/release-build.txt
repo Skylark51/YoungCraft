@@ -1,0 +1,34 @@
+msbuild 버전 17.14.60+43b635718(.NET Framework용)
+
+  youngcraft_core.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\youngcraft_core.lib
+  1>Automatic MOC and UIC for target Youngcraft
+  mocs_compilation_Release.cpp
+  MainWindow_MM.cpp
+  MainWindow_Xtb.cpp
+  XtbDialog.cpp
+  코드를 생성하고 있습니다...
+  Youngcraft.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\Youngcraft.exe
+  Deploying Qt runtime beside Youngcraft.exe				
+EXEC : warning : Translations will not be available due to the following error. [D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Youngcraft.vcxproj]
+  Cannot open D:/
+  D:\
+msbuild 버전 17.14.60+43b635718(.NET Framework용)
+
+  1>Automatic MOC and UIC for target mock_mm_worker
+  youngcraft_core.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\youngcraft_core.lib
+  mock_mm_worker.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\mock_mm_worker.exe
+  1>Automatic MOC and UIC for target test_smoke
+  mocs_compilation_Release.cpp
+  MainWindow_MM.cpp
+  MainWindow_Xtb.cpp
+  XtbDialog.cpp
+  test_smoke.cpp
+  코드를 생성하고 있습니다...
+  test_smoke.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_smoke.exe
+msbuild 버전 17.14.60+43b635718(.NET Framework용)
+
+  mock_xtb.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\mock_xtb.exe
+  youngcraft_core.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\youngcraft_core.lib
+  1>Automatic MOC and UIC for target test_xtb
+  test_xtb.cpp
+  test_xtb.vcxproj -> D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-current\Release\test_xtb.exe

@@ -1,0 +1,361 @@
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Configuring done (4.3s)
+-- Generating done (3.4s)
+-- Build files have been written to: D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-editor-final
+[1/2] Cleaning additional files...
+[2/2] Cleaning all built files...
+Cleaning... 10 files.
+
+[1/146] Automatic MOC and UIC for target mock_mm_worker
+[2/146] Automatic MOC and UIC for target mock_xtb
+[3/146] Building CXX object CMakeFiles\mock_mm_worker.dir\mock_mm_worker_autogen\mocs_compilation.cpp.obj
+[4/146] Building CXX object CMakeFiles\mock_xtb.dir\mock_xtb_autogen\mocs_compilation.cpp.obj
+[5/146] Automatic MOC and UIC for target youngcraft_core
+[6/146] Building CXX object CMakeFiles\mock_mm_worker.dir\tests\mm\mock_mm_worker.cpp.obj
+[7/146] Building CXX object CMakeFiles\mock_xtb.dir\tests\xtb\mock_xtb.cpp.obj
+[8/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\model\MoleculeEditController.cpp.obj
+[9/146] Building CXX object CMakeFiles\youngcraft_core.dir\youngcraft_core_autogen\mocs_compilation.cpp.obj
+[10/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\model\GeometryEditor.cpp.obj
+[11/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\model\FragmentLibrary.cpp.obj
+[12/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\compute\XtbRunner.cpp.obj
+[13/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\model\Molecule.cpp.obj
+[14/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\XYZParser.cpp.obj
+[15/146] Building CXX object CMakeFiles\youngcraft_core.dir\third_party\gemmi\symmetry.cpp.obj
+[16/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\CubeParser.cpp.obj
+[17/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\FchkParser.cpp.obj
+[18/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\FileDispatcher.cpp.obj
+[19/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\GaussianParser.cpp.obj
+[20/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\analysis\AnalysisEngine.cpp.obj
+[21/146] Linking CXX executable mock_mm_worker.exe
+[22/146] Linking CXX executable mock_xtb.exe
+[23/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\render\IsosurfaceBuilder.cpp.obj
+[24/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\animation\AnimationController.cpp.obj
+[25/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\settings\StyleManager.cpp.obj
+[26/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\export\ImageExporter.cpp.obj
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\src\export\ImageExporter.cpp(169): warning C4310: 캐스트할 때 상수 값은 잘립니다.
+[27/146] Building CXX object CMakeFiles\youngcraft_core.dir\src\io\StructureReader.cpp.obj
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\utf.hpp(29): warning C4127: 조건식이 상수입니다.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\utf.hpp(29): note: 'if constexpr' 문을 대신 사용해 보세요.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\fileutil.hpp(55): warning C4996: '_wfopen': This function or variable may be unsafe. Consider using _wfopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(41): warning C4127: 조건식이 상수입니다.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(41): note: 'if constexpr' 문을 대신 사용해 보세요.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(41): note: 템플릿 인스턴스화 컨텍스트(가장 오래된 인스턴스화 컨텍스트)가
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(307): note: 컴파일되는 함수 템플릿 인스턴스화 'gemmi::cif::Document gemmi::cif::read_input<tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>&>(Input,int)'에 대한 참조를 확인하세요.
+        with
+        [
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf> &
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(274): note: 컴파일되는 함수 템플릿 인스턴스화 'void gemmi::cif::parse_input<tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>&>(gemmi::cif::Document &,Input)'에 대한 참조를 확인하세요.
+        with
+        [
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf> &
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi/cif.hpp(268): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::parse<gemmi::cif::rules::file,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>&,gemmi::cif::Document&>(Input,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf> &
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl/parse.hpp(31): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::normal<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>,gemmi::cif::Document&,1>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::file,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\normal.hpp(88): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::match<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::file,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\match.hpp(64): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::control>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::file,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::nothing>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::file,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(42): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::seq<tao::pegtl::opt<gemmi::cif::rules::whitespace>,tao::pegtl::if_must<tao::pegtl::not_at<tao::pegtl::eof>,gemmi::cif::rules::content,tao::pegtl::eof>>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,Action,Control,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Action=gemmi::cif::Action,
+            Control=gemmi::cif::Errors,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal\seq.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::normal<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::active,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&,1>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::opt<gemmi::cif::rules::whitespace>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\normal.hpp(88): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::match<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::active,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::opt<gemmi::cif::rules::whitespace>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\match.hpp(64): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::active,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::control>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::opt<gemmi::cif::rules::whitespace>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::active,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::nothing>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::opt<gemmi::cif::rules::whitespace>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(42): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::opt<gemmi::cif::rules::whitespace>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::active,Action,Control,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Action=gemmi::cif::Action,
+            Control=gemmi::cif::Errors,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal\opt.hpp(53): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::normal<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&,1>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::whitespace,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\normal.hpp(88): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::match<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::whitespace,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\match.hpp(64): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::control>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::whitespace,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::nothing>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::whitespace,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(42): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::plus<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,Action,Control,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::sor<gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>,
+            Action=gemmi::cif::Action,
+            Control=gemmi::cif::Errors,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal\plus.hpp(53): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::normal<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&,1>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::sor<gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\normal.hpp(88): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::match<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::sor<gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\match.hpp(64): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::control>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::sor<gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::nothing>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=tao::pegtl::sor<gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(42): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::sor<tao::pegtl::internal::integer_sequence<T,0,1>,gemmi::cif::rules::ws_char,gemmi::cif::rules::comment>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,Action,Control,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            T=unsigned __int64,
+            Action=gemmi::cif::Action,
+            Control=gemmi::cif::Errors,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal\sor.hpp(55): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::normal<Rule>::match<tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&,1>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::ws_char,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\normal.hpp(88): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::match<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::ws_char,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\match.hpp(64): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::control>::match<Input,gemmi::cif::Document&>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::ws_char,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(69): note: 컴파일되는 함수 템플릿 인스턴스화 'bool tao::pegtl::internal::duseltronik<Rule,tao::pegtl::apply_mode::action,tao::pegtl::rewind_mode::required,gemmi::cif::Action,gemmi::cif::Errors,tao::pegtl::internal::dusel_mode::nothing>::match<Input,gemmi::cif::Document&,0>(Input &,gemmi::cif::Document &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Rule=gemmi::cif::rules::ws_char,
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\tao\pegtl\internal/duseltronik.hpp(51): note: 컴파일되는 함수 템플릿 인스턴스화 'bool gemmi::cif::rules::lookup_char<2>::match<Input>(Input &)'에 대한 참조를 확인하세요.
+        with
+        [
+            Input=tao::pegtl::read_input<tao::pegtl::tracking_mode::eager,tao::pegtl::ascii::eol::lf_crlf>
+        ]
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\fast_float.h(462) : warning C4702: 접근할 수 없는 코드입니다.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\third_party\gemmi\include\gemmi\third_party\fast_float.h(518) : warning C4702: 접근할 수 없는 코드입니다.
+[28/146] Linking CXX static library youngcraft_core.lib
+[29/146] Automatic MOC and UIC for target Youngcraft
+[30/146] Automatic MOC and UIC for target test_editor
+[31/146] Automatic MOC and UIC for target test_structure
+[32/146] Automatic MOC and UIC for target test_parser
+[33/146] Automatic MOC and UIC for target test_model
+[34/146] Building CXX object CMakeFiles\test_structure.dir\test_structure_autogen\mocs_compilation.cpp.obj
+[35/146] Building CXX object CMakeFiles\test_parser.dir\test_parser_autogen\mocs_compilation.cpp.obj
+[36/146] Automatic RCC for resources/fragments.qrc
+[37/146] Automatic MOC and UIC for target test_smoke
+[38/146] Automatic RCC for resources/fragments.qrc
+[39/146] Automatic MOC and UIC for target test_xtb
+[40/146] Automatic RCC for resources/fragments.qrc
+[41/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\main.cpp.obj
+[42/146] Building CXX object CMakeFiles\Youngcraft.dir\Youngcraft_autogen\mocs_compilation.cpp.obj
+[43/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\MainWindow.cpp.obj
+[44/146] Building CXX object CMakeFiles\test_structure.dir\tests\structure\test_structure.cpp.obj
+[45/146] Building CXX object CMakeFiles\test_parser.dir\tests\parser\test_gaussian_parser.cpp.obj
+[46/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Ui.cpp.obj
+[47/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Toolbar.cpp.obj
+[48/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Menus.cpp.obj
+[49/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_File.cpp.obj
+[50/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Animation.cpp.obj
+[51/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Navigation.cpp.obj
+[52/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Style.cpp.obj
+[53/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Export.cpp.obj
+[54/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Geometry.cpp.obj
+[55/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Xtb.cpp.obj
+[56/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Bonds.cpp.obj
+[57/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Window.cpp.obj
+[58/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\XtbDialog.cpp.obj
+[59/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\ParseWorker.cpp.obj
+[60/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\MoleculeView.cpp.obj
+[61/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_Editor.cpp.obj
+[62/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_State.cpp.obj
+[63/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Camera.cpp.obj
+[64/146] Building CXX object CMakeFiles\Youngcraft.dir\src\app\mainwindow\MainWindow_MM.cpp.obj
+[65/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_GL.cpp.obj
+[66/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Surface.cpp.obj
+[67/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Shadows.cpp.obj
+[68/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_AtomsBonds.cpp.obj
+[69/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Scene.cpp.obj
+[70/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Overlays.cpp.obj
+[71/146] Building CXX object CMakeFiles\Youngcraft.dir\src\render\moleculeview\MoleculeView_Interaction.cpp.obj
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\src\render\moleculeview\MoleculeView_Interaction.cpp(122): warning C4456: 'atom' 선언은 이전 로컬 선언을 숨깁니다.
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\src\render\moleculeview\MoleculeView_Interaction.cpp(105): note: 'atom' 선언을 참조하십시오.
+[72/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\PlotWidget.cpp.obj
+[73/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\ScanResultsDialog.cpp.obj
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\src\ui\ScanResultsDialog.cpp(141): warning C4458: 'data' 선언은 클래스 멤버를 숨깁니다.
+C:\Users\UNIST\Documents\ChatGPT\Youngcraft\qt-sdk\include\QtWidgets/qwidget.h(781): note: 'QWidget::data' 선언을 참조하십시오.
+[74/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\AnalysisPanel.cpp.obj
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\src\ui\AnalysisPanel.cpp(47): warning C4458: 'data' 선언은 클래스 멤버를 숨깁니다.
+C:\Users\UNIST\Documents\ChatGPT\Youngcraft\qt-sdk\include\QtWidgets/qwidget.h(781): note: 'QWidget::data' 선언을 참조하십시오.
+[75/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_Geometry.cpp.obj
+[76/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_Frequency.cpp.obj
+[77/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_Coordinates.cpp.obj
+[78/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_ScanIrc.cpp.obj
+[79/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_Tddft.cpp.obj
+[80/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\analysispanel\AnalysisPanel_AtomsOrbitals.cpp.obj
+[81/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\StyleEditorDialog.cpp.obj
+[82/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\GeometryMeasureBar.cpp.obj
+[83/146] Building CXX object CMakeFiles\Youngcraft.dir\Youngcraft_autogen\3YJK5W5UP7\qrc_fragments.cpp.obj
+[84/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\styleeditor\StyleEditor_Lighting.cpp.obj
+[85/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\styleeditor\StyleEditor_Bonds.cpp.obj
+[86/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\styleeditor\StyleEditor_Atoms.cpp.obj
+[87/146] Building CXX object CMakeFiles\Youngcraft.dir\src\ui\styleeditor\StyleEditor_Isosurface.cpp.obj
+[88/146] Building CXX object CMakeFiles\test_smoke.dir\test_smoke_autogen\mocs_compilation.cpp.obj
+[89/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\MainWindow.cpp.obj
+[90/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Toolbar.cpp.obj
+[91/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Menus.cpp.obj
+[92/146] Building CXX object CMakeFiles\test_smoke.dir\tests\smoke\test_smoke.cpp.obj
+[93/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Ui.cpp.obj
+[94/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_File.cpp.obj
+[95/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Navigation.cpp.obj
+[96/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Animation.cpp.obj
+[97/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Style.cpp.obj
+[98/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Export.cpp.obj
+[99/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Geometry.cpp.obj
+[100/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Window.cpp.obj
+[101/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Bonds.cpp.obj
+[102/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Xtb.cpp.obj
+[103/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\ParseWorker.cpp.obj
+[104/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\XtbDialog.cpp.obj
+[105/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_Editor.cpp.obj
+[106/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\MoleculeView.cpp.obj
+[107/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_State.cpp.obj
+[108/146] Building CXX object CMakeFiles\test_smoke.dir\src\app\mainwindow\MainWindow_MM.cpp.obj
+[109/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Camera.cpp.obj
+[110/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_GL.cpp.obj
+[111/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Surface.cpp.obj
+[112/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Shadows.cpp.obj
+[113/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_AtomsBonds.cpp.obj
+[114/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Scene.cpp.obj
+[115/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Interaction.cpp.obj
+[116/146] Building CXX object CMakeFiles\test_smoke.dir\src\render\moleculeview\MoleculeView_Overlays.cpp.obj
+[117/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\PlotWidget.cpp.obj
+[118/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\ScanResultsDialog.cpp.obj
+[119/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\AnalysisPanel.cpp.obj
+[120/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_Geometry.cpp.obj
+[121/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_Frequency.cpp.obj
+[122/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_Coordinates.cpp.obj
+[123/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_ScanIrc.cpp.obj
+[124/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_Tddft.cpp.obj
+[125/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\analysispanel\AnalysisPanel_AtomsOrbitals.cpp.obj
+[126/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\StyleEditorDialog.cpp.obj
+[127/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\GeometryMeasureBar.cpp.obj
+[128/146] Building CXX object CMakeFiles\test_editor.dir\test_editor_autogen\mocs_compilation.cpp.obj
+[129/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\styleeditor\StyleEditor_Lighting.cpp.obj
+[130/146] Building CXX object CMakeFiles\test_smoke.dir\test_smoke_autogen\3YJK5W5UP7\qrc_fragments.cpp.obj
+[131/146] Building CXX object CMakeFiles\test_model.dir\test_model_autogen\mocs_compilation.cpp.obj
+[132/146] Building CXX object CMakeFiles\test_editor.dir\test_editor_autogen\3YJK5W5UP7\qrc_fragments.cpp.obj
+[133/146] Building CXX object CMakeFiles\test_xtb.dir\test_xtb_autogen\mocs_compilation.cpp.obj
+[134/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\styleeditor\StyleEditor_Atoms.cpp.obj
+[135/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\styleeditor\StyleEditor_Bonds.cpp.obj
+[136/146] Building CXX object CMakeFiles\test_smoke.dir\src\ui\styleeditor\StyleEditor_Isosurface.cpp.obj
+[137/146] Linking CXX executable test_structure.exe
+[138/146] Linking CXX executable test_parser.exe
+[139/146] Linking CXX executable "D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\Youngcraft.exe"; Deploying Qt runtime beside Youngcraft.exe
+Warning: Translations will not be available due to the following error.
+
+Cannot open C:/Users/UNIST/Documents/ChatGPT/Youngcraft/qt-sdk/translations/catalogs.json
+
+D:\[140/146] Linking CXX executable test_smoke.exe
+[141/146] Building CXX object CMakeFiles\test_editor.dir\tests\editor\test_editor.cpp.obj
+[142/146] Building CXX object CMakeFiles\test_xtb.dir\tests\xtb\test_xtb.cpp.obj
+[143/146] Building CXX object CMakeFiles\test_model.dir\tests\model\test_model.cpp.obj
+[144/146] Linking CXX executable test_xtb.exe
+[145/146] Linking CXX executable test_editor.exe
+[146/146] Linking CXX executable test_model.exe
+

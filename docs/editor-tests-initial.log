@@ -1,0 +1,22 @@
+Test project D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-current
+    Start 1: structure_files
+1/6 Test #1: structure_files ..................   Passed    0.13 sec
+    Start 2: parser_gaussian
+2/6 Test #2: parser_gaussian ..................   Passed    0.19 sec
+    Start 3: model_atoms_bonds
+3/6 Test #3: model_atoms_bonds ................   Passed    0.12 sec
+    Start 4: gui_smoke
+4/6 Test #4: gui_smoke ........................***Failed    4.08 sec
+
+    Start 5: xtb_runner
+5/6 Test #5: xtb_runner .......................   Passed    8.05 sec
+    Start 6: molecular_editor
+6/6 Test #6: molecular_editor .................   Passed    0.12 sec
+
+83% tests passed, 1 tests failed out of 6
+
+Total Test time (real) =  12.86 sec
+
+The following tests FAILED:
+	  4 - gui_smoke (Failed)
+Errors while running CTest

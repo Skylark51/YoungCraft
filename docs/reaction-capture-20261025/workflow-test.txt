@@ -1,0 +1,66 @@
+********* Start testing of SmokeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SmokeTest::initTestCase()
+QINFO  : SmokeTest::reactionCaptureWorkflow() {?
+    "formats":  [?
+                    "HTML Format",?
+                    "image/gif",?
+                    "GIF"?
+                ],?
+    "htmlLength":  387804,?
+    "wordCount":  3,?
+    "wordFloatingCount":  0,?
+    "wordText":  "///\r\r",?
+    "wordWidthsCm":  [?
+                         5.002,?
+                         5.002,?
+                         5.002?
+                     ],?
+    "wordHeightsCm":  [?
+                          4.542,?
+                          4.542,?
+                          4.542?
+                      ],?
+    "wordMedia":  [?
+                      "/word/media/image1.png",?
+                      "/word/media/image2.gif"?
+                  ]?
+}?
+
+QINFO  : SmokeTest::reactionCaptureWorkflow() {?
+    "formats":  [?
+                    "HTML Format",?
+                    "image/gif",?
+                    "GIF"?
+                ],?
+    "htmlLength":  332479,?
+    "pptCount":  3,?
+    "pptWidthsCm":  [?
+                        10,?
+                        10.001,?
+                        10?
+                    ],?
+    "pptTypes":  [?
+                     13,?
+                     13,?
+                     13?
+                 ],?
+    "pptHeightsCm":  [?
+                         9.08,?
+                         9.075,?
+                         9.08?
+                     ],?
+    "pptGifRetained":  true?
+}?
+
+PASS   : SmokeTest::reactionCaptureWorkflow()
+PASS   : SmokeTest::copiesTsAnimation(paused-selected-mode)
+PASS   : SmokeTest::copiesTsAnimation(playing-after-tab-transfer)
+PASS   : SmokeTest::copiesTsAnimation(auto-imaginary-mode)
+PASS   : SmokeTest::copiesTsAnimation(no-frequency-keeps-clipboard)
+QWARN  : SmokeTest::copiesMoleculeWithTransparentBackground() 2x supersampling unavailable at this viewport size; retaining native MSAA.
+PASS   : SmokeTest::copiesMoleculeWithTransparentBackground()
+PASS   : SmokeTest::loadsGaussianFixtureWithoutBlocking()
+PASS   : SmokeTest::cleanupTestCase()
+Totals: 9 passed, 0 failed, 0 skipped, 0 blacklisted, 10790ms
+********* Finished testing of SmokeTest *********

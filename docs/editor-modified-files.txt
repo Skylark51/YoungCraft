@@ -1,0 +1,27 @@
+CMakeLists.txt
+licenses/Avogadro-fragments-BSD-3-Clause.txt
+resources/fragments.qrc
+src/app/MainWindow.h
+src/app/mainwindow/MainWindow_Bonds.cpp
+src/app/mainwindow/MainWindow_Editor.cpp
+src/app/mainwindow/MainWindow_Geometry.cpp
+src/app/mainwindow/MainWindow_MM.cpp
+src/app/mainwindow/MainWindow_Menus.cpp
+src/app/mainwindow/MainWindow_Ui.cpp
+src/app/mainwindow/MainWindow_Window.cpp
+src/model/FragmentLibrary.cpp
+src/model/FragmentLibrary.h
+src/model/Molecule.cpp
+src/model/Molecule.h
+src/model/MoleculeEditController.cpp
+src/model/MoleculeEditController.h
+src/render/MoleculeView.h
+src/render/moleculeview/MoleculeView_Camera.cpp
+src/render/moleculeview/MoleculeView_Interaction.cpp
+src/render/moleculeview/MoleculeView_Overlays.cpp
+src/render/moleculeview/MoleculeView_State.cpp
+tests/editor/test_editor.cpp
+tests/smoke/test_smoke.cpp
+tools/build_editor_release.ps1
+tools/package_portable.ps1
+resources/fragments/: 166 groups + 76 ligands, SOURCE.txt

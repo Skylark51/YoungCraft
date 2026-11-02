@@ -1,0 +1,20 @@
+[
+  "CMakeLists.txt",
+  "src/app/mainwindow/MainWindow_Menus.cpp",
+  "src/render/MoleculeView.h",
+  "src/render/moleculeview/MoleculeShaders.inc",
+  "src/render/moleculeview/MoleculeView_AtomsBonds.cpp",
+  "src/render/moleculeview/MoleculeView_GL.cpp",
+  "src/render/moleculeview/MoleculeView_Scene.cpp",
+  "src/render/moleculeview/MoleculeView_Shadows.cpp",
+  "src/settings/StyleManager.cpp",
+  "src/settings/StyleManager.h",
+  "src/ui/StyleEditorDialog.cpp",
+  "src/ui/StyleEditorDialog.h",
+  "src/ui/styleeditor/StyleEditor_Atoms.cpp",
+  "src/ui/styleeditor/StyleEditor_Bonds.cpp",
+  "src/ui/styleeditor/StyleEditor_Lighting.cpp",
+  "tests/model/test_model.cpp",
+  "tests/smoke/test_smoke.cpp",
+  "tools/render_quality_preview.cpp"
+]

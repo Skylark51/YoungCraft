@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-19",
+  "feature": "Lab Ligands metal coordination and continuous sketching",
+  "binaries": {
+    "Youngcraft.exe": "83e5a9f92c78bb966d586b1ede323a66e674db14295648a7ce3d9f3be250a12b",
+    "dist/Youngcraft.exe": "83e5a9f92c78bb966d586b1ede323a66e674db14295648a7ce3d9f3be250a12b",
+    ".build/update-20261019/app/Youngcraft.exe": "83e5a9f92c78bb966d586b1ede323a66e674db14295648a7ce3d9f3be250a12b"
+  },
+  "ctest": "7 suites passed",
+  "windowsGui": [
+    "labLigandBrowserBuildsSelectedMetal passed",
+    "continuousSketchClicksStrokeRingAndUndo passed"
+  ],
+  "metalModelCases": 25,
+  "runtimeLaunch": "root and dist passed"
+}

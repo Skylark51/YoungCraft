@@ -1,0 +1,91 @@
+343 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.7
+343 INFO: Python: 3.12.10
+392 INFO: Platform: Windows-11-10.0.26200-SP0
+392 INFO: Python environment: C:\Users\UNIST\AppData\Local\Programs\Python\Python312
+396 INFO: wrote D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\YoungcraftMM.spec
+398 INFO: Removing temporary files and cleaning cache in C:\Users\UNIST\AppData\Local\pyinstaller
+406 INFO: Module search paths (PYTHONPATH):
+['D:\\�̿���\\������Ʈ ����\\����������Ʈ\\Youngcraft',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312',
+ 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages',
+ 'C:\\Users\\UNIST\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages',
+ 'D:\\�̿���\\������Ʈ ����\\����������Ʈ\\Youngcraft\\tools']
+1109 INFO: checking Analysis
+1109 INFO: Building Analysis because Analysis-00.toc is non existent
+1109 INFO: Looking for Python shared library...
+1109 INFO: Using Python shared library: C:\Users\UNIST\AppData\Local\Programs\Python\Python312\python312.dll
+1109 INFO: Running Analysis Analysis-00.toc
+1109 INFO: Target bytecode optimization level: 0
+1109 INFO: Initializing module dependency graph...
+1109 INFO: Initializing module graph hook caches...
+1231 INFO: Analyzing modules for base_library.zip ...
+2890 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+3857 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+5276 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+6543 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+8414 INFO: Caching module dependency graph...
+8434 INFO: Analyzing D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\tools\mm_optimize.py
+8577 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+9082 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+9677 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+9681 INFO: SetuptoolsInfo: initializing cached setuptools info...
+10655 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+10874 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+11255 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+12046 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+12133 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+12304 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+13374 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+14259 INFO: Processing pre-find-module-path hook 'hook-tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+14263 INFO: TclTkInfo: initializing cached Tcl/Tk info...
+14781 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+14796 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+14875 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+15437 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+15599 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+15907 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+16140 INFO: Processing module hooks (post-graph stage)...
+16827 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+17010 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks'
+17039 INFO: Performing binary vs. data reclassification (929 entries)
+23422 INFO: Looking for ctypes DLLs
+23456 INFO: Analyzing run-time hooks ...
+23456 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+23463 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+23477 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+23483 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\PyInstaller\\hooks\\rthooks'
+23510 INFO: Creating base_library.zip...
+23514 INFO: Looking for dynamic libraries
+24374 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\rdkit.libs', 'C:\\Users\\UNIST\\AppData\\Roaming\\Python\\Python312\\site-packages\\numpy.libs']
+24374 INFO: Extra DLL search directories (PATH): []
+26326 INFO: Warnings written to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\warn-YoungcraftMM.txt
+26343 INFO: Graph cross-reference written to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\xref-YoungcraftMM.html
+26480 INFO: checking PYZ
+26480 INFO: Building PYZ because PYZ-00.toc is non existent
+26480 INFO: Building PYZ (ZlibArchive) D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\PYZ-00.pyz
+26874 INFO: Building PYZ (ZlibArchive) D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\PYZ-00.pyz completed successfully.
+26890 INFO: checking PKG
+26890 INFO: Building PKG because PKG-00.toc is non existent
+26890 INFO: Building PKG (CArchive) YoungcraftMM.pkg
+26937 INFO: Building PKG (CArchive) YoungcraftMM.pkg completed successfully.
+26937 INFO: Bootloader C:\Users\UNIST\AppData\Roaming\Python\Python312\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+26937 INFO: checking EXE
+26937 INFO: Building EXE because EXE-00.toc is non existent
+26937 INFO: Building EXE from EXE-00.toc
+26937 INFO: Copying bootloader EXE to D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\work\YoungcraftMM\YoungcraftMM.exe
+26999 INFO: Copying icon to EXE
+27030 INFO: Copying 0 resources to EXE
+27030 INFO: Embedding manifest in EXE
+27061 INFO: Appending PKG archive to EXE
+27202 INFO: Fixing EXE headers
+27421 INFO: Building EXE from EXE-00.toc completed successfully.
+27421 INFO: checking COLLECT
+27421 INFO: Building COLLECT because COLLECT-00.toc is non existent
+27421 INFO: Removing dir D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime\YoungcraftMM
+28055 INFO: Building COLLECT COLLECT-00.toc
+33343 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+33359 INFO: Build complete! The results are available in: D:\�̿���\������Ʈ ����\����������Ʈ\Youngcraft\build-mm-runtime
+D:\이영섭\프로젝트 개발\개발프로젝트\Youngcraft\build-mm-runtime\YoungcraftMM\YoungcraftMM.exe

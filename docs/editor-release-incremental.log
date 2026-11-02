@@ -1,0 +1,8 @@
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR) 
+-- Configuring done (0.3s)
+-- Generating done (0.9s)
+-- Build files have been written to: D:/이영섭/프로젝트 개발/개발프로젝트/Youngcraft/build-editor-final
+[1/4] Automatic MOC and UIC for target test_smoke
+[2/3] Building CXX object CMakeFiles\test_smoke.dir\tests\smoke\test_smoke.cpp.obj
+[3/3] Linking CXX executable test_smoke.exe

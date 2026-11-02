@@ -1,0 +1,51 @@
+[
+  {
+    "repo": "dftd4/dftd4",
+    "revision": "v3.4.0",
+    "source": "https://api.github.com/repos/dftd4/dftd4/tarball/v3.4.0",
+    "archive": "dftd4-v3.4.0.tar.gz",
+    "selection": "pinned release"
+  },
+  {
+    "repo": "dftd3/simple-dftd3",
+    "revision": "v1.0.0",
+    "source": "https://api.github.com/repos/dftd3/simple-dftd3/tarball/v1.0.0",
+    "archive": "simple-dftd3-v1.0.0.tar.gz",
+    "selection": "pinned release"
+  },
+  {
+    "repo": "grimme-lab/multicharge",
+    "revision": "v0.2.0",
+    "source": "https://api.github.com/repos/grimme-lab/multicharge/tarball/v0.2.0",
+    "archive": "multicharge-v0.2.0.tar.gz",
+    "selection": "pinned release"
+  },
+  {
+    "repo": "toml-f/toml-f",
+    "revision": "v0.4.1",
+    "source": "https://api.github.com/repos/toml-f/toml-f/tarball/v0.4.1",
+    "archive": "toml-f-v0.4.1.tar.gz",
+    "selection": "pinned release"
+  },
+  {
+    "repo": "grimme-lab/mctc-lib",
+    "revision": "77f65c6f2cf6330d05d0757ca173da097096780e",
+    "source": "https://api.github.com/repos/grimme-lab/mctc-lib/tarball/77f65c6f2cf6330d05d0757ca173da097096780e",
+    "archive": "mctc-lib-77f65c6f2cf6.tar.gz",
+    "selection": "last upstream commit before Windows compilation date; exact upstream dependency build revision is not published"
+  },
+  {
+    "repo": "grimme-lab/CPCM-X",
+    "revision": "2eebe2435999b7cb1a518ae0a7b34214067aa5ab",
+    "source": "https://api.github.com/repos/grimme-lab/CPCM-X/tarball/2eebe2435999b7cb1a518ae0a7b34214067aa5ab",
+    "archive": "CPCM-X-2eebe2435999.tar.gz",
+    "selection": "last upstream commit before Windows compilation date; exact upstream dependency build revision is not published"
+  },
+  {
+    "repo": "grimme-lab/numsa",
+    "revision": "8baa4fc25c72aeee5c052a9096f4461a39439a66",
+    "source": "https://api.github.com/repos/grimme-lab/numsa/tarball/8baa4fc25c72aeee5c052a9096f4461a39439a66",
+    "archive": "numsa-8baa4fc25c72.tar.gz",
+    "selection": "last upstream commit before Windows compilation date; exact upstream dependency build revision is not published"
+  }
+]

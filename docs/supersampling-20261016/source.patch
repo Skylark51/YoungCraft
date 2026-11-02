@@ -1,0 +1,296 @@
+--- before/src/render/MoleculeView.cpp
++++ after/src/render/MoleculeView.cpp
+@@ -48,6 +48,9 @@
+ MoleculeView::~MoleculeView() {
+     if (context()) makeCurrent();
+     clearSurfaceBuffers();
++    m_supersampleFbo.reset();
++    m_downsampleVao.destroy();
++    delete m_downsampleProgram;
+     delete m_program;
+     delete m_lineProgram;
+     delete m_depthProgram;
+--- before/src/render/MoleculeView.h
++++ after/src/render/MoleculeView.h
+@@ -8,6 +8,7 @@
+ 
+ #include <QMatrix4x4>
+ #include <QOpenGLBuffer>
++#include <QOpenGLFramebufferObject>
+ #include <QOpenGLFunctions_3_3_Core>
+ #include <QOpenGLShaderProgram>
+ #include <QOpenGLVertexArrayObject>
+@@ -111,6 +112,8 @@
+ private:
+ 
+     bool createPrograms();
++    bool beginSupersampling();
++    void resolveSupersampling();
+     void createMeshes();
+     void drawMesh(QOpenGLVertexArrayObject &vao, int vertexCount, const QMatrix4x4 &model,
+                   const QColor &color, bool lighting = true, float opacity = -1.0f,
+@@ -203,6 +206,11 @@
+     int m_cylinderVertexCount = 0;
+     int m_positiveSurfaceVertexCount = 0;
+     int m_negativeSurfaceVertexCount = 0;
++    std::unique_ptr<QOpenGLFramebufferObject> m_supersampleFbo;
++    QOpenGLShaderProgram *m_downsampleProgram = nullptr;
++    QOpenGLVertexArrayObject m_downsampleVao;
++    bool m_supersamplingActive = false;
++    bool m_supersamplingWarning = false;
+     bool m_glReady = false;
+     bool m_shadowReady = false;
+     bool m_depthPass = false;
+--- before/src/render/moleculeview/MoleculeView_GL.cpp
++++ after/src/render/moleculeview/MoleculeView_GL.cpp
+@@ -121,7 +121,29 @@
+     m_depthProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, kDepthVertexShader);
+     m_depthProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, kDepthFragmentShader);
+     m_depthProgram->link();
+-    for (auto *program : {m_program, m_lineProgram, m_depthProgram}) {
++    m_downsampleProgram = new QOpenGLShaderProgram;
++    m_downsampleProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, R"(
++        #version 330 core
++        out vec2 uv;
++        void main() {
++            vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
++            uv = p;
++            gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
++        }
++    )");
++    m_downsampleProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, R"(
++        #version 330 core
++        in vec2 uv;
++        uniform sampler2D scene;
++        out vec4 color;
++        void main() {
++            // At a 2:1 ratio, bilinear sampling averages exactly four source pixels.
++            color = texture(scene, uv);
++        }
++    )");
++    m_downsampleProgram->link();
++    m_downsampleVao.create();
++    for (auto *program : {m_program, m_lineProgram, m_depthProgram, m_downsampleProgram}) {
+         if (!program->isLinked()) { qWarning() << "Molecular shader failed:" << program->log(); return false; }
+     }
+     return true;
+--- before/src/render/moleculeview/MoleculeView_Scene.cpp
++++ after/src/render/moleculeview/MoleculeView_Scene.cpp
+@@ -30,6 +30,7 @@
+     const QVector3D keyLight = light(m_style.lightDirection, QVector3D(-1, 1, 2));
+     const QVector3D fillLight = light(m_style.secondLightDirection, QVector3D(1, 0, 1));
+     if (m_style.shadows && m_shadowReady) renderShadowMap(keyLight);
++    m_supersamplingActive = beginSupersampling();
+     glEnable(GL_DEPTH_TEST);
+     glEnable(GL_CULL_FACE);
+     glCullFace(GL_BACK);
+@@ -38,7 +39,8 @@
+     glDepthMask(GL_TRUE);
+     if (m_style.antiAliasing) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
+     const QColor background = m_style.background;
+-    glClearColor(background.redF(), background.greenF(), background.blueF(), m_transparentCapture ? 0.0f : 1.0f);
++    if (m_transparentCapture) glClearColor(0, 0, 0, 0);
++    else glClearColor(background.redF(), background.greenF(), background.blueF(), 1.0f);
+     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+     if (m_molecule.atoms.isEmpty()) {
+         QPainter painter(this);
+@@ -124,6 +126,8 @@
+     m_program->release();
+ 
+     if (m_style.showAxes) drawAxes(vp);
++    // Resolve the 3D scene before QPainter draws annotations in logical pixels.
++    if (m_supersamplingActive) resolveSupersampling();
+     if (m_cellVisible) drawCrystalCell(vp);
+     if (m_style.showVibrationVectors) drawVibrationVectors(vp);
+     // Screen-space annotations must remain visible over every rendered atom.
+@@ -131,6 +135,68 @@
+     glDisable(GL_CULL_FACE);
+     drawLabels(vp);
+     drawGeometryMeasurements(vp);
++    glEnable(GL_CULL_FACE);
++    glEnable(GL_DEPTH_TEST);
++}
++
++bool MoleculeView::beginSupersampling() {
++    const QSize native(qMax(1, qRound(width() * devicePixelRatioF())),
++                       qMax(1, qRound(height() * devicePixelRatioF())));
++    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
++    glViewport(0, 0, native.width(), native.height());
++    if (!m_style.antiAliasing || m_molecule.atoms.isEmpty()) {
++        m_supersampleFbo.reset();
++        return false;
++    }
++    const QSize high = native * 2;
++    GLint maxTexture = 0, maxViewport[2] = {};
++    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTexture);
++    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewport);
++    // Bound framebuffer memory on very large/high-DPI windows; retain native MSAA.
++    const bool supported = high.width() <= qMin(maxTexture, maxViewport[0]) &&
++        high.height() <= qMin(maxTexture, maxViewport[1]) &&
++        qint64(high.width()) * high.height() <= 16777216;
++    if (supported && (!m_supersampleFbo || m_supersampleFbo->size() != high)) {
++        m_supersampleFbo.reset();
++        QOpenGLFramebufferObjectFormat format;
++        format.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
++        format.setInternalTextureFormat(GL_RGBA8);
++        format.setSamples(0);
++        m_supersampleFbo = std::make_unique<QOpenGLFramebufferObject>(high, format);
++    }
++    if (!supported || !m_supersampleFbo || !m_supersampleFbo->isValid() || !m_supersampleFbo->bind()) {
++        m_supersampleFbo.reset();
++        glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
++        if (!m_supersamplingWarning) {
++            qWarning("2x supersampling unavailable at this viewport size; retaining native MSAA.");
++            m_supersamplingWarning = true;
++        }
++        return false;
++    }
++    glViewport(0, 0, high.width(), high.height());
++    return true;
++}
++
++void MoleculeView::resolveSupersampling() {
++    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
++    glViewport(0, 0, qRound(width() * devicePixelRatioF()), qRound(height() * devicePixelRatioF()));
++    glDisable(GL_DEPTH_TEST);
++    glDisable(GL_CULL_FACE);
++    glDisable(GL_BLEND);
++    glActiveTexture(GL_TEXTURE0);
++    glBindTexture(GL_TEXTURE_2D, m_supersampleFbo->texture());
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++    m_downsampleProgram->bind();
++    m_downsampleProgram->setUniformValue("scene", 0);
++    m_downsampleVao.bind();
++    glDrawArrays(GL_TRIANGLES, 0, 3);
++    m_downsampleVao.release();
++    m_downsampleProgram->release();
++    glBindTexture(GL_TEXTURE_2D, 0);
++    glEnable(GL_BLEND);
+     glEnable(GL_CULL_FACE);
+     glEnable(GL_DEPTH_TEST);
+ }
+--- before/src/render/moleculeview/MoleculeView_State.cpp
++++ after/src/render/moleculeview/MoleculeView_State.cpp
+@@ -86,24 +86,25 @@
+     update();
+     if(m_previewOverlay)m_previewOverlay->update();
+     repaint();
++    // A queued widget repaint may still contain the preceding opaque frame.
++    // Render capture flags synchronously before reading the framebuffer.
++    makeCurrent();
++    paintGL();
+     QImage captured = grabFramebuffer();
++    doneCurrent();
+     m_transparentCapture = false;
+     m_viewportOnlyCapture = false;
+     update();
+     if(m_previewOverlay)m_previewOverlay->update();
+     if (transparent) {
+-        QImage converted = captured.convertToFormat(QImage::Format_ARGB32);
+-        const QColor background = m_style.background;
+-        for (int y = 0; y < converted.height(); ++y) {
+-            for (int x = 0; x < converted.width(); ++x) {
+-                const QColor color = converted.pixelColor(x, y);
+-                if (color.alpha() == 0 || (std::abs(color.red() - background.red()) <= 2 &&
+-                    std::abs(color.green() - background.green()) <= 2 &&
+-                    std::abs(color.blue() - background.blue()) <= 2))
+-                    converted.setPixelColor(x, y, QColor(0, 0, 0, 0));
+-            }
+-        }
+-        return converted;
++        // Coverage averaging produces premultiplied RGB in the OpenGL buffer.
++        // Export straight-alpha pixels so PNG/clipboard edges keep their color.
++        if (captured.format() == QImage::Format_ARGB32_Premultiplied ||
++            captured.format() == QImage::Format_RGBA8888_Premultiplied)
++            return captured.convertToFormat(QImage::Format_ARGB32);
++        QImage premultiplied = captured.convertToFormat(QImage::Format_ARGB32);
++        premultiplied.reinterpretAsFormat(QImage::Format_ARGB32_Premultiplied);
++        return premultiplied.convertToFormat(QImage::Format_ARGB32);
+     }
+     return captured;
+ }
+--- before/src/ui/styleeditor/StyleEditor_Lighting.cpp
++++ after/src/ui/styleeditor/StyleEditor_Lighting.cpp
+@@ -87,7 +87,7 @@
+     connect(m_shadowStrengthSlider, &QSlider::valueChanged, m_shadowStrength, [this](int value) { QSignalBlocker blocker(m_shadowStrength); m_shadowStrength->setValue(value / 100.0); });
+     connect(m_shadowStrength, qOverload<double>(&QDoubleSpinBox::valueChanged), m_shadowStrengthSlider, [this](double value) { QSignalBlocker blocker(m_shadowStrengthSlider); m_shadowStrengthSlider->setValue(qRound(value * 100.0)); });
+     m_depthCueStrength = new QDoubleSpinBox; m_depthCueStrength->setRange(0, 1); m_depthCueStrength->setValue(m_style.depthCueStrength);
+-    m_antiAliasing = new QCheckBox(QStringLiteral("MSAA (지원 시 8×, 아니면 4×)")); m_antiAliasing->setChecked(m_style.antiAliasing);
++    m_antiAliasing = new QCheckBox(QStringLiteral("슈퍼샘플링 (가로·세로 2배) + MSAA")); m_antiAliasing->setChecked(m_style.antiAliasing);
+     m_perspective = new QCheckBox(QStringLiteral("원근 보기")); m_perspective->setChecked(m_style.perspective);
+     m_perspectiveFov = new QDoubleSpinBox; m_perspectiveFov->setRange(20, 70); m_perspectiveFov->setSuffix(QStringLiteral("°")); m_perspectiveFov->setValue(m_style.perspectiveFov);
+     m_grid = new QCheckBox(QStringLiteral("원자 격자 표시")); m_grid->setChecked(m_style.gridOnAtoms);
+--- before/tests/smoke/test_smoke.cpp
++++ after/tests/smoke/test_smoke.cpp
+@@ -62,6 +62,7 @@
+     void loadsGaussianFixtureWithoutBlocking();
+     void moleculeViewKeepsManualBond();
+     void rendersShadowAndTransparentCapture();
++    void supersamplingSmoothsDiagonalEdges();
+     void copiesMoleculeWithTransparentBackground();
+     void rendersOutwardFacesAndMolecularDepth();
+     void rendersContinuousBondsAndCleanSphereShadows();
+@@ -836,6 +837,60 @@
+     QCOMPARE(view.molecule().bonds.first().order, 2.0);
+ }
+ 
++void SmokeTest::supersamplingSmoothsDiagonalEdges() {
++    if (QGuiApplication::platformName()=="offscreen") QSKIP("Requires OpenGL");
++    MoleculeView view; view.resize(400,300);
++    Molecule m; m.atoms={{1,6,"C",{-2,-.8f,0}},{2,6,"C",{2,.8f,0}}}; m.setBond(0,1,1);
++    RenderStyle style; style.perspective=false; style.lighting=false; style.shadows=false;
++    style.depthCueing=false; style.showAxes=false; style.showLabels=false;
++    style.background=Qt::white; style.bondColorMode=BondColorMode::Uniform;
++    style.bondColor=Qt::blue; style.elementColors[6]=Qt::blue;
++    style.atomScale=.035f; style.bondRadius=.035f; style.antiAliasing=false;
++    view.setStyle(style); view.setMolecule(m); view.show(); QTest::qWait(100);
++    QVERIFY(view.isValid());
++    const auto projection=view.viewProjection();
++    const QImage before=view.image(false); QVERIFY(!view.m_supersamplingActive);
++    style.antiAliasing=true; view.setStyle(style);
++    const QImage after=view.image(false); QVERIFY(view.m_supersamplingActive);
++    const QSize native(qRound(view.width()*view.devicePixelRatioF()),qRound(view.height()*view.devicePixelRatioF()));
++    QCOMPARE(view.m_supersampleFbo->size(),native*2); QCOMPARE(after.size(),before.size());
++    QCOMPARE(view.viewProjection(),projection);
++    auto partialPixels=[](const QImage &im) {
++        int count=0;
++        for (int y=0;y<im.height();++y) for(int x=0;x<im.width();++x) {
++            auto c=im.pixelColor(x,y);
++            if(c.red()>5 && c.red()<250 && c.blue()>250) ++count;
++        }
++        return count;
++    };
++    QVERIFY2(partialPixels(after)>partialPixels(before)+100,"Diagonal silhouette needs intermediate coverage pixels");
++    QCOMPARE(view.pickAtom(QPoint(qRound(view.project(m.atoms[0].position,projection).x()),
++                                 qRound(view.project(m.atoms[0].position,projection).y()))),0);
++    const QImage transparent=view.image(true); QCOMPARE(transparent.size(),after.size());
++    QCOMPARE(transparent.pixelColor(0,0).alpha(),0);
++    int partialAlpha=0;
++    for(int y=0;y<transparent.height();++y) for(int x=transparent.width()/5;x<transparent.width()*4/5;++x) {
++        const auto c=transparent.pixelColor(x,y);
++        if(c.alpha()>20 && c.alpha()<235) {
++            ++partialAlpha;
++            QVERIFY2(c.blue()>245,"Transparent edge colors must retain straight alpha without dark halos");
++        }
++    }
++    qInfo() << "edge pixels before/after/transparent:" << partialPixels(before) << partialPixels(after) << partialAlpha << "format:" << transparent.format();
++    QVERIFY(partialAlpha>100);
++    style.background=Qt::black; view.setStyle(style);
++    const auto darkTransparent=view.image(true);
++    QCOMPARE(darkTransparent,transparent);
++    const auto capture=qEnvironmentVariable("YOUNGCRAFT_SSAA_CAPTURE_DIR");
++    if(!capture.isEmpty()) {
++        QVERIFY(before.save(capture+"/before.png")); QVERIFY(after.save(capture+"/after.png"));
++        QVERIFY(transparent.save(capture+"/transparent.png"));
++    }
++    view.resize(512,384); QTest::qWait(60); view.image();
++    QCOMPARE(view.m_supersampleFbo->size(),QSize(qRound(512*view.devicePixelRatioF()),qRound(384*view.devicePixelRatioF()))*2);
++    view.makeCurrent(); QCOMPARE(view.glGetError(),GLenum(GL_NO_ERROR)); view.doneCurrent();
++}
++
+ void SmokeTest::rendersShadowAndTransparentCapture() {
+     Molecule molecule;
+     molecule.atoms = {{1, 6, QStringLiteral("C"), {-0.7f, 0, 0}},

@@ -1,0 +1,8 @@
+********* Start testing of EditorTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : EditorTest::initTestCase()
+QWARN  : EditorTest::oxygenWithColigands() QCoreApplication::applicationDirPath: Please instantiate the QApplication object first
+PASS   : EditorTest::oxygenWithColigands()
+PASS   : EditorTest::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 13ms
+********* Finished testing of EditorTest *********

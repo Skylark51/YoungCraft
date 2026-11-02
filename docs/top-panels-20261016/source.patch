@@ -1,0 +1,294 @@
+--- before/src/app/MainWindow.cpp
++++ after/src/app/MainWindow.cpp
+@@ -52,7 +52,7 @@
+     createToolBar();
+     const QSettings settings;
+     restoreGeometry(settings.value(QStringLiteral("window/geometry")).toByteArray());
+-    restoreState(settings.value(QStringLiteral("window/state")).toByteArray());
++    restoreState(settings.value(QStringLiteral("window/topPanelState")).toByteArray());
+     if (width() < 900 || height() < 600) resize(1400, 900);
+     updateWindowTitle();
+ }
+--- before/src/app/MainWindow.h
++++ after/src/app/MainWindow.h
+@@ -64,6 +64,8 @@
+     void showScanPoint(int index);
+     void showIrcPoint(int index);
+     void showAtom(int index);
++    void updateAtomVisibility();
++    void updatePanelActions();
+     void toggleFrameAnimation();
+     void toggleFrequencyAnimation();
+     void restoreFrequencyGeometry();
+--- before/src/render/MoleculeView.h
++++ after/src/render/MoleculeView.h
+@@ -31,6 +31,7 @@
+     ~MoleculeView() override;
+ 
+     void setMolecule(const Molecule &molecule);
++    void setAtomVisibility(const QVector<bool> &visibility);
+     void setEditedMolecule(const Molecule &molecule);
+     void setCoordinates(const QVector<QVector3D> &coordinates);
+     void setFrequencyMode(const FrequencyMode *mode);
+--- before/src/ui/AnalysisPanel.cpp
++++ after/src/ui/AnalysisPanel.cpp
+@@ -19,6 +19,7 @@
+ #include <QTableWidget>
+ #include <QTableWidgetItem>
+ #include <QTimer>
++#include <QTabBar>
+ #include <QVBoxLayout>
+ 
+ #include <cmath>
+@@ -39,6 +40,7 @@
+     m_tabs->addTab(makeOrbitalsTab(), QStringLiteral("오비탈"));
+     m_coordinateTabIndex = m_tabs->addTab(makeCoordinateTab(), QStringLiteral("좌표"));
+     connect(m_tabs, &QTabWidget::currentChanged, this, [this](int index) {
++        emit currentTabChanged(index);
+         if (index == m_coordinateTabIndex) emit coordinateViewRequested();
+         emit workspaceModeRequested(index == m_tddftTabIndex);
+     });
+@@ -59,6 +61,16 @@
+     if (list && list->currentRow() > 0) list->setCurrentRow(list->currentRow() - 1);
+ }
+ 
++QStringList AnalysisPanel::tabTitles() const {
++    QStringList titles;
++    for (int i = 0; i < m_tabs->count(); ++i) titles.push_back(m_tabs->tabText(i));
++    return titles;
++}
++
++void AnalysisPanel::setTabBarVisible(bool visible) {
++    m_tabs->tabBar()->setVisible(visible);
++}
++
+ void AnalysisPanel::setCurrentTab(int index) {
+     if (m_tabs && index >= 0 && index < m_tabs->count()) m_tabs->setCurrentIndex(index);
+ }
+--- before/src/ui/AnalysisPanel.h
++++ after/src/ui/AnalysisPanel.h
+@@ -41,8 +41,11 @@
+     void selectNext();
+     void selectPrevious();
+     void setCurrentTab(int index);
++    QStringList tabTitles() const;
++    void setTabBarVisible(bool visible);
+ 
+ signals:
++    void currentTabChanged(int index);
+     void frameRequested(int index);
+     void frequencyRequested(int index);
+     void scanPointRequested(int index);
+--- before/src/app/mainwindow/MainWindow_File.cpp
++++ after/src/app/mainwindow/MainWindow_File.cpp
+@@ -138,6 +138,7 @@
+     if (m_activeDocument != target) { saveDocumentState(); bindDocument(target); }
+     m_documentArea->setCurrentWidget(index >= 0 ? static_cast<QWidget *>(m_documentTabs) : m_emptyDocument->workspace);
+     m_sidebars->setCurrentWidget(target->sidebar);
++    updatePanelActions();
+     const bool ready = target == m_emptyDocument || target->workspace->property("loadFinished").toBool();
+     for (QAction *action : menuBar()->actions()) {
+         if (action->text() == QStringLiteral("편집") || action->text() == QStringLiteral("도구")) action->setEnabled(ready);
+--- before/src/app/mainwindow/MainWindow_Menus.cpp
++++ after/src/app/mainwindow/MainWindow_Menus.cpp
+@@ -131,10 +131,10 @@
+     view->addAction(m_explorerDock->toggleViewAction());
+     m_explorerDock->toggleViewAction()->setText(QStringLiteral("분석 패널 표시"));
+     add(view, QStringLiteral("기본 패널 배치 복원"), {}, [this] {
+-        addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
++        addDockWidget(Qt::TopDockWidgetArea, m_explorerDock);
+         m_explorerDock->show();
+         m_explorerDock->raise();
+-        resizeDocks({m_explorerDock}, {340}, Qt::Horizontal);
++        resizeDocks({m_explorerDock}, {280}, Qt::Vertical);
+         setStatus(QStringLiteral("기본 패널 배치를 복원했습니다"));
+     });
+     view->addSeparator();
+@@ -194,27 +194,29 @@
+             if (first.atomicNumber == 1 && second.atomicNumber == 6) first.visible = false;
+             if (second.atomicNumber == 1 && first.atomicNumber == 6) second.visible = false;
+         }
+-        m_view->setMolecule(molecule);
++        updateAtomVisibility();
+     });
+     add(hideAtoms, QStringLiteral("더미 원자 숨기기"), {}, [this] {
+         for (Atom &atom : m_data.molecule.atoms)
+             if (atom.atomicNumber <= 0) atom.visible = false;
+-        m_view->setMolecule(m_data.molecule);
++        updateAtomVisibility();
+     });
+     add(hideAtoms, QStringLiteral("선택 원자 숨기기"), {}, [this] {
+-        const int selected = m_view->selectedAtom();
+-        if (selected < 0 || selected >= m_data.molecule.atoms.size()) {
++        auto selected = selectedStructureAtoms();
++        const int picked = m_view->selectedAtom();
++        if (selected.isEmpty() && picked >= 0 && picked < m_data.molecule.atoms.size()) selected.insert(picked);
++        if (selected.isEmpty()) {
+             setStatus(QStringLiteral("선택된 원자가 없습니다"));
+             return;
+         }
+-        m_data.molecule.atoms[selected].visible = !m_data.molecule.atoms[selected].visible;
+-        m_view->setMolecule(m_data.molecule);
++        for (int index : selected) m_data.molecule.atoms[index].visible = false;
++        updateAtomVisibility();
+     });
+     hideAtoms->addSeparator();
+     add(hideAtoms, QStringLiteral("숨긴 원자 모두 복원"), {}, [this, showHydrogen] {
+         for (Atom &atom : m_data.molecule.atoms) atom.visible = true;
+         m_style.showHydrogen = true;
+-        m_view->setMolecule(m_data.molecule);
++        updateAtomVisibility();
+         applyStyle(m_style);
+         showHydrogen->setChecked(true);
+     });
+--- before/src/app/mainwindow/MainWindow_Navigation.cpp
++++ after/src/app/mainwindow/MainWindow_Navigation.cpp
+@@ -142,6 +142,13 @@
+     setStatus(QStringLiteral("IRC 점 %1 표시").arg(index + 1));
+ }
+ 
++void MainWindow::updateAtomVisibility() {
++    QVector<bool> visibility;
++    visibility.reserve(m_data.molecule.atoms.size());
++    for (const Atom &atom : m_data.molecule.atoms) visibility.push_back(atom.visible);
++    m_view->setAtomVisibility(visibility);
++}
++
+ void MainWindow::showAtom(int index) {
+     if (index < 0 || index >= m_data.molecule.atoms.size()) return;
+     m_workspace->setCurrentWidget(m_moleculeWorkspace);
+--- before/src/app/mainwindow/MainWindow_Toolbar.cpp
++++ after/src/app/mainwindow/MainWindow_Toolbar.cpp
+@@ -45,6 +45,7 @@
+ void MainWindow::createToolBar() {
+     auto *toolbar = addToolBar(QStringLiteral("주 도구 모음"));
+     toolbar->setObjectName(QStringLiteral("MainToolBar"));
++    toolbar->setMovable(false);
+     auto add = [this, toolbar](const QString &text, const std::function<void()> &function) {
+         auto *action = toolbar->addAction(text);
+         connect(action, &QAction::triggered, function);
+@@ -61,6 +62,39 @@
+     add(QStringLiteral("중앙 정렬"), [this] { m_view->centerOnMolecule(); });
+     toolbar->addAction(m_atomLabelsAction);
+     add(QStringLiteral("재생"), [this] { m_analysis->currentTab() == 1 ? toggleFrequencyAnimation() : toggleFrameAnimation(); });
++
++    addToolBarBreak(Qt::TopToolBarArea);
++    auto *panels = addToolBar(QStringLiteral("분석 패널 도구 모음"));
++    panels->setObjectName(QStringLiteral("AnalysisToolBar"));
++    panels->setMovable(false);
++    panels->addAction(m_explorerDock->toggleViewAction());
++    panels->addSeparator();
++    const auto titles = m_analysis->tabTitles();
++    for (int i = 0; i < titles.size(); ++i) {
++        auto *action = panels->addAction(titles[i]);
++        action->setObjectName(QStringLiteral("AnalysisPanelTab%1").arg(i));
++        action->setProperty("analysisTab", i);
++        action->setCheckable(true);
++        connect(action, &QAction::triggered, this, [this, i] {
++            if (m_explorerDock->isVisible() && m_analysis->currentTab() == i) {
++                m_explorerDock->hide();
++            } else {
++                m_analysis->setCurrentTab(i);
++                m_explorerDock->show();
++                m_explorerDock->raise();
++            }
++            updatePanelActions();
++        });
++    }
++    connect(m_explorerDock, &QDockWidget::visibilityChanged, this, &MainWindow::updatePanelActions);
++    updatePanelActions();
++}
++
++void MainWindow::updatePanelActions() {
++    for (auto *action : findChildren<QAction *>()) {
++        const auto tab = action->property("analysisTab");
++        if (tab.isValid()) action->setChecked(m_explorerDock->isVisible() && m_analysis->currentTab() == tab.toInt());
++    }
+ }
+ 
+ } // namespace youngcraft
+--- before/src/app/mainwindow/MainWindow_Ui.cpp
++++ after/src/app/mainwindow/MainWindow_Ui.cpp
+@@ -36,6 +36,7 @@
+ #include <QPushButton>
+ #include <QProgressBar>
+ #include <QSettings>
++#include <QScrollArea>
+ #include <QSpinBox>
+ #include <QSplitter>
+ #include <QStackedWidget>
+@@ -64,10 +65,10 @@
+     m_explorerDock = new QDockWidget(QStringLiteral("분석 패널"), this);
+     m_explorerDock->setObjectName(QStringLiteral("ResultExplorerDock"));
+     m_sidebars = new QStackedWidget(m_explorerDock);
+-    m_explorerDock->setMinimumWidth(300);
++    m_explorerDock->setAllowedAreas(Qt::TopDockWidgetArea);
+     m_explorerDock->setWidget(m_sidebars);
+-    addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
+-    resizeDocks({m_explorerDock}, {340}, Qt::Horizontal);
++    addDockWidget(Qt::TopDockWidgetArea, m_explorerDock);
++    resizeDocks({m_explorerDock}, {280}, Qt::Vertical);
+     m_statusLabel = new QLabel(QStringLiteral("준비"), this);
+     statusBar()->addPermanentWidget(m_statusLabel, 1);
+     createDocumentUi();
+@@ -312,16 +313,26 @@
+         QApplication::clipboard()->setImage(m_tddftWorkspacePlot->image(true));
+     });
+     m_workspace->addWidget(m_tddftWorkspace);
+-    auto *contextSplitter = new QSplitter(Qt::Vertical, m_sidebars);
++    auto *contextSplitter = new QSplitter(Qt::Horizontal, m_sidebars);
++    contextSplitter->setObjectName(QStringLiteral("TopPanelSplitter"));
+     m_currentSidebar = contextSplitter;
+     m_explorer = new QTreeWidget(contextSplitter);
+     m_explorer->setHeaderLabels({QStringLiteral("계산 결과")});
+-    m_analysis = new AnalysisPanel(contextSplitter);
++    auto *analysisScroll = new QScrollArea(contextSplitter);
++    analysisScroll->setObjectName(QStringLiteral("TopAnalysisScroll"));
++    analysisScroll->setWidgetResizable(true);
++    analysisScroll->setFrameShape(QFrame::NoFrame);
++    m_analysis = new AnalysisPanel(analysisScroll);
++    m_analysis->setTabBarVisible(false);
++    analysisScroll->setWidget(m_analysis);
+     contextSplitter->addWidget(m_explorer);
+-    contextSplitter->addWidget(m_analysis);
+-    contextSplitter->setStretchFactor(0, 2);
+-    contextSplitter->setStretchFactor(1, 3);
+-    contextSplitter->setSizes({260, 430});
++    contextSplitter->addWidget(analysisScroll);
++    contextSplitter->setStretchFactor(0, 0);
++    contextSplitter->setStretchFactor(1, 1);
++    contextSplitter->setSizes({240, 1000});
++    connect(m_analysis, &AnalysisPanel::currentTabChanged, this, [this, panel = m_analysis] {
++        if (panel == m_analysis) updatePanelActions();
++    });
+     m_sidebars->addWidget(contextSplitter);
+     m_animation = new AnimationController(m_workspace);
+     connect(m_view, &MoleculeView::atomPicked, this, [this](int index) {
+--- before/src/app/mainwindow/MainWindow_Window.cpp
++++ after/src/app/mainwindow/MainWindow_Window.cpp
+@@ -62,7 +62,7 @@
+ void MainWindow::closeEvent(QCloseEvent *event) {
+     QSettings settings;
+     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
+-    settings.setValue(QStringLiteral("window/state"), saveState());
++    settings.setValue(QStringLiteral("window/topPanelState"), saveState());
+     StyleManager::save(m_style);
+     event->accept();
+ }
+--- before/src/render/moleculeview/MoleculeView_State.cpp
++++ after/src/render/moleculeview/MoleculeView_State.cpp
+@@ -25,6 +25,14 @@
+     emit geometryChanged();
+     update();
+     if(m_previewOverlay)m_previewOverlay->update();
++}
++
++void MoleculeView::setAtomVisibility(const QVector<bool> &visibility) {
++    if (visibility.size() != m_molecule.atoms.size()) return;
++    for (int i = 0; i < visibility.size(); ++i) m_molecule.atoms[i].visible = visibility[i];
++    // Visibility changes must not refit the camera or replace live frame coordinates.
++    update();
++    if (m_previewOverlay) m_previewOverlay->update();
+ }
+ 
+ void MoleculeView::setEditedMolecule(const Molecule &molecule) {

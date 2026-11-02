@@ -1,0 +1,10 @@
+********* Start testing of SmokeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SmokeTest::initTestCase()
+PASS   : SmokeTest::topPanelToolbarFollowsDocuments()
+QWARN  : SmokeTest::scanVisibilityAndSquareViewport() setGeometry: Unable to set geometry 2000x1188+9+38 (frame: 2018x1235+0+0) on QWidgetWindow/"YoungcraftMainWindowWindow" on "TFG24F07W". Resulting geometry: 2000x1055+9+38 (frame: 2018x1102+0+0) margins: 9, 38, 9, 9 minimum size: 559x634 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=717, y=840)))
+PASS   : SmokeTest::scanVisibilityAndSquareViewport()
+PASS   : SmokeTest::pastedXYZWorkflow()
+PASS   : SmokeTest::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 3506ms
+********* Finished testing of SmokeTest *********

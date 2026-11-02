@@ -1,0 +1,57 @@
+{
+  "chemicalJson": 1,
+  "atoms": {
+    "elements": {
+      "number": [
+        0,
+        8,
+        8
+      ]
+    },
+    "coords": {
+      "3d": [
+        0.0,
+        0.0,
+        0.0,
+        1.575107077442023,
+        -0.11839019964806621,
+        -1.1434690442768178,
+        1.5097044748687953,
+        -0.848910025892396,
+        -2.394294085216038
+      ]
+    },
+    "formalCharges": [
+      0,
+      -1,
+      -1
+    ]
+  },
+  "bonds": {
+    "connections": {
+      "index": [
+        0,
+        1,
+        1,
+        2
+      ]
+    },
+    "order": [
+      1,
+      1
+    ]
+  },
+  "properties": {
+    "name": "peroxo (end-on, eta1)",
+    "category": "lab-adduct",
+    "totalCharge": -2,
+    "source": {
+      "kind": "idealized editable starting model",
+      "metalOAngstrom": 1.95,
+      "oxygenOxygenAngstrom": 1.45,
+      "notOptimized": true,
+      "reference": "https://doi.org/10.1073/pnas.0535926100",
+      "note": "Binding geometry/charge are input assumptions, not an electronic-state assignment. Superoxo O-O uses a schematic bond order of 1.5."
+    }
+  }
+}

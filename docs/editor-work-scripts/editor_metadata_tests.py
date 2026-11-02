@@ -1,0 +1,15 @@
+from pathlib import Path
+p=Path('src/model/FragmentLibrary.cpp');s=p.read_text(encoding='utf-8').replace('if(site>=0)edited.coordinationSites[site].occupied=true;', 'if(site>=0){edited.coordinationSites[site].occupied=true;edited.coordinationSites[site].donor=map[donor];}');p.write_text(s,encoding='utf-8')
+p=Path('src/model/MoleculeEditController.cpp');s=p.read_text(encoding='utf-8').replace('s.direction.lengthSquared() < 0.5f)', 's.direction.lengthSquared() < 0.5f || (s.occupied && (s.donor<0 || s.donor>=m.atoms.size())))');p.write_text(s,encoding='utf-8')
+p=Path('src/app/mainwindow/MainWindow_MM.cpp');s=p.read_text(encoding='utf-8').replace('a.occupied!=b.occupied','a.occupied!=b.occupied||a.donor!=b.donor');p.write_text(s,encoding='utf-8')
+p=Path('tests/editor/test_editor.cpp');s=p.read_text(encoding='utf-8').replace('QCOMPARE(metal.bonds.first().order,3.0);', 'QCOMPARE(metal.bonds.first().order,3.0);metal.reconcileAutoHydrogens();QCOMPARE(metal.atoms.size(),3);\n    metal.removeAtom(1);for(auto site:metal.coordinationSites)QVERIFY(!site.occupied);QVERIFY(MoleculeEditController::validate(metal));');p.write_text(s,encoding='utf-8')
+p=Path('tests/smoke/test_smoke.cpp');s=p.read_text(encoding='utf-8').replace('    void editorFragmentUndoAndKeyboard();','    void editorFragmentUndoAndKeyboard();\n    void editorVisualPreview();');idx=s.index('QTEST_MAIN');s=s[:idx]+'''void SmokeTest::editorVisualPreview(){
+    if(QGuiApplication::platformName()=="offscreen")QSKIP("OpenGL visual verification runs on Windows platform");
+    MainWindow w;w.resize(1200,850);w.show();Molecule m;FragmentLibrary::coordinationCenter(m,27,2,7,{});Fragment f;QString error;QVERIFY(FragmentLibrary::read(":/fragments/ligands/monodentate/carbonyl.cjson",f,&error));QVERIFY(FragmentLibrary::insert(m,f,0,{}, {1,0,0},&error));w.newDrawingDocument(m);auto *v=w.m_view;w.m_drawElement->setCurrentText("Co");w.m_drawBar->findChild<QSpinBox *>("DrawFormalCharge")->setValue(2);v->selection().atoms={0};QTest::qWait(100);QVERIFY(v->isValid());v->bestView();
+    QString capture=qEnvironmentVariable("YOUNGCRAFT_EDITOR_CAPTURE");if(!capture.isEmpty())QVERIFY(w.grab().save(capture));
+    auto before=v->molecule();w.setDrawingMode(false);v->setBondCentricMode(true);int index=before.bondIndex(1,2);QVERIFY(index>=0);v->m_activeBond=index;
+    auto p=v->project(before.atoms[2].position,v->viewProjection());QPoint start(qRound(p.x()),qRound(p.y())),end=start+QPoint(40,0);
+    QTest::mousePress(v,Qt::RightButton,Qt::NoModifier,start);QMouseEvent e(QEvent::MouseMove,QPointF(end),QPointF(v->mapToGlobal(end)),Qt::NoButton,Qt::RightButton,Qt::NoModifier);QApplication::sendEvent(v,&e);QCOMPARE(v->molecule().atoms[2].position,before.atoms[2].position);QVERIFY(v->m_centricDrag);QTest::mouseRelease(v,Qt::RightButton,Qt::NoModifier,end);QVERIFY(qAbs(GeometryEditor::distance(v->molecule(),1,2)-GeometryEditor::distance(before,1,2)-0.4)<1e-4);w.undoDrawingEdit();QCOMPARE(v->molecule().atoms[2].position,before.atoms[2].position);
+}
+
+'''+s[idx:];p.write_text(s,encoding='utf-8')

@@ -1,0 +1,64 @@
+#p B3LYP/6-31G(d) opt freq scan TD(NStates=2)
+
+Youngcraft regression fixture
+
+ Charge =  0 Multiplicity = 1
+ Step number   1 out of a maximum of  2
+ Standard orientation:
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.000000
+      2          1           0        0.000000    0.000000    0.960000
+      3          1           0        0.920000    0.000000   -0.240000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -75.123456789     A.U. after   8 cycles
+ Maximum Force            0.0100     0.0005     YES
+ RMS     Force            0.0040     0.0002     YES
+ Maximum Displacement     0.0200     0.0010     YES
+ RMS     Displacement     0.0080     0.0003     YES
+ Optimization completed.
+ Step number   2 out of a maximum of  2
+ Standard orientation:
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.010000
+      2          1           0        0.000000    0.000000    0.970000
+      3          1           0        0.920000    0.000000   -0.230000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -75.223456789     A.U. after   7 cycles
+ Optimization completed.
+ Summary of Optimized Potential Surface Scan
+                         1               2
+ Eigenvalues -- -75.123456789   -75.223456789
+
+ Frequencies --  -120.50  1550.25  3650.10
+ IR Inten    --  12.0  2.0  30.0
+ Raman Activ --  4.0  5.0  6.0
+ Atom AN      X      Y      Z        X      Y      Z        X      Y      Z
+ ---------------------------------------------------------------------
+    1   8     0.01 0.02 0.03  0.04 0.05 0.06  0.07 0.08 0.09
+    2   1     0.02 0.03 0.04  0.05 0.06 0.07  0.08 0.09 0.10
+    3   1     0.03 0.04 0.05  0.06 0.07 0.08  0.09 0.10 0.11
+
+ Mulliken charges:
+               1
+     1  O   -0.80000
+     2  H    0.40000
+     3  H    0.40000
+ Sum of Mulliken charges =   0.00000
+ Mulliken atomic spin densities:
+               1
+     1  O    0.10000
+     2  H    0.00000
+     3  H    0.00000
+ Sum of Mulliken spin densities =   0.10000
+ Dipole moment (field-independent basis, Debye):
+     X=      1.0000    Y=      2.0000    Z=      3.0000  Tot=      3.7417
+ Excited State   1: Singlet-A  3.50 eV  354.2 nm  f=0.1234
+      5 -> 6        0.70
+ IRC Forward path begins
+ Normal termination of Gaussian 16

@@ -1,0 +1,356 @@
+--- before/src/app/MainWindow.cpp
++++ after/src/app/MainWindow.cpp
+@@ -52,7 +52,7 @@
+     createToolBar();
+     const QSettings settings;
+     restoreGeometry(settings.value(QStringLiteral("window/geometry")).toByteArray());
+-    restoreState(settings.value(QStringLiteral("window/topPanelState")).toByteArray());
++    restoreState(settings.value(QStringLiteral("window/sidebarPanelState")).toByteArray());
+     if (width() < 900 || height() < 600) resize(1400, 900);
+     updateWindowTitle();
+ }
+--- before/src/app/mainwindow/MainWindow_File.cpp
++++ after/src/app/mainwindow/MainWindow_File.cpp
+@@ -258,7 +258,7 @@
+     }
+     m_scanWorkspacePlot->setEmptyMessage(m_data.scanStatusText());
+     m_scanWorkspaceStatus->setText(m_data.scanStatusText());
+-    m_scanWorkspace->show();
++    m_scanWorkspace->setVisible(m_data.scanDetected && !m_data.scanPoints.isEmpty());
+     m_currentFrequency = -1;
+     m_currentFrame = -1;
+     if (m_geometryMode) toggleGeometryMode();
+@@ -337,6 +337,7 @@
+     if (m_documentTabs->currentIndex() >= 0) { closeDocument(m_documentTabs->currentIndex()); return; }
+     m_animation->stop();
+     m_data = {};
++    m_scanWorkspace->hide();
+     m_scanWorkspacePlot->clear();
+     m_scanWorkspacePlot->setEmptyMessage(m_data.scanStatusText());
+     m_scanWorkspaceStatus->setText(m_data.scanStatusText());
+--- before/src/app/mainwindow/MainWindow_Menus.cpp
++++ after/src/app/mainwindow/MainWindow_Menus.cpp
+@@ -131,10 +131,10 @@
+     view->addAction(m_explorerDock->toggleViewAction());
+     m_explorerDock->toggleViewAction()->setText(QStringLiteral("분석 패널 표시"));
+     add(view, QStringLiteral("기본 패널 배치 복원"), {}, [this] {
+-        addDockWidget(Qt::TopDockWidgetArea, m_explorerDock);
++        addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
+         m_explorerDock->show();
+         m_explorerDock->raise();
+-        resizeDocks({m_explorerDock}, {280}, Qt::Vertical);
++        resizeDocks({m_explorerDock}, {320}, Qt::Horizontal);
+         setStatus(QStringLiteral("기본 패널 배치를 복원했습니다"));
+     });
+     view->addSeparator();
+@@ -165,7 +165,7 @@
+     QMenu *labels = view->addMenu(QStringLiteral("원자/결합 라벨"));
+     m_atomLabelsAction = labels->addAction(QStringLiteral("원자 번호"));
+     m_atomLabelsAction->setObjectName(QStringLiteral("ShowAtomNumbers"));
+-    m_atomLabelsAction->setIconText(QStringLiteral("원자 번호"));
++    m_atomLabelsAction->setIconText(QStringLiteral("Atomic number"));
+     m_atomLabelsAction->setToolTip(QStringLiteral("모든 표시 원자의 구 중심에 번호 표시 · 다시 누르면 숨기기"));
+     m_atomLabelsAction->setCheckable(true);
+     m_atomLabelsAction->setChecked(m_style.showLabels);
+--- before/src/app/mainwindow/MainWindow_Toolbar.cpp
++++ after/src/app/mainwindow/MainWindow_Toolbar.cpp
+@@ -52,16 +52,16 @@
+     };
+     add(QStringLiteral("열기"), [this] { openFile(); });
+     add(QStringLiteral("새 구조"), [this] { newDrawingDocument(); });
+-    add(QStringLiteral("그리기"), [this] {
++    add(QStringLiteral("구조 그리기"), [this] {
+         if (!m_currentFile.isEmpty()) newDrawingDocument(m_view->molecule());
+         else setDrawingMode(!m_drawingMode);
+     });
+-    add(QStringLiteral("MM 최적화"), [this] { startMMOptimization(); });
++    add(QStringLiteral("MM opt"), [this] { startMMOptimization(); });
+     add(QStringLiteral("이미지 복사"), [this] { copyImage(); });
+-    add(QStringLiteral("최적 보기"), [this] { m_view->bestView(); });
+-    add(QStringLiteral("중앙 정렬"), [this] { m_view->centerOnMolecule(); });
++    add(QStringLiteral("베스트뷰"), [this] { m_view->bestView(); });
++    add(QStringLiteral("가운데 배치"), [this] { m_view->centerOnMolecule(); });
+     toolbar->addAction(m_atomLabelsAction);
+-    add(QStringLiteral("재생"), [this] { m_analysis->currentTab() == 1 ? toggleFrequencyAnimation() : toggleFrameAnimation(); });
++    add(QStringLiteral("애니메이션"), [this] { m_analysis->currentTab() == 1 ? toggleFrequencyAnimation() : toggleFrameAnimation(); });
+ 
+     addToolBarBreak(Qt::TopToolBarArea);
+     auto *panels = addToolBar(QStringLiteral("분석 패널 도구 모음"));
+@@ -69,7 +69,9 @@
+     panels->setMovable(false);
+     panels->addAction(m_explorerDock->toggleViewAction());
+     panels->addSeparator();
+-    const auto titles = m_analysis->tabTitles();
++    const QStringList titles = {QStringLiteral("Opt"), QStringLiteral("Freq"),
++        QStringLiteral("Scan"), QStringLiteral("IRC"), QStringLiteral("TD-DFT"),
++        QStringLiteral("Atom Properties"), QStringLiteral("Orbitals"), QStringLiteral("XYZ")};
+     for (int i = 0; i < titles.size(); ++i) {
+         auto *action = panels->addAction(titles[i]);
+         action->setObjectName(QStringLiteral("AnalysisPanelTab%1").arg(i));
+--- before/src/app/mainwindow/MainWindow_Ui.cpp
++++ after/src/app/mainwindow/MainWindow_Ui.cpp
+@@ -37,6 +37,7 @@
+ #include <QProgressBar>
+ #include <QSettings>
+ #include <QScrollArea>
++#include <QResizeEvent>
+ #include <QSpinBox>
+ #include <QSplitter>
+ #include <QStackedWidget>
+@@ -53,6 +54,31 @@
+ #include <functional>
+ 
+ namespace youngcraft {
++namespace {
++// Keep the OpenGL widget itself square, so picking, projection and exports agree.
++class SquareMoleculeViewport final : public QWidget {
++public:
++    explicit SquareMoleculeViewport(MoleculeView *view, QWidget *parent)
++        : QWidget(parent), m_view(view) {
++        setObjectName(QStringLiteral("SquareMoleculeViewport"));
++        setAutoFillBackground(true);
++        auto colors = palette();
++        colors.setColor(QPalette::Window, QColor(230, 232, 235));
++        setPalette(colors);
++        view->setParent(this);
++        setMinimumSize(120, 120);
++    }
++protected:
++    void resizeEvent(QResizeEvent *event) override {
++        QWidget::resizeEvent(event);
++        const int side = qMin(width(), height());
++        m_view->setGeometry((width() - side) / 2, (height() - side) / 2, side, side);
++    }
++private:
++    MoleculeView *m_view;
++};
++}
++
+ 
+ void MainWindow::createUi() {
+     m_documentArea = new QStackedWidget(this);
+@@ -65,10 +91,13 @@
+     m_explorerDock = new QDockWidget(QStringLiteral("분석 패널"), this);
+     m_explorerDock->setObjectName(QStringLiteral("ResultExplorerDock"));
+     m_sidebars = new QStackedWidget(m_explorerDock);
+-    m_explorerDock->setAllowedAreas(Qt::TopDockWidgetArea);
++    m_explorerDock->setAllowedAreas(Qt::LeftDockWidgetArea);
++    m_explorerDock->setFeatures(QDockWidget::DockWidgetClosable);
++    m_explorerDock->setMinimumWidth(280);
++    m_explorerDock->setMaximumWidth(360);
+     m_explorerDock->setWidget(m_sidebars);
+-    addDockWidget(Qt::TopDockWidgetArea, m_explorerDock);
+-    resizeDocks({m_explorerDock}, {280}, Qt::Vertical);
++    addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
++    resizeDocks({m_explorerDock}, {320}, Qt::Horizontal);
+     m_statusLabel = new QLabel(QStringLiteral("준비"), this);
+     statusBar()->addPermanentWidget(m_statusLabel, 1);
+     createDocumentUi();
+@@ -85,7 +114,7 @@
+ void MainWindow::createDocumentUi() {
+     m_view = new MoleculeView(this);
+     m_view->setStyle(m_style);
+-    m_moleculeWorkspace = new QWidget(this);auto *moleculeLayout=new QVBoxLayout(m_moleculeWorkspace);moleculeLayout->setContentsMargins(0,0,0,0);moleculeLayout->setSpacing(2);moleculeLayout->addWidget(m_view,1);m_geometryBar=new GeometryMeasureBar(m_moleculeWorkspace);m_geometryBar->setVisible(false);moleculeLayout->addWidget(m_geometryBar);
++    m_moleculeWorkspace = new QWidget(this);auto *moleculeLayout=new QVBoxLayout(m_moleculeWorkspace);moleculeLayout->setContentsMargins(0,0,0,0);moleculeLayout->setSpacing(2);moleculeLayout->addWidget(new SquareMoleculeViewport(m_view, m_moleculeWorkspace),1);m_geometryBar=new GeometryMeasureBar(m_moleculeWorkspace);m_geometryBar->setVisible(false);moleculeLayout->addWidget(m_geometryBar);
+     auto *measurementRow = new QWidget(m_moleculeWorkspace);
+     auto *measurementLayout = new QHBoxLayout(measurementRow);
+     measurementLayout->setContentsMargins(8, 4, 8, 4);
+@@ -268,8 +297,9 @@
+     scanLayout->addWidget(m_scanWorkspaceStatus);
+     m_scanWorkspacePlot = new PlotWidget(m_scanWorkspace);
+     m_scanWorkspacePlot->setObjectName(QStringLiteral("ScanWorkspacePlot"));
+-    m_scanWorkspacePlot->setMinimumHeight(260);
++    m_scanWorkspacePlot->setMinimumHeight(180);
+     scanLayout->addWidget(m_scanWorkspacePlot, 1);
++    m_scanWorkspace->hide();
+     moleculeLayout->insertWidget(1, m_scanWorkspace, 1);
+     moleculeLayout->setStretch(0, 2);
+     m_scanWorkspacePlot->setEmptyMessage(QStringLiteral("Scan 데이터 없음"));
+@@ -313,13 +343,13 @@
+         QApplication::clipboard()->setImage(m_tddftWorkspacePlot->image(true));
+     });
+     m_workspace->addWidget(m_tddftWorkspace);
+-    auto *contextSplitter = new QSplitter(Qt::Horizontal, m_sidebars);
+-    contextSplitter->setObjectName(QStringLiteral("TopPanelSplitter"));
++    auto *contextSplitter = new QSplitter(Qt::Vertical, m_sidebars);
++    contextSplitter->setObjectName(QStringLiteral("SidebarPanelSplitter"));
+     m_currentSidebar = contextSplitter;
+     m_explorer = new QTreeWidget(contextSplitter);
+     m_explorer->setHeaderLabels({QStringLiteral("계산 결과")});
+     auto *analysisScroll = new QScrollArea(contextSplitter);
+-    analysisScroll->setObjectName(QStringLiteral("TopAnalysisScroll"));
++    analysisScroll->setObjectName(QStringLiteral("SidebarAnalysisScroll"));
+     analysisScroll->setWidgetResizable(true);
+     analysisScroll->setFrameShape(QFrame::NoFrame);
+     m_analysis = new AnalysisPanel(analysisScroll);
+@@ -329,7 +359,7 @@
+     contextSplitter->addWidget(analysisScroll);
+     contextSplitter->setStretchFactor(0, 0);
+     contextSplitter->setStretchFactor(1, 1);
+-    contextSplitter->setSizes({240, 1000});
++    contextSplitter->setSizes({180, 540});
+     connect(m_analysis, &AnalysisPanel::currentTabChanged, this, [this, panel = m_analysis] {
+         if (panel == m_analysis) updatePanelActions();
+     });
+--- before/src/app/mainwindow/MainWindow_Window.cpp
++++ after/src/app/mainwindow/MainWindow_Window.cpp
+@@ -62,7 +62,7 @@
+ void MainWindow::closeEvent(QCloseEvent *event) {
+     QSettings settings;
+     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
+-    settings.setValue(QStringLiteral("window/topPanelState"), saveState());
++    settings.setValue(QStringLiteral("window/sidebarPanelState"), saveState());
+     StyleManager::save(m_style);
+     event->accept();
+ }
+--- before/src/ui/analysispanel/AnalysisPanel_Frequency.cpp
++++ after/src/ui/analysispanel/AnalysisPanel_Frequency.cpp
+@@ -37,10 +37,11 @@
+ 
+ QWidget *AnalysisPanel::makeFrequencyTab() {
+     auto *page = new QWidget;
+-    auto *layout = new QHBoxLayout(page);
++    auto *layout = new QVBoxLayout(page);
+     m_frequencyList = new QListWidget;
+     m_frequencyList->setObjectName(QStringLiteral("FrequencyList"));
+-    m_frequencyList->setMinimumWidth(260);
++    m_frequencyList->setMinimumWidth(0);
++    m_frequencyList->setMinimumHeight(90);
+     layout->addWidget(m_frequencyList, 1);
+     auto *right = new QVBoxLayout;
+     m_frequencyInfo = new QLabel(QStringLiteral("진동 모드를 선택하세요"));
+--- before/src/ui/analysispanel/AnalysisPanel_ScanIrc.cpp
++++ after/src/ui/analysispanel/AnalysisPanel_ScanIrc.cpp
+@@ -59,7 +59,7 @@
+         m_scanResults->raise();
+         m_scanResults->activateWindow();
+     });
+-    auto *layout = new QHBoxLayout;
++    auto *layout = new QVBoxLayout;
+     outer->addLayout(layout);
+     m_scanList = new QListWidget;
+     m_scanList->setObjectName(QStringLiteral("ScanList"));
+@@ -74,7 +74,7 @@
+ 
+ QWidget *AnalysisPanel::makeIrcTab() {
+     auto *page = new QWidget;
+-    auto *layout = new QHBoxLayout(page);
++    auto *layout = new QVBoxLayout(page);
+     m_ircList = new QListWidget;
+     layout->addWidget(m_ircList, 1);
+     m_ircPlot = new PlotWidget;
+--- before/tests/smoke/test_smoke.cpp
++++ after/tests/smoke/test_smoke.cpp
+@@ -55,6 +55,7 @@
+     void atomVisibilityPreservesViewAndScroll_data();
+     void atomVisibilityPreservesViewAndScroll();
+     void topPanelToolbarFollowsDocuments();
++    void scanVisibilityAndSquareViewport();
+     void chemcraftSelectionAndClipboard();
+     void chemcraftGeneratedDialogsAndExtraction();
+     void mainWindowStartsWithKoreanUi();
+@@ -157,16 +158,16 @@
+     MainWindow w; w.resize(1400,900); w.show();
+     auto *toolbar = w.findChild<QToolBar *>("AnalysisToolBar"); QVERIFY(toolbar);
+     QCOMPARE(w.toolBarArea(toolbar), Qt::TopToolBarArea);
+-    QCOMPARE(w.dockWidgetArea(w.m_explorerDock), Qt::TopDockWidgetArea);
++    QCOMPARE(w.dockWidgetArea(w.m_explorerDock), Qt::LeftDockWidgetArea);
+     QVERIFY(toolbar->geometry().top() > w.findChild<QToolBar *>("MainToolBar")->geometry().top());
+     Molecule m; m.atoms = {{1,6,"C",{}}}; w.newDrawingDocument(m); w.setDrawingMode(false);
+     const int first = w.m_documentTabs->currentIndex();
+     auto *frequency = w.findChild<QAction *>("AnalysisPanelTab1"); QVERIFY(frequency);
+     frequency->trigger(); QCOMPARE(w.m_analysis->currentTab(),1); QVERIFY(frequency->isChecked());
+-    auto *splitter = w.m_currentSidebar->findChild<QSplitter *>("TopPanelSplitter");
++    auto *splitter = w.m_currentSidebar->findChild<QSplitter *>("SidebarPanelSplitter");
+     // The sidebar itself is the splitter.
+     if (!splitter) splitter = qobject_cast<QSplitter *>(w.m_currentSidebar);
+-    QVERIFY(splitter); QCOMPARE(splitter->orientation(), Qt::Horizontal);
++    QVERIFY(splitter); QCOMPARE(splitter->orientation(), Qt::Vertical);
+     auto *firstPanel = w.m_analysis;
+     w.newDrawingDocument(m); w.setDrawingMode(false);
+     auto *atoms = w.findChild<QAction *>("AnalysisPanelTab5"); QVERIFY(atoms);
+@@ -184,6 +185,57 @@
+         w.m_analysis->setCurrentTab(1); w.m_explorerDock->show();
+         QTest::qWait(150); QVERIFY(w.grab().save(capture));
+     }
++}
++
++void SmokeTest::scanVisibilityAndSquareViewport() {
++    MainWindow w; w.resize(1400,900); w.show(); QTest::qWait(60);
++    QVERIFY(w.m_scanWorkspace->isHidden());
++    QCOMPARE(w.m_view->width(), w.m_view->height());
++    auto *toolbar = w.findChild<QToolBar *>("AnalysisToolBar"); QVERIFY(toolbar);
++    const QStringList labels = {"Opt","Freq","Scan","IRC","TD-DFT","Atom Properties","Orbitals","XYZ"};
++    for (int i=0; i<labels.size(); ++i) {
++        auto *a=w.findChild<QAction *>(QString("AnalysisPanelTab%1").arg(i));
++        QVERIFY(a); QCOMPARE(a->text(), labels[i]);
++    }
++    // A real Gaussian optimization/frequency output with its Scan sections removed.
++    QFile input("tests/data/mvp.out"); QVERIFY(input.open(QIODevice::ReadOnly));
++    auto data=input.readAll(); data.replace("opt freq scan", "opt freq");
++    const int start=data.indexOf(" Summary of Optimized Potential Surface Scan");
++    const int end=data.indexOf(" Frequencies --", start); QVERIFY(start>=0); QVERIFY(end>start);
++    data.remove(start,end-start);
++    QTemporaryFile ordinary(QDir::tempPath()+"/youngcraft-optfreq-XXXXXX.out");
++    QVERIFY(ordinary.open()); ordinary.write(data); ordinary.flush();
++    w.openFile(ordinary.fileName());
++    QTRY_VERIFY_WITH_TIMEOUT(w.m_workspace->property("loadFinished").toBool(),10000);
++    QVERIFY(!w.m_data.scanDetected); QVERIFY(w.m_scanWorkspace->isHidden());
++    const int nonScan=w.m_documentTabs->currentIndex();
++    QTest::qWait(60); QCOMPARE(w.m_view->width(),w.m_view->height());
++    QVERIFY(w.m_explorerDock->width()<=360);
++    QVERIFY(w.m_view->width()>w.m_explorerDock->width());
++    const auto capture=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_CAPTURE");
++    if (!capture.isEmpty()) { w.m_analysis->setCurrentTab(1); QTest::qWait(100); QVERIFY(w.grab().save(capture)); }
++    w.openFile("tests/data/mvp.out");
++    QTRY_VERIFY_WITH_TIMEOUT(w.m_workspace->property("loadFinished").toBool(),10000);
++    QVERIFY(w.m_data.scanDetected); QVERIFY(w.m_scanWorkspace->isVisible());
++    QTest::qWait(60); QCOMPARE(w.m_view->width(),w.m_view->height());
++    if (!capture.isEmpty()) QVERIFY(w.grab().save(capture+".scan.png"));
++    w.m_documentTabs->setCurrentIndex(nonScan);
++    QVERIFY(w.m_scanWorkspace->isHidden());
++    for (const QSize size : {QSize(900,700),QSize(1600,950)}) {
++        w.resize(size); QTest::qWait(60);
++        QCOMPARE(w.m_view->width(),w.m_view->height());
++        QVERIFY(w.m_explorerDock->width()<=360);
++        QVERIFY(w.m_view->width()>w.m_explorerDock->width());
++    }
++    w.newDrawingDocument(); QTest::qWait(60);
++    QVERIFY(w.m_scanWorkspace->isHidden()); QCOMPARE(w.m_view->width(),w.m_view->height());
++    // A detected but unfinished Scan has no graph data to display yet.
++    auto pendingScan=FileDispatcher::load(ordinary.fileName(), {});
++    QVERIFY(pendingScan.parseResult.success);
++    pendingScan.parseResult.data.scanDetected=true;
++    pendingScan.parseResult.data.scanPoints.clear();
++    w.onFileLoaded(pendingScan); QTest::qWait(60);
++    QVERIFY(w.m_scanWorkspace->isHidden());
+ }
+ 
+ void SmokeTest::chemcraftSelectionAndClipboard() {
+@@ -236,7 +288,7 @@
+     QVERIFY(action); QVERIFY(toolbar);
+     auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
+     QVERIFY(button);
+-    QCOMPARE(button->text(), QStringLiteral("원자 번호"));
++    QCOMPARE(button->text(), QStringLiteral("Atomic number"));
+     QVERIFY(!button->isChecked());
+     auto *view = window.m_view;
+     view->bestView();
+@@ -578,7 +630,7 @@
+     QVERIFY(toolbar);
+     QAction *draw = nullptr;
+     for (QAction *action : toolbar->actions())
+-        if (action->text() == QStringLiteral("그리기")) draw = action;
++        if (action->text() == QStringLiteral("구조 그리기")) draw = action;
+     QVERIFY(draw);
+     QWidget *button = toolbar->widgetForAction(draw);
+     QVERIFY(button);
+@@ -706,7 +758,7 @@
+         if (!probe.waitForFinished(3000) || probe.exitCode() != 0) return;
+     }
+     const float initialDistance = (view->molecule().atoms[1].position - view->molecule().atoms[0].position).length();
+-    auto *progress = view->parentWidget()->findChild<QProgressBar *>(QStringLiteral("MMProgress"));
++    auto *progress = window.m_moleculeWorkspace->findChild<QProgressBar *>(QStringLiteral("MMProgress"));
+     QVERIFY(progress);
+     int firstWorkerStep = -1;
+     float distanceAtFirstWorkerStep = -1.0f;
