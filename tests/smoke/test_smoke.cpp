@@ -2740,19 +2740,19 @@ void SmokeTest::matchingAtomViewsSynchronize() {
 
 void SmokeTest::documentsAreIndependent() {
     QTemporaryFile large(QDir::tempPath() + "/youngcraft-large-XXXXXX.out");
-    QTemporaryFile small(QDir::tempPath() + "/youngcraft-small-XXXXXX.out");
-    QVERIFY(large.open()); QVERIFY(small.open());
+    QTemporaryFile smallFile(QDir::tempPath() + "/youngcraft-small-XXXXXX.out");
+    QVERIFY(large.open()); QVERIFY(smallFile.open());
     const QByteArray orientation(" Input orientation:\n -----\n Center Atomic Atomic Coordinates\n Number Number Type X Y Z\n -----\n 1 1 0 0 0 0\n 2 1 0 0 0 2\n -----\n");
     for (int i = 0; i < 1500; ++i) large.write(orientation + " SCF Done: E(RHF) = -10 A.U.\n");
-    small.write(orientation + " SCF Done: E(RHF) = -20 A.U.\n");
-    large.flush(); small.flush();
+    smallFile.write(orientation + " SCF Done: E(RHF) = -20 A.U.\n");
+    large.flush(); smallFile.flush();
     MainWindow window;
     window.show();
     auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("DocumentTabs"));
     QSignalSpy completed(&window, &MainWindow::documentLoaded);
     window.openFile(large.fileName());
     QWidget *first = tabs->currentWidget();
-    window.openFile(small.fileName());
+    window.openFile(smallFile.fileName());
     QWidget *second = tabs->currentWidget();
     QCOMPARE(tabs->count(), 2);
     QTRY_VERIFY_WITH_TIMEOUT(second->property("loadFinished").toBool(), 15000);
