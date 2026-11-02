@@ -69,6 +69,7 @@ qt_add_executable(Youngcraft WIN32
     src/app/mainwindow/MainWindow_Animation.cpp
     src/app/mainwindow/MainWindow_Style.cpp
     src/app/mainwindow/MainWindow_Export.cpp
+    src/app/mainwindow/MainWindow_ProjectLibrary.cpp
     src/ui/ReactionCaptureDialog.cpp
     src/ui/MultiCaptureDialog.cpp
     src/ui/MultiCaptureDialog.h
@@ -206,6 +207,7 @@ if(BUILD_TESTING)
     src/app/mainwindow/MainWindow_Animation.cpp
     src/app/mainwindow/MainWindow_Style.cpp
     src/app/mainwindow/MainWindow_Export.cpp
+    src/app/mainwindow/MainWindow_ProjectLibrary.cpp
     src/ui/ReactionCaptureDialog.cpp
     src/ui/MultiCaptureDialog.cpp
     src/ui/MultiCaptureDialog.h
