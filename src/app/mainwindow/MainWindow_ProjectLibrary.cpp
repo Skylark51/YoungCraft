@@ -2,6 +2,9 @@
 #include "ui/PlotWidget.h"
 
 #include <QApplication>
+#include <QAbstractItemView>
+#include <QDialog>
+#include <QFont>
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
