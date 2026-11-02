@@ -1,0 +1,80 @@
+name: Build YoungCraft Patch EXE
+on:
+  push:
+    branches: [codex/optimize-portable-patcher]
+    paths:
+      - tools/patch_youngcraft.ps1
+      - tools/YoungcraftPatcher.cs
+      - .github/workflows/build-patcher.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell source
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/tools/patch_youngcraft.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { $errors | Format-List; throw "PowerShell parser errors" }
+      - name: Integration test on disposable mock installation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'Youngcraft-fixture'
+          $target = Join-Path $root 'old install'
+          $stage = Join-Path $root 'payload'
+          New-Item -ItemType Directory -Force -Path $target,$stage | Out-Null
+          @('Youngcraft.exe','Qt6Core.dll','mm_runtime/YoungcraftMM.exe','xtb_runtime/xtb.exe') | ForEach-Object {
+            $path = Join-Path $stage $_
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+            Set-Content -LiteralPath $path -Value "new:$_"
+          }
+          New-Item -ItemType Directory -Force -Path (Join-Path $target 'resources/fragments'),(Join-Path $target 'xtb_runtime/sources'),(Join-Path $target 'lab_fragments') | Out-Null
+          Set-Content -LiteralPath (Join-Path $target 'Youngcraft.exe') -Value 'old'
+          Set-Content -LiteralPath (Join-Path $target 'resources/fragments/old.cjson') -Value 'legacy'
+          Set-Content -LiteralPath (Join-Path $target 'xtb_runtime/sources/archive.tar.gz') -Value 'legacy'
+          Set-Content -LiteralPath (Join-Path $target 'Youngcraft-before-old.exe') -Value 'legacy'
+          Set-Content -LiteralPath (Join-Path $target 'youngcraft-server.json') -Value 'private'
+          Set-Content -LiteralPath (Join-Path $target 'lab_fragments/user.cjson') -Value 'user'
+          $items = @(Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
+            @{path=$_.FullName.Substring($stage.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash;size=$_.Length}
+          })
+          @{schema=1;files=$items} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding UTF8
+          $zip = Join-Path $root 'Youngcraft-portable.zip'
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/patch_youngcraft.ps1 -TargetDir $target -PackageZip $zip
+          if ($LASTEXITCODE -ne 0) { throw 'Patch failed' }
+          if ((Get-Content -LiteralPath (Join-Path $target 'Youngcraft.exe') -Raw) -notmatch 'new:') { throw 'Patch not installed' }
+          foreach ($old in @('resources/fragments','xtb_runtime/sources','Youngcraft-before-old.exe')) {
+            if (Test-Path -LiteralPath (Join-Path $target $old)) { throw "Legacy file remains: $old" }
+          }
+          if ((Get-Content -LiteralPath (Join-Path $target 'youngcraft-server.json') -Raw).Trim() -ne 'private') { throw 'Server config changed' }
+          if ((Get-Content -LiteralPath (Join-Path $target 'lab_fragments/user.cjson') -Raw).Trim() -ne 'user') { throw 'User fragment changed' }
+          Write-Host 'Integration test passed.'
+      - name: Build standalone Windows EXE
+        shell: powershell
+        run: |
+          $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+          if (-not (Test-Path $compiler)) { throw "C# compiler missing: $compiler" }
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          & $compiler /nologo /target:exe /optimize+ /out:release/Youngcraft-Patch.exe /resource:tools/patch_youngcraft.ps1,YoungcraftPatchScript tools/YoungcraftPatcher.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Patcher compilation failed' }
+      - name: Commit EXE into source branch
+        shell: powershell
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f release/Youngcraft-Patch.exe
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Build Windows Youngcraft patch executable"
+            git push origin "HEAD:$env:GITHUB_REF_NAME"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not push EXE' }
+          }
