@@ -50,7 +50,7 @@ Windows에서 `tools/package_portable.ps1`을 실행하면 xTB의 실행 데이�
 
 `release/Youngcraft-Patch.exe`를 실행하면 기존 Youngcraft 설치 폴더를 자동으로 검색합니다. 패처 옆에 `Youngcraft-portable.zip`이 있으면 그 파일을 사용하고, 없으면 GitHub 최신 릴리스에서 다운로드합니다. Youngcraft를 종료한 상태에서 실행해야 하며, ZIP 해시 검증 후 적용하고 이전 배포의 중복 xTB 소스 아카이브와 기본 fragment 복사본, 구버전 실행 파일 백업을 정리합니다. 사용자 `lab_fragments`와 `youngcraft-server.json`은 보존합니다. 실패 시 이전 파일을 복구합니다.
 
-현재 GitHub 저장소에는 배포용 ZIP 릴리스가 포함되어 있지 않습니다. 패처를 사용하려면 먼저 최적화된 ZIP을 만들어 패처 EXE와 같은 폴더에 두거나 GitHub Releases에 게시해야 합니다. 상세 내용은 [패치 및 검증](docs/PORTABLE_PATCHING.md)을 참고하세요.
+현재 GitHub 저장소에는 최적화된 ZIP 릴리스가 없습니다. ZIP을 찾을 수 없으면 패처는 구버전 잔재 정리만 수행하며 실행 파일은 유지합니다. 프로그램 자체를 업데이트하려면 최적화된 ZIP을 EXE 옆에 두거나 GitHub Releases에 게시해야 합니다. 상세 내용은 [패치 및 검증](docs/PORTABLE_PATCHING.md)을 참고하세요.
 
 ## 빌드
 
