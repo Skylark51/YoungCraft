@@ -89,6 +89,10 @@ jobs:
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m "Build Windows Youngcraft patch executable"
+            git fetch origin $env:GITHUB_REF_NAME
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh remote branch' }
+            git rebase FETCH_HEAD
+            if ($LASTEXITCODE -ne 0) { throw 'Could not rebase patch EXE commit' }
             git push origin "HEAD:$env:GITHUB_REF_NAME"
             if ($LASTEXITCODE -ne 0) { throw 'Could not push EXE' }
           }
