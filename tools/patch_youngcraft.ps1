@@ -86,7 +86,13 @@ if(-not $CleanupOnly){
         try{
             Log 'Downloading latest release...'
             Invoke-WebRequest -UseBasicParsing -TimeoutSec 120 -Uri 'https://github.com/Skylark51/YoungCraft/releases/latest/download/Youngcraft-portable.zip' -OutFile $archive
-        }catch{throw 'No optimized release ZIP found. Place Youngcraft-portable.zip beside the patch EXE.'}
+        }catch{
+            Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue
+            $download=''
+            $archive=''
+            $CleanupOnly=$true
+            Log 'No optimized release ZIP is published yet. Cleaning known legacy files only; application executable stays unchanged.'
+        }
     }
 }
 $parent=Split-Path -Parent $target
