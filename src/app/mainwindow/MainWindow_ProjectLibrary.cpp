@@ -438,6 +438,7 @@ private:
             return;
         }
         m_window->openFile(file);
+        accept();
     }
     double valueOf(const PathStep &step) const {
         return m_energyMode->currentIndex() == 0 ? step.electronic : step.gibbs;
