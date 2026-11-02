@@ -67,17 +67,40 @@ try {
     foreach ($required in @('xtb.exe', 'libiomp5md.dll', 'licenses/COPYING', 'licenses/COPYING.LESSER', 'licenses/Intel-Simplified-License.pdf', 'RUNTIME.txt')) {
         if (-not (Test-Path -LiteralPath (Join-Path $xtbSource $required))) { throw "xTB runtime 파일 누락: $required" }
     }
-    Copy-Item -LiteralPath $xtbSource -Destination (Join-Path $stage 'xtb_runtime') -Recurse -Force
+    # Only runtime files are required. Source tarballs under sources/ and
+    # xtb-source-*.tar.gz are retained in the source tree for license compliance.
+    $xtbDest = Join-Path $stage 'xtb_runtime'
+    New-Item -ItemType Directory -Path $xtbDest -Force | Out-Null
+    foreach ($item in @('xtb.exe', 'libiomp5md.dll', 'gfnff', 'share', 'licenses', 'RUNTIME.txt')) {
+        $source = Join-Path $xtbSource $item
+        if (-not (Test-Path -LiteralPath $source)) { throw "xTB runtime 구성요소 누락: $item" }
+        Copy-Item -LiteralPath $source -Destination (Join-Path $xtbDest $item) -Recurse -Force
+    }
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'lab_fragments') -Destination (Join-Path $stage 'lab_fragments') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'README.md') -Destination (Join-Path $stage 'README.md') -Force
     New-Item -ItemType Directory -Path (Join-Path $stage 'resources') -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'resources/fragments') -Destination (Join-Path $stage 'resources/fragments') -Recurse -Force
+    # Built-in fragments are already embedded by resources/fragments.qrc.
     $licenses = Join-Path $stage 'licenses'
     New-Item -ItemType Directory -Path $licenses -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'licenses/Avogadro-fragments-BSD-3-Clause.txt') -Destination $licenses -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'third_party/gemmi/LICENSE.txt') -Destination (Join-Path $licenses 'Gemmi-MPL-2.0.txt') -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'third_party/gemmi/include/gemmi/third_party/tao/LICENSE') -Destination (Join-Path $licenses 'PEGTL-MIT.txt') -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'third_party/gemmi/FAST_FLOAT_LICENSE_MIT.txt') -Destination (Join-Path $licenses 'fast_float-MIT.txt') -Force
+
+    # The patcher verifies the payload before touching any installed files.
+    # Paths in the manifest are normalized to '/' separators.
+    $fileRecords = @(
+        Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+            [ordered]@{
+                path = $_.FullName.Substring($stage.Length + 1).Replace('\\', '/')
+                sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                size = $_.Length
+            }
+        }
+    )
+    $packageInfo = [ordered]@{ schema = 1; files = $fileRecords }
+    $packageInfo | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding UTF8
 
     if (Test-Path -LiteralPath $actualDist) {
         $resolved = (Resolve-Path -LiteralPath $actualDist).Path
