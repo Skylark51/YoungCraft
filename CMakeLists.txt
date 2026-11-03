@@ -32,6 +32,7 @@ set(YOUNGCRAFT_CORE_SOURCES
     src/model/FragmentLibrary.cpp
     src/model/Molecule.cpp
     src/model/GeometryEditor.cpp
+    src/io/OrcaParser.cpp
     src/io/GaussianParser.cpp
     src/io/XYZParser.cpp
     src/io/CubeParser.cpp
@@ -188,6 +189,10 @@ if(BUILD_TESTING)
     target_link_libraries(test_structure PRIVATE youngcraft_core Qt6::Test)
     add_test(NAME structure_files COMMAND test_structure)
     set_tests_properties(structure_files PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    qt_add_executable(test_orca_parser tests/parser/test_orca_parser.cpp)
+    target_link_libraries(test_orca_parser PRIVATE youngcraft_core Qt6::Test)
+    add_test(NAME parser_orca COMMAND test_orca_parser)
+
     qt_add_executable(test_parser tests/parser/test_gaussian_parser.cpp)
     target_link_libraries(test_parser PRIVATE youngcraft_core Qt6::Test)
     target_include_directories(test_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
