@@ -130,7 +130,14 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     connect(start,&QPushButton::clicked,this,&XtbDialog::startCalculation);
     connect(cancel,&QPushButton::clicked,&runner,&XtbRunner::cancel);
     connect(&runner,&XtbRunner::frameReady,this,[this](const XtbFrame &f){
-        emit previewCoordinates(f.coordinates);if(std::isfinite(f.energy))series.push_back(QPointF(f.step,f.energy));refreshPlot();
+        emit previewCoordinates(f.coordinates);
+        if(std::isfinite(f.energy)){
+            double x=f.step;
+            if(kind->currentIndex()==2 && scanPoints->value()>1)
+                x=scanFrom->value()+(scanTo->value()-scanFrom->value())*(f.step-1)/double(scanPoints->value()-1);
+            series.push_back(QPointF(x,f.energy));
+        }
+        refreshPlot();
         status->setText(QStringLiteral("진행 중 · %1 %2 · E %3 Eh · ∇ %4")
             .arg(kind->currentIndex()==2?QStringLiteral("Scan point"):QStringLiteral("step"))
             .arg(f.step).arg(f.energy,0,'f',9).arg(f.gradient,0,'g',6));
@@ -172,7 +179,7 @@ void XtbDialog::startCalculation() {
 void XtbDialog::refreshPlot() {
     auto values=series;if(energyMode->currentIndex()&&!values.isEmpty()){double ref=values.first().y();for(auto &p:values)p.setY((p.y()-ref)*627.509474);}
     const QString y=energyMode->currentIndex()?QStringLiteral("ΔE (kcal mol⁻¹)"):QStringLiteral("Energy (Eh)");
-    if(kind->currentIndex()==2)plot->setScanSeries(values,QStringLiteral("Scan point"),y);
+    if(kind->currentIndex()==2)plot->setScanSeries(values,scanType->currentIndex()==0?QStringLiteral("Distance (Å)"):scanType->currentIndex()==1?QStringLiteral("Angle (°)"):QStringLiteral("Dihedral (°)"),y);
     else plot->setSeries(values,QStringLiteral("Optimization step"),y);
 }
 void XtbDialog::finishCalculation() {
