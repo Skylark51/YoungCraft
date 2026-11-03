@@ -63,6 +63,12 @@ LoadedFile FileDispatcher::load(const QString &filePath, const ParseOptions &opt
         StructureLoad structure = StructureReader::read(filePath, loaded.format);
         loaded.parseResult = std::move(structure.result);
         loaded.crystal = std::move(structure.crystal);
+    } else if (loaded.format == QStringLiteral("Gaussian") &&
+               (QFileInfo(filePath).suffix().compare(QStringLiteral("out"), Qt::CaseInsensitive) == 0 ||
+                QFileInfo(filePath).suffix().compare(QStringLiteral("log"), Qt::CaseInsensitive) == 0) &&
+               OrcaParser::isOrcaOutput(filePath)) {
+        loaded.format = QStringLiteral("ORCA");
+        loaded.parseResult = OrcaParser::parse(filePath, options);
     } else {
         loaded.parseResult = GaussianParser::parse(filePath, options);
     }
