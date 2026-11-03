@@ -280,7 +280,7 @@ if(WIN32)
         list(APPEND _runtime_targets render_quality_preview)
     endif()
     if(BUILD_TESTING)
-        list(APPEND _runtime_targets test_orbitals test_parser test_model test_smoke test_instance)
+        list(APPEND _runtime_targets test_orbitals test_parser test_orca_parser test_model test_smoke test_instance)
     endif()
     foreach(_target IN LISTS _runtime_targets)
         add_custom_command(TARGET ${_target} POST_BUILD
