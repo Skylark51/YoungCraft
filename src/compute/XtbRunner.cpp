@@ -259,7 +259,7 @@ void XtbRunner::finish(int code,QProcess::ExitStatus status) {
     else if(options.optimize&&(marker||nonconvergence))state=State::NotConverged;
     else if(options.scan && scanFrames.isEmpty()) {state=State::Failed;error=QStringLiteral("xTB Scan trajectory(xtbscan.log)가 생성되지 않았습니다.");}
     else if(code!=0||status!=QProcess::NormalExit||!std::isfinite(energy)) {state=State::Failed;error=QStringLiteral("xTB 실행 실패 (exit %1). 출력 보기를 확인하세요.").arg(code);}
-    else if(options.scan && scanFrames.size()<options.scan->points)state=State::NotConverged;
+    else if(options.scan)state=scanFrames.size()==options.scan->points?State::Finished:State::NotConverged;
     else if(options.optimize&&!convergence)state=State::NotConverged;
     else state=State::Finished;
     if(options.optimize && (state==State::Finished || state==State::NotConverged)) {
