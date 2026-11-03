@@ -5,10 +5,19 @@
 #include <QProcess>
 #include <QTimer>
 #include <QFile>
+#include <optional>
 
 namespace youngcraft {
+// A one-dimensional relaxed internal-coordinate PES scan.
+struct XtbScan {
+    QString type = QStringLiteral("distance"); // distance / angle / dihedral
+    QVector<int> atoms; // zero-based indices
+    double from = 1.0, to = 2.0;
+    int points = 11;
+};
 struct XtbOptions {
     QVector<GeometryConstraint> constraints;
+    std::optional<XtbScan> scan;
     bool optimize = true;
     bool preserveCoordination = false;
     bool preserveBondLengths = false;
@@ -42,6 +51,9 @@ public:
     QString directory, output, error, geometryWarning;
     QStringList arguments;
     Molecule result;
+    QVector<XtbFrame> scanFrames;
+    int tsCandidateIndex = -1; // an interior local maximum, not a verified TS
+    bool selectScanFrame(int index);
     double energy = kNaN, gradient = kNaN, gap = kNaN;
     int cycle = 0;
     static QStringList solvents();
