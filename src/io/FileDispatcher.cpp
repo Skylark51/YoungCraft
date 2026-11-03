@@ -2,6 +2,7 @@
 #include "io/FileDispatcher.h"
 
 #include "io/FchkParser.h"
+#include "io/OrcaParser.h"
 #include "io/XYZParser.h"
 
 #include <QFileInfo>
@@ -11,7 +12,7 @@ namespace youngcraft {
 QString FileDispatcher::openFilter() {
     return QStringLiteral(
         "지원되는 모든 구조/계산 파일 (*.out *.log *.gjf *.com *.xyz *.cube *.cub *.fchk *.fch *.chk *.cif *.mmcif *.cmf *.mol *.sdf *.sd *.mdl *.mol2 *.pdb *.ent *.res *.ins *.cssr);;"
-        "Gaussian 파일 (*.out *.log *.gjf *.com);;XYZ 파일 (*.xyz);;CIF / 결정 구조 (*.cif *.mmcif *.cmf);;"
+        "Gaussian / ORCA 출력 (*.out *.log);;Gaussian 입력 (*.gjf *.com);;XYZ 파일 (*.xyz);;CIF / 결정 구조 (*.cif *.mmcif *.cmf);;"
         "MOL / SDF (*.mol *.sdf *.sd *.mdl);;MOL2 (*.mol2);;PDB (*.pdb *.ent);;"
         "SHELX (*.res *.ins);;CSSR (*.cssr);;CUBE (*.cube *.cub);;FCHK (*.fchk *.fch *.chk);;모든 파일 (*.*)");
 }
@@ -62,6 +63,12 @@ LoadedFile FileDispatcher::load(const QString &filePath, const ParseOptions &opt
         StructureLoad structure = StructureReader::read(filePath, loaded.format);
         loaded.parseResult = std::move(structure.result);
         loaded.crystal = std::move(structure.crystal);
+    } else if (loaded.format == QStringLiteral("Gaussian") &&
+               (QFileInfo(filePath).suffix().compare(QStringLiteral("out"), Qt::CaseInsensitive) == 0 ||
+                QFileInfo(filePath).suffix().compare(QStringLiteral("log"), Qt::CaseInsensitive) == 0) &&
+               OrcaParser::isOrcaOutput(filePath)) {
+        loaded.format = QStringLiteral("ORCA");
+        loaded.parseResult = OrcaParser::parse(filePath, options);
     } else {
         loaded.parseResult = GaussianParser::parse(filePath, options);
     }

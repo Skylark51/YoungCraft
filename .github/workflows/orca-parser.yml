@@ -1,0 +1,31 @@
+name: Build and test ORCA parser
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: 'win64_msvc2022_64'
+          cache: true
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
+      - name: Build executable and parsers
+        run: cmake --build build --target Youngcraft test_orca_parser test_parser --parallel 2
+      - name: Run parser regression tests
+        run: ctest --test-dir build -C Release --output-on-failure -R "parser_(orca|gaussian)"
+      - name: Show CTest failure log
+        if: failure()
+        shell: pwsh
+        run: |
+          & ./build/test_orca_parser.exe -o orca-results.txt,txt
+          Get-Content orca-results.txt
+          Write-Host "Exit code: $LASTEXITCODE"
