@@ -7,6 +7,7 @@
 #include <QRegularExpression>
 
 #include <cmath>
+#include <utility>
 
 namespace youngcraft {
 namespace {
@@ -209,7 +210,6 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                     mode.number = freqMatch.captured(1).toInt() + 1;
                     mode.wavenumber = value;
                     mode.imaginary = value < 0.0;
-                    mode.displacement.resize(atoms.size());
                     data.frequencies.push_back(mode);
                     data.index.sectionOffsets[QStringLiteral("frequency_modes")].push_back(offset);
                 }
