@@ -8,6 +8,7 @@
 #include <QThread>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -39,6 +40,8 @@ QVector<XtbFrame> XtbTrajectoryParser::append(const QByteArray &bytes, const Mol
         XtbFrame frame; frame.step = ++frameIndex;
         QString comment = QString::fromUtf8(lines[1]);
         frame.energy = metric(comment, QStringLiteral("energy"));
+        // xtbscan.log uses "SCF done  -7.123..." rather than "energy:".
+        if (!std::isfinite(frame.energy)) frame.energy = metric(comment, QStringLiteral("SCF\\s+done"));
         frame.gradient = metric(comment, QStringLiteral("gnorm"));
         for (int i=0;i<count;++i) {
             auto words = QString::fromUtf8(lines[i+2]).simplified().split(' ');
@@ -83,6 +86,7 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
     if(o.optimize&&!prepareFixedDistances(m,o.constraints,&error))return fail(error);
     options=o;input=m;result=m;result.charge=o.charge;result.multiplicity=o.multiplicity;
     output.clear();error.clear();geometryWarning.clear();outputPending.clear();parser={};offset=0;cycle=0;
+    scanFrames.clear();tsCandidateIndex=-1;
     energy=gradient=gap=kNaN;convergence=nonconvergence=false;
     QString exe=QDir(runtime).absoluteFilePath("xtb.exe");
     const bool exactFix=std::any_of(o.constraints.cbegin(),o.constraints.cend(),[](const GeometryConstraint &c){return c.type=="fixed";});
@@ -95,6 +99,21 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
     if(m.isEmpty() || (o.method!=0&&o.method!=1&&o.method!=2) || o.multiplicity<1 || o.cycles<10 || o.cycles>5000 ||
        !QStringList{"loose","normal","tight"}.contains(o.level) || (!o.solvent.isEmpty()&&!solvents().contains(o.solvent)))return fail(QStringLiteral("xTB 계산 설정이 유효하지 않습니다."));
     if(!validateConstraints(o.constraints,m.atoms.size(),&error))return fail(error);
+    if(o.scan) {
+        const auto &s=*o.scan;
+        const GeometryConstraint scanned{s.type,s.atoms,s.from};
+        const bool endValid=std::isfinite(s.to) && (s.type=="distance" ? s.to>0 :
+            s.type=="angle" ? s.to>0 && s.to<180 : s.type=="dihedral" && std::abs(s.to)<=720);
+        if(!o.optimize || o.method==0 || s.points<3 || s.points>501 ||
+           !endValid || std::abs(s.to-s.from)<1e-8 || !validateConstraints({scanned},m.atoms.size(),&error))
+            return fail(QStringLiteral("PES Scan 설정이 유효하지 않습니다. GFN1/2, 유효한 원자·범위와 3–501개 point를 사용하세요."));
+        for(const auto &existing:o.constraints) {
+            if(existing.type!=s.type)continue;
+            auto reverse=s.atoms;std::reverse(reverse.begin(),reverse.end());
+            if(existing.atoms==s.atoms || existing.atoms==reverse)
+                return fail(QStringLiteral("Scan 좌표가 다른 constraint에 이미 고정되어 있습니다."));
+        }
+    }
     int electrons=-o.charge;
     for(const auto &a:m.atoms){electrons+=a.atomicNumber;if(a.atomicNumber<1 || !std::isfinite(a.position.lengthSquared()))return fail(QStringLiteral("원소 또는 좌표가 유효하지 않습니다."));}
     if(o.method!=0 && (electrons<o.multiplicity-1 || (electrons-(o.multiplicity-1))%2))return fail(QStringLiteral("전자 수와 multiplicity가 맞지 않습니다."));
@@ -138,7 +157,10 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
                     if(isMetal(m.atoms[i].atomicNumber)&&(m.bondIndex(i,bond.first)>=0||m.bondIndex(i,bond.second)>=0))retain=true;
             bool explicitDistance=false;
             for(const auto &c:o.constraints) if(c.type=="distance" && c.atoms.contains(bond.first) && c.atoms.contains(bond.second)) explicitDistance=true;
-            if((o.preserveBondLengths || (o.preserveCoordination && retain)) && !explicitDistance)controls+=QString(" distance: %1, %2, %3\n").arg(bond.first+1).arg(bond.second+1)
+            const bool scannedBond=o.scan && o.scan->type=="distance" && o.scan->atoms.size()==2 &&
+                ((o.scan->atoms[0]==bond.first && o.scan->atoms[1]==bond.second) ||
+                 (o.scan->atoms[0]==bond.second && o.scan->atoms[1]==bond.first));
+            if((o.preserveBondLengths || (o.preserveCoordination && retain)) && !explicitDistance && !scannedBond)controls+=QString(" distance: %1, %2, %3\n").arg(bond.first+1).arg(bond.second+1)
                 .arg((m.atoms[bond.first].position-m.atoms[bond.second].position).length(),0,'f',8);
         }
         for(const auto &c:o.constraints) {
@@ -146,6 +168,15 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
             QStringList ids; for(int i:c.atoms)ids<<QString::number(i+1);
             controls+=QString(" %1: %2, %3\n").arg(c.type,ids.join(", "),QString::number(c.target,'f',8));
         }
+        controls+="$end\n";
+    }
+    if(o.scan) {
+        const auto &s=*o.scan;
+        QStringList ids;for(int atom:s.atoms)ids<<QString::number(atom+1);
+        controls+="$scan\n";
+        controls+=QString(" %1: %2, %3; %4, %5, %6\n")
+            .arg(s.type,ids.join(", ")).arg(s.from,0,'f',8)
+            .arg(s.from,0,'f',8).arg(s.to,0,'f',8).arg(s.points);
         controls+="$end\n";
     }
     if(!controls.isEmpty()) {
@@ -183,14 +214,14 @@ void XtbRunner::readOutput() {
     emit metricsChanged();
 }
 void XtbRunner::pollTrajectory() {
-    QFile file(directory+"/xtbopt.log");if(!file.open(QIODevice::ReadOnly))return;
+    QFile file(directory+(options.scan ? "/xtbscan.log" : "/xtbopt.log"));if(!file.open(QIODevice::ReadOnly))return;
     if(file.size()<offset){error=QStringLiteral("xTB trajectory 파일이 계산 중 잘렸습니다.");cancel();return;}
     file.seek(offset);const auto bytes=file.readAll();offset=file.pos();
     for(const auto &frame:parser.append(bytes,input)) {
         for(const auto &c:options.constraints)if(c.type=="fixed"&&(frame.coordinates[c.atoms[0]]-input.atoms[c.atoms[0]].position).length()>0.00002f){error=QStringLiteral("xTB 실행기가 고정 원자의 좌표를 변경했습니다. 결과를 적용하지 않습니다.");cancel();return;}
         for(int i=0;i<result.atoms.size();++i)result.atoms[i].position=frame.coordinates[i];
         if(std::isfinite(frame.energy))energy=frame.energy;if(std::isfinite(frame.gradient))gradient=frame.gradient;
-        cycle=frame.step;emit frameReady(frame);
+        cycle=frame.step;if(options.scan)scanFrames.push_back(frame);emit frameReady(frame);
     }
     if(!parser.error.isEmpty()){error=parser.error;cancel();}
 }
@@ -199,10 +230,25 @@ void XtbRunner::finish(int code,QProcess::ExitStatus status) {
     bool cancelled=state==State::Stopping;
     bool marker=QFileInfo::exists(directory+"/NOT_CONVERGED");
     QFile finalFile(directory+"/xtbopt.xyz");
-    if(options.optimize&&finalFile.open(QIODevice::ReadOnly)) {
+    if(options.optimize&&!options.scan&&finalFile.open(QIODevice::ReadOnly)) {
         XtbTrajectoryParser finalParser;auto frames=finalParser.append(finalFile.readAll()+"\n",input);
         if(!finalParser.error.isEmpty())error=finalParser.error;
         else if(!frames.isEmpty()){const auto &f=frames.last();for(int i=0;i<result.atoms.size();++i)result.atoms[i].position=f.coordinates[i];}
+    }
+    if(options.scan) {
+        double best=-std::numeric_limits<double>::infinity();
+        for(int i=1;i+1<scanFrames.size();++i) {
+            const double e=scanFrames[i].energy;
+            if(std::isfinite(e) && std::isfinite(scanFrames[i-1].energy) &&
+               std::isfinite(scanFrames[i+1].energy) && e>scanFrames[i-1].energy &&
+               e>scanFrames[i+1].energy && e>best) {best=e;tsCandidateIndex=i;}
+        }
+        if(!scanFrames.isEmpty()) {
+            const int choice=tsCandidateIndex>=0?tsCandidateIndex:scanFrames.size()-1;
+            const auto &frame=scanFrames[choice];
+            for(int i=0;i<result.atoms.size();++i)result.atoms[i].position=frame.coordinates[i];
+            energy=frame.energy;cycle=choice+1;
+        }
     }
     for(const auto &c:options.constraints)if(c.type=="fixed"&&(result.atoms[c.atoms[0]].position-input.atoms[c.atoms[0]].position).length()>0.00002f)error=QStringLiteral("xTB 실행기가 고정 원자의 좌표를 변경했습니다. 결과를 적용하지 않습니다.");
     if(!error.isEmpty())state=State::Failed;
@@ -211,7 +257,9 @@ void XtbRunner::finish(int code,QProcess::ExitStatus status) {
         state=State::Failed;error=QStringLiteral("GFN-FF 실행기가 명시적 결합 목록을 적용하지 않았습니다. 함께 제공된 gfnff runtime을 사용하세요.");
     }
     else if(options.optimize&&(marker||nonconvergence))state=State::NotConverged;
+    else if(options.scan && scanFrames.isEmpty()) {state=State::Failed;error=QStringLiteral("xTB Scan trajectory(xtbscan.log)가 생성되지 않았습니다.");}
     else if(code!=0||status!=QProcess::NormalExit||!std::isfinite(energy)) {state=State::Failed;error=QStringLiteral("xTB 실행 실패 (exit %1). 출력 보기를 확인하세요.").arg(code);}
+    else if(options.scan && scanFrames.size()<options.scan->points)state=State::NotConverged;
     else if(options.optimize&&!convergence)state=State::NotConverged;
     else state=State::Finished;
     if(options.optimize && (state==State::Finished || state==State::NotConverged)) {
@@ -227,6 +275,14 @@ void XtbRunner::finish(int code,QProcess::ExitStatus status) {
         if(!changes.isEmpty())geometryWarning=QStringLiteral("결합 연결이 크게 변했습니다 (%1개): %2").arg(changes.size()).arg(changes.mid(0,5).join("; "));
     }
     emit completed();
+}
+bool XtbRunner::selectScanFrame(int index) {
+    if(isRunning() || index<0 || index>=scanFrames.size())return false;
+    const auto &frame=scanFrames[index];
+    if(frame.coordinates.size()!=result.atoms.size())return false;
+    for(int i=0;i<result.atoms.size();++i)result.atoms[i].position=frame.coordinates[i];
+    energy=frame.energy;cycle=index+1;
+    return true;
 }
 void XtbRunner::cancel() {
     if(state!=State::Starting&&state!=State::Running)return;
