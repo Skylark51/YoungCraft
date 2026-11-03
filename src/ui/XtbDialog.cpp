@@ -58,21 +58,28 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     scanFrom=new QDoubleSpinBox(scanSettings);scanTo=new QDoubleSpinBox(scanSettings);
     for(auto *spin:{scanFrom,scanTo}){spin->setRange(-720,720);spin->setDecimals(4);spin->setSingleStep(0.1);}
     scanFrom->setObjectName("XtbScanFrom");scanTo->setObjectName("XtbScanTo");
-    double initial=1.5;
-    if(selection.size()>=2) {
-        if(initialType==0)initial=GeometryEditor::distance(m,selection[0],selection[1]);
-        else if(initialType==1)initial=GeometryEditor::angleDegrees(m,selection[0],selection[1],selection[2]);
-        else initial=GeometryEditor::dihedralDegrees(m,selection[0],selection[1],selection[2],selection[3]);
-    }
-    if(!std::isfinite(initial))initial=initialType==0?1.5:90;
-    scanFrom->setValue(initial);scanTo->setValue(initial+(initialType==0?0.5:20));
+    scanFrom->setValue(1.5);scanTo->setValue(2.0);
     scanForm->addRow(QStringLiteral("Start"),scanFrom);scanForm->addRow(QStringLiteral("End"),scanTo);
     scanPoints=new QSpinBox(scanSettings);scanPoints->setRange(3,501);scanPoints->setValue(11);
     scanPoints->setObjectName("XtbScanPoints");scanForm->addRow(QStringLiteral("Points"),scanPoints);
     auto updateAtoms=[this](int type){
-        for(int i=0;i<4;++i)scanAtoms[i]->setVisible(i<type+2);
+        const int count=type+2;
+        QVector<int> ids;QSet<int> unique;
+        for(int i=0;i<4;++i) {
+            scanAtoms[i]->setVisible(i<count);
+            if(i<count){ids<<scanAtoms[i]->value()-1;unique.insert(ids.last());}
+        }
         const QString unit=type==0?QStringLiteral(" Å"):QStringLiteral("°");
         scanFrom->setSuffix(unit);scanTo->setSuffix(unit);
+        if(unique.size()==count){
+            double value=type==0?GeometryEditor::distance(original,ids[0],ids[1]):
+                type==1?GeometryEditor::angleDegrees(original,ids[0],ids[1],ids[2]):
+                GeometryEditor::dihedralDegrees(original,ids[0],ids[1],ids[2],ids[3]);
+            if(std::isfinite(value)) {
+                scanFrom->setValue(value);
+                scanTo->setValue(value+(type==0?0.5:20));
+            }
+        }
     };
     connect(scanType,&QComboBox::currentIndexChanged,this,updateAtoms);
     updateAtoms(initialType);
