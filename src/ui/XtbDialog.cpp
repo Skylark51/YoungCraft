@@ -139,7 +139,7 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     connect(&runner,&XtbRunner::completed,this,&XtbDialog::finishCalculation);
     connect(apply,&QPushButton::clicked,this,[this]{applied=true;original=runner.result;emit applyGeometry(runner.result);});
     connect(open,&QPushButton::clicked,this,[this]{emit openGeometry(runner.result);});
-    connect(save,&QPushButton::clicked,this,[this]{QString path=QFileDialog::getSaveFileName(this,QStringLiteral("XYZ 저장"),"xtbopt.xyz","XYZ (*.xyz)");if(path.isEmpty())return;QFile file(path);if(!file.open(QIODevice::WriteOnly)||file.write(XtbRunner::xyz(runner.result).toUtf8())<0)QMessageBox::warning(this,"xTB",QStringLiteral("XYZ 저장 실패"));});
+    connect(save,&QPushButton::clicked,this,[this]{QString path=QFileDialog::getSaveFileName(this,QStringLiteral("XYZ 저장"),kind->currentIndex()==2?QString("xtb_scan_point_%1.xyz").arg(runner.cycle):QStringLiteral("xtbopt.xyz"),"XYZ (*.xyz)");if(path.isEmpty())return;QFile file(path);if(!file.open(QIODevice::WriteOnly)||file.write(XtbRunner::xyz(runner.result).toUtf8())<0)QMessageBox::warning(this,"xTB",QStringLiteral("XYZ 저장 실패"));});
     connect(outputButton,&QPushButton::clicked,this,[this]{auto *d=new QDialog(this);d->setAttribute(Qt::WA_DeleteOnClose);d->setWindowTitle(QStringLiteral("xTB 출력 — ")+runner.directory);d->resize(800,600);auto *l=new QVBoxLayout(d);auto *text=new QPlainTextEdit(d);text->setReadOnly(true);text->setPlainText(runner.output);l->addWidget(text);d->show();});
     refreshPlot();
     if(automatic)QTimer::singleShot(0,this,&XtbDialog::startCalculation);
@@ -180,7 +180,7 @@ void XtbDialog::finishCalculation() {
     QString label;
     switch(runner.state){case XtbRunner::State::Finished:
         label=kind->currentIndex()==2?QStringLiteral("Relaxed PES Scan 완료"):
-            (kind->currentIndex()?QStringLiteral("최적화 수렴"):QStringLiteral("Single Point 완료"));break;case XtbRunner::State::NotConverged:label=QStringLiteral("최적화 미수렴 — 마지막 geometry 확인 가능");break;case XtbRunner::State::Cancelled:label=QStringLiteral("중단 — 마지막 geometry 확인 가능");break;default:label=runner.error;break;}
+            (kind->currentIndex()?QStringLiteral("최적화 수렴"):QStringLiteral("Single Point 완료"));break;case XtbRunner::State::NotConverged:label=kind->currentIndex()==2?QStringLiteral("Scan 일부 완료 (미수렴)"):QStringLiteral("최적화 미수렴 — 마지막 geometry 확인 가능");break;case XtbRunner::State::Cancelled:label=QStringLiteral("중단 — 마지막 geometry 확인 가능");break;default:label=runner.error;break;}
     auto value=[](double v){return std::isfinite(v)?QString::number(v,'g',12):QStringLiteral("제공되지 않음");};
     status->setText(QStringLiteral("%1\nStep %2 · Total Energy %3 Eh · Gradient norm %4 · HOMO-LUMO gap %5 eV\n%6").arg(label).arg(runner.cycle).arg(value(runner.energy),value(runner.gradient),value(runner.gap),runner.directory));
     if(kind->currentIndex() && (preserveBonds->isChecked() || preserveFramework->isChecked()))
