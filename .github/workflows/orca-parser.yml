@@ -19,7 +19,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
       - name: Build executable and parsers
-        run: cmake --build build --target test_orca_parser test_parser --parallel 2
+        run: cmake --build build --target Youngcraft test_orca_parser test_parser --parallel 2
       - name: Run parser regression tests
         run: ctest --test-dir build -C Release --output-on-failure -R "parser_(orca|gaussian)"
       - name: Show CTest failure log
