@@ -134,9 +134,9 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     const QRegularExpression freqRe(QStringLiteral(
         R"(^\s*(\d+)\s*:\s*([+-]?\d+(?:\.\d+)?(?:[EeDd][+-]?\d+)?)\s*cm\*\*-1)"),
         QRegularExpression::CaseInsensitiveOption);
-    const QRegularExpression chargeRe(QStringLiteral(R"(Total Charge\s*[:.]?\s*(-?\d+))"),
+    const QRegularExpression chargeRe(QStringLiteral(R"(Total Charge\s*[.:]*\s*(-?\d+))"),
         QRegularExpression::CaseInsensitiveOption);
-    const QRegularExpression multRe(QStringLiteral(R"(Multiplicity\s*[:.]?\s*(\d+))"),
+    const QRegularExpression multRe(QStringLiteral(R"(Multiplicity\s*[.:]*\s*(\d+))"),
         QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression energyRe(QStringLiteral(
         R"(FINAL SINGLE POINT ENERGY\s+([+-]?[0-9.EeDd]+))"));
