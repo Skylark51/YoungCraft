@@ -218,6 +218,7 @@ void XtbRunner::pollTrajectory() {
     if(file.size()<offset){error=QStringLiteral("xTB trajectory 파일이 계산 중 잘렸습니다.");cancel();return;}
     file.seek(offset);const auto bytes=file.readAll();offset=file.pos();
     for(const auto &frame:parser.append(bytes,input)) {
+        if(options.scan && !std::isfinite(frame.energy)) {error=QStringLiteral("xTB Scan frame의 에너지를 읽을 수 없습니다.");cancel();return;}
         for(const auto &c:options.constraints)if(c.type=="fixed"&&(frame.coordinates[c.atoms[0]]-input.atoms[c.atoms[0]].position).length()>0.00002f){error=QStringLiteral("xTB 실행기가 고정 원자의 좌표를 변경했습니다. 결과를 적용하지 않습니다.");cancel();return;}
         for(int i=0;i<result.atoms.size();++i)result.atoms[i].position=frame.coordinates[i];
         if(std::isfinite(frame.energy))energy=frame.energy;if(std::isfinite(frame.gradient))gradient=frame.gradient;
