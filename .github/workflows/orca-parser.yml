@@ -26,6 +26,6 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          Get-Content build/Testing/Temporary/LastTest.log
-          & ./build/test_orca_parser.exe -v2
+          & ./build/test_orca_parser.exe -o orca-results.txt,txt
+          Get-Content orca-results.txt
           Write-Host "Exit code: $LASTEXITCODE"
