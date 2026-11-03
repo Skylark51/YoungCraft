@@ -72,7 +72,7 @@ void readMulliken(QFile &file, QVector<Atom> &atoms) {
             break;
         }
         bool ok = false;
-        const int idx = cols[0].remove(QLatin1Char(':')).toInt(&ok);
+        const int idx = cols[0].toInt(&ok);
         if (!ok || idx < 0 || idx >= atoms.size()) {
             if (parsed > 0) file.seek(start);
             break;
@@ -85,7 +85,7 @@ void readMulliken(QFile &file, QVector<Atom> &atoms) {
         }
         atoms[idx].charge = charge;
         double spin = 0.0;
-        if (number(cols.value(4), spin)) atoms[idx].spinDensity = spin;
+        if (number(cols.value(values + 1), spin)) atoms[idx].spinDensity = spin;
         ++parsed;
     }
 }
@@ -131,16 +131,16 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     bool inFrequencyTable = false;
     int step = 0;
     const QRegularExpression freqRe(QStringLiteral(
-        R"(^\\s*(\\d+)\\s*:\\s*([+-]?\\d+(?:\\.\\d+)?(?:[EeDd][+-]?\\d+)?)\\s*cm\\*\\*-1)"),
+        R"(^\s*(\d+)\s*:\s*([+-]?\d+(?:\.\d+)?(?:[EeDd][+-]?\d+)?)\s*cm\*\*-1)"),
         QRegularExpression::CaseInsensitiveOption);
-    const QRegularExpression chargeRe(QStringLiteral(R"(Total Charge\\s*[:.]?\\s*(-?\\d+))"),
+    const QRegularExpression chargeRe(QStringLiteral(R"(Total Charge\s*[:.]?\s*(-?\d+))"),
         QRegularExpression::CaseInsensitiveOption);
-    const QRegularExpression multRe(QStringLiteral(R"(Multiplicity\\s*[:.]?\\s*(\\d+))"),
+    const QRegularExpression multRe(QStringLiteral(R"(Multiplicity\s*[:.]?\s*(\d+))"),
         QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression energyRe(QStringLiteral(
-        R"(FINAL SINGLE POINT ENERGY\\s+([+-]?[0-9.EeDd]+))"));
+        R"(FINAL SINGLE POINT ENERGY\s+([+-]?[0-9.EeDd]+))"));
     const QRegularExpression scfRe(QStringLiteral(
-        R"(^\\s*Total Energy\\s*:\\s*([+-]?[0-9.EeDd]+)\\s*Eh)"),
+        R"(^\s*Total Energy\s*:\s*([+-]?[0-9.EeDd]+)\s*Eh)"),
         QRegularExpression::CaseInsensitiveOption);
 
     while (!file.atEnd()) {
