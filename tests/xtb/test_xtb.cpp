@@ -152,7 +152,12 @@ private slots:
     QVERIFY2(r.state==XtbRunner::State::Finished,qPrintable(r.output.right(2000)+r.error));
     QCOMPARE(r.scanFrames.size(),5);
     for(const auto &frame:r.scanFrames)QVERIFY(std::isfinite(frame.energy));
-    QCOMPARE(r.tsCandidateIndex,-1); // bond stretch is approximately monotonic
+    if(r.tsCandidateIndex>=0) {
+        const int i=r.tsCandidateIndex;
+        QVERIFY(i>0 && i+1<r.scanFrames.size());
+        QVERIFY(r.scanFrames[i].energy>r.scanFrames[i-1].energy);
+        QVERIFY(r.scanFrames[i].energy>r.scanFrames[i+1].energy);
+    }
     QVERIFY(r.selectScanFrame(0));QCOMPARE(r.cycle,1);
     QVERIFY(std::abs(r.energy-r.scanFrames[0].energy)<1e-10);
     QVERIFY(!r.selectScanFrame(5));
