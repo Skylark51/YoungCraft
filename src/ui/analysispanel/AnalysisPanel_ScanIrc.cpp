@@ -89,7 +89,10 @@ void AnalysisPanel::fillScanPlot() {
     m_scanList->clear();
     for (int i = 0; i < m_data.scanPoints.size(); ++i) {
         const ScanPoint &point = m_data.scanPoints[i];
-        if (m_data.scanDimensions == 2) {
+        if (m_data.format == QStringLiteral("GSM")) {
+            m_scanList->addItem(QStringLiteral("노드 %1  |  ΔE %2 kcal/mol")
+                                    .arg(point.index).arg(numberOrDash(point.relativeKcal, 2)));
+        } else if (m_data.scanDimensions == 2) {
             m_scanList->addItem(QStringLiteral("점 %1  |  %2 / %3  |  ΔE %4 kcal/mol")
                                     .arg(point.index).arg(numberOrDash(point.coordinate, 2))
                                     .arg(numberOrDash(point.coordinate2, 2)).arg(numberOrDash(point.relativeKcal, 2)));
@@ -101,7 +104,9 @@ void AnalysisPanel::fillScanPlot() {
     for (int i = 0; i < m_data.scanPoints.size(); ++i) {
         const auto &point = m_data.scanPoints[i];
         if (point.inProgress) m_scanList->item(i)->setText(m_scanList->item(i)->text() + QStringLiteral(" · 진행 중"));
-        m_scanList->item(i)->setToolTip(QStringLiteral("E = %1 Hartree").arg(point.energyHartree, 0, 'f', 2));
+        m_scanList->item(i)->setToolTip(m_data.format == QStringLiteral("GSM")
+            ? QStringLiteral("ΔE = %1 kcal/mol").arg(numberOrDash(point.relativeKcal, 3))
+            : QStringLiteral("E = %1 Hartree").arg(point.energyHartree, 0, 'f', 2));
     }
     m_scanStatus->setText(m_data.scanStatusText());
     if (m_scanResults) m_scanResults->setData(m_data, m_scanList->currentRow());

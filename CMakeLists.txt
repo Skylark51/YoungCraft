@@ -33,6 +33,7 @@ set(YOUNGCRAFT_CORE_SOURCES
     src/model/Molecule.cpp
     src/model/GeometryEditor.cpp
     src/io/OrcaParser.cpp
+    src/io/GsmParser.cpp
     src/io/GaussianParser.cpp
     src/io/XYZParser.cpp
     src/io/CubeParser.cpp

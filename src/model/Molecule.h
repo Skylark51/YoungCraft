@@ -173,6 +173,12 @@ struct CalculationData {
     int scanDimensions = 1;
     QString scanAxisLabel2;
     QString scanStatusText() const {
+        if (format == QStringLiteral("GSM")) {
+            if (scanPoints.isEmpty()) return QStringLiteral("GSM 경로: 구조만 확인 가능 (노드 에너지 없음)");
+            return QStringLiteral("GSM 경로: %1개 노드 · 상대 에너지 (kcal/mol)%2")
+                .arg(scanPoints.size())
+                .arg(status == CalculationStatus::Incomplete ? QStringLiteral(" · 마지막 노드 불완전") : QString());
+        }
         if (!scanDetected) return QStringLiteral("Scan 데이터 없음");
         if (scanPoints.isEmpty()) return QStringLiteral("Scan은 감지되었지만 아직 표시할 point 없음");
         if (scanPoints.last().inProgress)
