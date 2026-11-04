@@ -224,7 +224,9 @@ void ScanResultsDialog::setData(const CalculationData &data,int selected) {
             const double value=col==0?p.coordinate:(m_scanDimensions==2&&col==1?p.coordinate2:p.relativeKcal);
             auto *item=new QTableWidgetItem(number(value,9));
             item->setTextAlignment(Qt::AlignRight|Qt::AlignVCenter);
-            item->setToolTip(QStringLiteral("E = %1 Hartree").arg(number(p.energyHartree,14)));
+            item->setToolTip(data.format == QStringLiteral("GSM")
+                ? QStringLiteral("ΔE = %1 kcal/mol").arg(number(p.relativeKcal,9))
+                : QStringLiteral("E = %1 Hartree").arg(number(p.energyHartree,14)));
             m_table->setItem(i,col,item);
         }
     }
@@ -263,7 +265,10 @@ void ScanResultsDialog::setSelectedPoint(int index) {
     const QSignalBlocker blocker(m_table);
     m_table->setCurrentCell(index,0);
     m_plot->setSelectedPoint(index);
-    if(m_scanDimensions==2) {
+    if(m_scanAxisLabel == QStringLiteral("GSM node")) {
+        m_status->setText(QStringLiteral("GSM 노드 %1 | ΔE = %2 kcal/mol")
+            .arg(m_points[index].index).arg(number(m_points[index].relativeKcal,10)));
+    } else if(m_scanDimensions==2) {
         m_status->setText(QStringLiteral("지점 %1 | %2 = %3 | %4 = %5 | E = %6 Hartree | ΔE = %7 kcal/mol")
             .arg(m_points[index].index).arg(m_scanAxisLabel,number(m_points[index].coordinate,9),
                  m_scanAxisLabel2,number(m_points[index].coordinate2,9),number(m_points[index].energyHartree,14),

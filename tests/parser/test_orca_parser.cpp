@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <cmath>
 
 using namespace youngcraft;
 
@@ -14,6 +15,11 @@ private slots:
     void acceptsIncompleteOptimization();
     void keepsGaussianDispatch();
     void rejectsUnrecognizedOutput();
+    void readsMolecularGsmStringfile();
+    void readsPyGsmMoldenPath();
+    void readsLabeledGsmEnergies();
+    void preservesOrdinaryXyz();
+    void rejectsMixedGsmAtoms();
 };
 
 void OrcaParserTest::parsesCompleteOutput() {
@@ -113,6 +119,92 @@ void OrcaParserTest::rejectsUnrecognizedOutput() {
     file.write("Not an ORCA or Gaussian output\n");
     file.close();
     QVERIFY(!OrcaParser::isOrcaOutput(path));
+}
+
+
+void OrcaParserTest::readsMolecularGsmStringfile() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("stringfile.xyz0001"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("2\n0.000000\nH 0 0 0\nH 0 0 1\n"
+               "2\n12.500000\nH 0 0 0\nH 0 0 1.2\n"
+               "2\n-3.250000\nH 0 0 0\nH 0 0 1.5\n");
+    file.close();
+    const LoadedFile loaded = FileDispatcher::load(path);
+    QVERIFY2(loaded.parseResult.success, qPrintable(loaded.parseResult.error));
+    QCOMPARE(loaded.format, QStringLiteral("GSM"));
+    const auto &data = loaded.parseResult.data;
+    QCOMPARE(data.frames.size(), 3);
+    QCOMPARE(data.scanPoints.size(), 3);
+    QCOMPARE(data.scanPoints[1].frameIndex, 1);
+    QCOMPARE(data.scanPoints[1].relativeKcal, 12.5);
+    QCOMPARE(data.scanPoints[2].relativeKcal, -3.25);
+    QVERIFY(!std::isfinite(data.scanPoints[1].energyHartree));
+    QCOMPARE(data.frames[1].coordinates[1].z(), 1.2f);
+}
+
+void OrcaParserTest::readsPyGsmMoldenPath() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("opt_converged_000.xyz"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("[Molden Format]\n[Geometries] (XYZ)\n"
+               "2\n\nH 0 0 0\nH 0 0 1\n"
+               "2\n\nH 0 0 0\nH 0 0 1.2\n"
+               "[GEOCONV]\nenergy\n0.0\n8.75\nmax-force\n0.1\n0.2\n");
+    file.close();
+    const LoadedFile loaded = FileDispatcher::load(path);
+    QVERIFY2(loaded.parseResult.success, qPrintable(loaded.parseResult.error));
+    QCOMPARE(loaded.format, QStringLiteral("GSM"));
+    QCOMPARE(loaded.parseResult.data.frames.size(), 2);
+    QCOMPARE(loaded.parseResult.data.scanPoints.size(), 2);
+    QCOMPARE(loaded.parseResult.data.scanPoints.last().relativeKcal, 8.75);
+    QVERIFY(loaded.parseResult.data.scanHasSummary);
+}
+
+void OrcaParserTest::readsLabeledGsmEnergies() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("stringfile.standard"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("1\n-100.0 kcal/mol\nH 0 0 0\n"
+               "1\n-95.5 kcal/mol\nH 0 0 1\n");
+    file.close();
+    const LoadedFile loaded = FileDispatcher::load(path);
+    QVERIFY2(loaded.parseResult.success, qPrintable(loaded.parseResult.error));
+    QCOMPARE(loaded.parseResult.data.scanPoints.last().relativeKcal, 4.5);
+}
+
+void OrcaParserTest::preservesOrdinaryXyz() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("plain.xyz"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("1\nordinary molecule\nH 0 0 0\n");
+    file.close();
+    const LoadedFile loaded = FileDispatcher::load(path);
+    QVERIFY2(loaded.parseResult.success, qPrintable(loaded.parseResult.error));
+    QCOMPARE(loaded.format, QStringLiteral("XYZ"));
+    QVERIFY(loaded.parseResult.data.scanPoints.isEmpty());
+}
+
+void OrcaParserTest::rejectsMixedGsmAtoms() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("stringfile.xyz0002"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("1\n0\nH 0 0 0\n"
+               "1\n1\nO 0 0 0\n");
+    file.close();
+    const LoadedFile loaded = FileDispatcher::load(path);
+    QVERIFY(!loaded.parseResult.success);
+    QVERIFY(loaded.parseResult.error.contains(QStringLiteral("원자 순서")));
 }
 
 QTEST_APPLESS_MAIN(OrcaParserTest)

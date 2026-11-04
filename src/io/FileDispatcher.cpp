@@ -2,6 +2,7 @@
 #include "io/FileDispatcher.h"
 
 #include "io/FchkParser.h"
+#include "io/GsmParser.h"
 #include "io/OrcaParser.h"
 #include "io/XYZParser.h"
 
@@ -11,13 +12,14 @@ namespace youngcraft {
 
 QString FileDispatcher::openFilter() {
     return QStringLiteral(
-        "지원되는 모든 구조/계산 파일 (*.out *.log *.gjf *.com *.xyz *.cube *.cub *.fchk *.fch *.chk *.cif *.mmcif *.cmf *.mol *.sdf *.sd *.mdl *.mol2 *.pdb *.ent *.res *.ins *.cssr);;"
-        "Gaussian / ORCA 출력 (*.out *.log);;Gaussian 입력 (*.gjf *.com);;XYZ 파일 (*.xyz);;CIF / 결정 구조 (*.cif *.mmcif *.cmf);;"
+        "지원되는 모든 구조/계산 파일 (*.out *.log *.gjf *.com *.xyz *.xyz* stringfile.* *.cube *.cub *.fchk *.fch *.chk *.cif *.mmcif *.cmf *.mol *.sdf *.sd *.mdl *.mol2 *.pdb *.ent *.res *.ins *.cssr);;"
+        "Gaussian / ORCA 출력 (*.out *.log);;Gaussian 입력 (*.gjf *.com);;GSM 경로 (*.xyz* stringfile.*);;XYZ 파일 (*.xyz);;CIF / 결정 구조 (*.cif *.mmcif *.cmf);;"
         "MOL / SDF (*.mol *.sdf *.sd *.mdl);;MOL2 (*.mol2);;PDB (*.pdb *.ent);;"
         "SHELX (*.res *.ins);;CSSR (*.cssr);;CUBE (*.cube *.cub);;FCHK (*.fchk *.fch *.chk);;모든 파일 (*.*)");
 }
 
 QString FileDispatcher::formatForPath(const QString &filePath) {
+    if (GsmParser::isGsmPath(filePath)) return QStringLiteral("GSM");
     const QString suffix = QFileInfo(filePath).suffix().toLower();
     if (suffix == QStringLiteral("out") || suffix == QStringLiteral("log") ||
         suffix == QStringLiteral("gjf") || suffix == QStringLiteral("com")) return QStringLiteral("Gaussian");
@@ -47,6 +49,10 @@ LoadedFile FileDispatcher::load(const QString &filePath, const ParseOptions &opt
         loaded.parseResult.data.hasCubeGrid = loaded.cube->valid;
         loaded.parseResult.success = loaded.cube->valid;
         loaded.parseResult.error = loaded.cube->error;
+    } else if (loaded.format == QStringLiteral("GSM") ||
+               (loaded.format == QStringLiteral("XYZ") && GsmParser::isMoldenOutput(filePath))) {
+        loaded.format = QStringLiteral("GSM");
+        loaded.parseResult = GsmParser::parse(filePath);
     } else if (loaded.format == QStringLiteral("XYZ")) {
         loaded.parseResult = XYZParser::parse(filePath);
     } else if (loaded.format == QStringLiteral("CHK")) {

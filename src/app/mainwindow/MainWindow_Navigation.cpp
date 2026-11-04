@@ -63,7 +63,9 @@ void MainWindow::populateExplorer() {
     }
     auto *frequency = new QTreeWidgetItem({QStringLiteral("진동 (%1)").arg(m_data.frequencies.size())}); frequency->setData(0, Qt::UserRole, QStringLiteral("section")); frequency->setData(0, Qt::UserRole + 1, 1); root->addChild(frequency);
     for (int i = 0; i < m_data.frequencies.size(); ++i) { auto *child = new QTreeWidgetItem({QStringLiteral("%1: %2 cm⁻¹").arg(i + 1).arg(m_data.frequencies[i].wavenumber)}); child->setData(0, Qt::UserRole, QStringLiteral("frequency")); child->setData(0, Qt::UserRole + 1, i); frequency->addChild(child); }
-    auto *scan = new QTreeWidgetItem({QStringLiteral("퍼텐셜 에너지 스캔 (%1)").arg(m_data.scanPoints.size())}); scan->setData(0, Qt::UserRole, QStringLiteral("section")); scan->setData(0, Qt::UserRole + 1, 2); root->addChild(scan);
+    auto *scan = new QTreeWidgetItem({(m_data.format == QStringLiteral("GSM")
+        ? QStringLiteral("GSM 경로 (%1)") : QStringLiteral("퍼텐셜 에너지 스캔 (%1)"))
+        .arg(m_data.scanPoints.size())}); scan->setData(0, Qt::UserRole, QStringLiteral("section")); scan->setData(0, Qt::UserRole + 1, 2); root->addChild(scan);
     for (int i = 0; i < m_data.scanPoints.size(); ++i) {
         const auto &point = m_data.scanPoints[i];
         auto *child = new QTreeWidgetItem({QStringLiteral("점 %1%2").arg(point.index)
@@ -135,7 +137,11 @@ void MainWindow::showScanPoint(int index) {
     if (frame >= 0 && frame < m_data.frames.size()) showFrame(frame);
     m_analysis->setCurrentScanPoint(index);
     const auto &point = m_data.scanPoints[index];
-    setStatus(QStringLiteral("PES Scan 점 %1 | E = %2 Hartree%3").arg(point.index)
+    if (m_data.format == QStringLiteral("GSM"))
+        setStatus(QStringLiteral("GSM 노드 %1 | ΔE = %2 kcal/mol").arg(point.index)
+                  .arg(point.relativeKcal, 0, 'f', 3));
+    else
+        setStatus(QStringLiteral("PES Scan 점 %1 | E = %2 Hartree%3").arg(point.index)
                   .arg(point.energyHartree, 0, 'f', 9).arg(frame < 0 ? QStringLiteral(" | 대응 구조 없음") : QString()));
     QTreeWidgetItemIterator it(m_explorer);
     while (*it) {
