@@ -20,8 +20,10 @@ public:
     void refresh();
     void setTime(double seconds);
     double mappedTime(double seconds) const;
-    void edit();
-    QImage imageAtTime(QSize size, double seconds) const;
+    double timeForMapped(double seconds) const;
+    float impactFlash(double seconds) const;
+    void edit(int selectedStage=0);
+    QImage imageAtTime(QSize size, double seconds, bool transparent=false, bool force=false) const;
     QJsonObject settings() const;
     void restoreSettings(const QJsonObject &settings);
 signals:
@@ -29,13 +31,15 @@ signals:
 protected:
     void paintEvent(QPaintEvent *) override;
 private:
-    struct Position { int from=0,to=0; double fraction=0,time=0; bool collision=false; };
+    struct Position { int from=0,to=0; double fraction=0,time=0,impact=0; bool collision=false; };
     Position position(double seconds) const;
     QVector<double> stageTimes() const;
-    void draw(QPainter &painter, const QRectF &rect, double seconds) const;
+    void draw(QPainter &painter, const QRectF &rect, double seconds, bool transparent=false, bool force=false) const;
     QVector<MechanismStep> *m_steps;
     QVector<QImage> m_images;
     bool m_enabled=false;
-    double m_time=0,m_barrier=20;
+    bool m_grid=true,m_values=false;
+    int m_reference=0;
+    double m_time=0;
 };
 }
