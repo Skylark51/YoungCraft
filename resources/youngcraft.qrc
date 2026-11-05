@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/youngcraft">
     <file alias="icon.png">youngcraft-icon.png</file>
+    <file>export-mechanism-pptx.ps1</file>
   </qresource>
 </RCC>

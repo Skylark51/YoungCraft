@@ -33,6 +33,7 @@ struct Atom {
     bool optimizationFixed = false; // Retained core for subsequent partial optimizations.
     bool autoHydrogenLocked = false; // Complete library ligand, e.g. CO / CN, retains its explicit H topology.
     float displayOpacity = 1.0f; // Viewer emphasis only; does not alter molecular data.
+    float displayFlash = 0.0f;
 };
 
 enum class BondStyle { Solid, Dashed };
@@ -45,6 +46,7 @@ struct Bond {
     BondStyle style = BondStyle::Solid;
     bool manual = false;
     float displayOpacity = 1.0f; // Presentation-only fading of forming/breaking bonds.
+    float displayFlash = 0.0f;
 };
 
 struct FrameMetrics {

@@ -13,6 +13,8 @@ struct MechanismStep {
     QVector<int> mapping; // Empty: ordered automatic match. -1: new track; otherwise existing track.
     double seconds = 3.0; // Travel time from the preceding step, including this step's path frames.
     bool reversed = false;
+    double travelSeconds() const;
+    double holdSeconds() const;
     QJsonObject presentation; // Optional reaction-coordinate artwork, energy and annotations.
     static MechanismStep fromCalculation(const CalculationData &data, bool usePath = true);
 };
@@ -29,7 +31,11 @@ public:
     bool build(const QVector<MechanismStep> &steps, const MechanismOptions &options, QString *error = nullptr);
     Molecule sample(double seconds) const;
     Molecule envelope() const;
+    QVector<QPair<int,int>> cleavableBonds(int stage) const;
+    QVector<double> cleavageTimes(int stage, int first, int second) const;
     double duration() const { return m_nodes.isEmpty() ? 0 : m_nodes.last().time; }
+    const QVector<double> &topologyChangeTimes() const { return m_topologyChanges; }
+    double stageTime(int stage) const { return m_nodes[m_stageEnds[stage]].time; }
     int trackCount() const { return m_tracks.size(); }
     const QVector<QVector<int>> &mappings() const { return m_mappings; }
     QStringList summaries() const { return m_summaries; }
@@ -46,7 +52,12 @@ private:
         QVector<float> presence;
         QVector<Bond> bonds;
     };
+    QMap<quint64,QVector<int>> cleavageNodes(int stage) const;
     QVector<Node> m_nodes;
+    QVector<int> m_stageEnds;
+    QVector<double> m_topologyChanges;
+    struct PhotoCleavage { Bond bond; double start, end; };
+    QVector<PhotoCleavage> m_photoCleavages;
     QVector<Atom> m_tracks;
     QVector<QVector<int>> m_mappings;
     QStringList m_names, m_summaries;
