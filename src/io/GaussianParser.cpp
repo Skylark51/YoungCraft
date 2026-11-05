@@ -1,5 +1,6 @@
 #include "io/GaussianParser.h"
 
+#include "io/NboParser.h"
 #include "io/ParserCommon.h"
 
 #include <QFile>

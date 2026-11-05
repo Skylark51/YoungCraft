@@ -10,7 +10,7 @@
 #include "ui/PlotWidget.h"
 #include "ui/StyleEditorDialog.h"
 #include "ui/GeometryMeasureBar.h"
-#include "ui/AppPattern.h"
+#include "settings/AppPattern.h"
 #include "ui/SidebarPaper.h"
 #include "ui/OutputSourceView.h"
 #include <QShortcut>

@@ -1,4 +1,4 @@
-#include "io/NboParser.h"
+#include "model/NboData.h"
 #pragma once
 
 #include <QColor>
