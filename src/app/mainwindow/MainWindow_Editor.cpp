@@ -145,6 +145,19 @@ void MainWindow::createBuildMenu(){
     add("금속–리간드–산소 조합...",[this]{buildLabComplex();});
     add("Scan 접근 배치...",[this]{arrangeScanApproach();});menu->addSeparator();
     for(auto pair:{qMakePair(QString("수소 보정"),HydrogenAction::Adjust),qMakePair(QString("수소 추가"),HydrogenAction::Add),qMakePair(QString("과잉 수소 제거"),HydrogenAction::RemoveExtra),qMakePair(QString("모든 수소 제거"),HydrogenAction::RemoveAll)})add(pair.first,[this,pair]{auto edited=m_view->molecule();MoleculeEditController::hydrogens(edited,pair.second);commitEditedMolecule(edited,true,false);});
+    for(auto pair:{qMakePair(QStringLiteral("탄소에 붙은 수소 제거"),HydrogenAction::RemoveCarbonBound),qMakePair(QStringLiteral("선택한 수소만 남기기"),HydrogenAction::RemoveExceptSelected)}) {
+        auto *action=menu->addAction(pair.first);action->setObjectName(pair.second==HydrogenAction::RemoveCarbonBound?"RemoveCarbonHydrogens":"RemoveUnselectedHydrogens");
+        connect(action,&QAction::triggered,this,[this,pair]{
+            auto selected=m_view->selection().atoms;if(selected.isEmpty()&&m_view->selectedAtom()>=0)selected.insert(m_view->selectedAtom());
+            if(pair.second==HydrogenAction::RemoveExceptSelected) {
+                bool hasHydrogen=false;for(int i:selected)if(i>=0&&i<m_view->molecule().atoms.size()&&m_view->molecule().atoms[i].atomicNumber==1)hasHydrogen=true;
+                if(!hasHydrogen){setStatus(QStringLiteral("남길 수소를 먼저 선택하세요. Shift/Ctrl로 여러 수소를 선택할 수 있습니다."));return;}
+            }
+            auto edited=m_view->molecule();const int before=edited.atoms.size();MoleculeEditController::hydrogens(edited,pair.second,selected);
+            if(before==edited.atoms.size()){setStatus(QStringLiteral("제거할 수소가 없습니다."));return;}
+            const int removed=before-edited.atoms.size();commitEditedMolecule(edited,true,false);setStatus(QStringLiteral("수소 %1개를 제거했습니다. Ctrl+Z로 되돌릴 수 있습니다.").arg(removed));
+        });
+    }
     menu->addSeparator();add("원소 변경...",[this]{changeSelectionElement();});add("선택 원자 이동 / 회전...",[this]{manipulateSelection();});
     add("선택 원자 사이에 결합 추가",[this]{auto ids=m_view->selection().atoms.values();if(ids.size()!=2){setStatus("원자 두 개를 선택하세요.");return;}auto edited=m_view->molecule();MoleculeEditController::drawBond(edited,ids[0],ids[1],drawState());commitEditedMolecule(edited,true);});
     add("선택 결합 제거",[this]{auto edited=m_view->molecule();auto ids=m_view->selection().atoms;auto bs=m_view->selection().bonds;for(int i=edited.bonds.size()-1;i>=0;--i){auto b=edited.bonds[i];if(bs.contains(i)||(ids.contains(b.first)&&ids.contains(b.second)))edited.bonds.removeAt(i);}commitEditedMolecule(edited,true);});

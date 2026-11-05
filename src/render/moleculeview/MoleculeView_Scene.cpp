@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <iterator>
+#include <algorithm>
 
 namespace youngcraft {
 
@@ -68,6 +69,7 @@ void MoleculeView::paintGL() {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glDepthFunc(GL_LESS);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_TRUE);
     if (m_style.antiAliasing) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
     const bool patterned=uiPattern::active(this) && !m_transparentCapture
@@ -129,7 +131,11 @@ void MoleculeView::paintGL() {
     if (m_style.displayMode != DisplayMode::SpaceFilling) {
         m_program->setUniformValue("uMaterialSpecular", 0.42f);
         m_program->setUniformValue("uMaterialShininess", 0.72f);
-        for (const Bond &bond : m_molecule.bonds) drawColoredBond(bond);
+        for (const Bond &bond : m_molecule.bonds) {
+            if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
+            if (qMin(m_molecule.atoms[bond.first].displayOpacity, m_molecule.atoms[bond.second].displayOpacity) * bond.displayOpacity >= 1.0f)
+                drawColoredBond(bond);
+        }
     }
 
     if ((m_style.showPositiveSurface && m_positiveSurfaceVertexCount > 0) ||
@@ -152,13 +158,44 @@ void MoleculeView::paintGL() {
     glDepthMask(GL_TRUE);
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const Atom &atom = m_molecule.atoms[i];
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atom.visible || atom.displayOpacity < 1.0f || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
         const bool metal = isMetal(atom.atomicNumber);
         m_program->setUniformValue("uMaterialSpecular", metal ? 1.12f : 1.0f);
         m_program->setUniformValue("uMaterialShininess", metal ? 1.18f : 1.0f);
         drawAtomSphere(atom);
     }
     glEnable(GL_BLEND);
+    // Draw faded atoms and their bonds back-to-front after opaque geometry.
+    // They test against opaque depth but never obscure atoms behind them.
+    struct FadedItem { float depth; int index; bool bond; };
+    QVector<FadedItem> faded;
+    for (int i = 0; i < m_molecule.atoms.size(); ++i) {
+        const auto &atom = m_molecule.atoms[i];
+        if (atom.visible && atom.displayOpacity < 1.0f && (m_style.showHydrogen || atom.atomicNumber != 1))
+            faded.push_back({QVector3D::dotProduct(atom.position, viewDirection), i, false});
+    }
+    if (m_style.displayMode != DisplayMode::SpaceFilling) for (int i = 0; i < m_molecule.bonds.size(); ++i) {
+        const auto &bond = m_molecule.bonds[i];
+        if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
+        const auto &a = m_molecule.atoms[bond.first]; const auto &b = m_molecule.atoms[bond.second];
+        if (a.visible && b.visible && qMin(a.displayOpacity, b.displayOpacity) * bond.displayOpacity < 1.0f)
+            faded.push_back({QVector3D::dotProduct((a.position + b.position) * 0.5f, viewDirection), i, true});
+    }
+    std::stable_sort(faded.begin(), faded.end(), [](const FadedItem &a, const FadedItem &b) { return a.depth < b.depth; });
+    glDepthMask(GL_FALSE);
+    for (const auto &item : faded) {
+        if (item.bond) {
+            m_program->setUniformValue("uMaterialSpecular", 0.42f);
+            m_program->setUniformValue("uMaterialShininess", 0.72f);
+            drawColoredBond(m_molecule.bonds[item.index]);
+        } else {
+            const auto &atom = m_molecule.atoms[item.index];
+            m_program->setUniformValue("uMaterialSpecular", isMetal(atom.atomicNumber) ? 1.12f : 1.0f);
+            m_program->setUniformValue("uMaterialShininess", isMetal(atom.atomicNumber) ? 1.18f : 1.0f);
+            drawAtomSphere(atom);
+        }
+    }
+    glDepthMask(GL_TRUE);
     m_program->release();
 
     if (m_style.showAxes) drawAxes(vp);
@@ -297,10 +334,17 @@ void MoleculeView::drawSurface(QOpenGLVertexArrayObject &vao, int vertexCount,
     m_program->setUniformValue("uColor", color.redF(), color.greenF(), color.blueF());
     m_program->setUniformValue("uColorBlend", false);
     m_program->setUniformValue("uOpacity", m_style.isoOpacity);
+    m_program->setUniformValue("uSurfacePattern", int(m_style.surfacePattern));
+    GLint viewport[4]; glGetIntegerv(GL_VIEWPORT, viewport);
+    m_program->setUniformValue("uPatternScale", float(viewport[2]) / qMax(1, width()));
     m_program->setUniformValue("uLighting", m_style.lighting);
     vao.bind();
+    const bool mesh = m_style.surfacePattern == SurfacePattern::Mesh;
+    if (mesh) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+    if (mesh) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     vao.release();
+    m_program->setUniformValue("uSurfacePattern", 0);
     m_program->setUniformValue("uSurfaceColor", false);
 }
 

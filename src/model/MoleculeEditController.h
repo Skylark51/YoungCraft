@@ -4,7 +4,7 @@
 
 namespace youngcraft {
 struct DrawState { int element = 6; double bondOrder = 0; int formalCharge = 0; bool autoHydrogen = false; };
-enum class HydrogenAction { Adjust, Add, RemoveExtra, RemoveAll };
+enum class HydrogenAction { Adjust, Add, RemoveExtra, RemoveAll, RemoveCarbonBound, RemoveExceptSelected };
 struct SelectionModel {
     QSet<int> atoms;
     QSet<int> bonds;
@@ -22,7 +22,7 @@ public:
     static int addAtom(Molecule &m, const QVector3D &p, const DrawState &s);
     static bool replace(Molecule &m, const QSet<int> &selection, int element, int charge);
     static bool drawBond(Molecule &m, int a, int b, const DrawState &s);
-    static void hydrogens(Molecule &m, HydrogenAction action);
+    static void hydrogens(Molecule &m, HydrogenAction action, const QSet<int> &selection = {});
     static void transform(Molecule &m, const QSet<int> &ids, const QVector3D &translation,
                           const QVector3D &rotation, const QVector3D &center);
     static QSet<int> side(const Molecule &m, int start, int a, int b);

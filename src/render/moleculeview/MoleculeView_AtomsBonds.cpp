@@ -58,9 +58,9 @@ void MoleculeView::drawAtomSphere(const Atom &atom) {
     const float radius = atomVisualRadius(atom);
     QMatrix4x4 model; model.translate(atom.position); model.scale(radius);
     const int level = sphereMeshLevel(atom.position, radius);
-    if (level == 0) drawMesh(m_sphereLowVao, m_sphereLowVertexCount, model, atomRenderColor(atom), true, 1.0f);
-    else if (level == 1) drawMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model, atomRenderColor(atom), true, 1.0f);
-    else drawMesh(m_sphereVao, m_sphereVertexCount, model, atomRenderColor(atom), true, 1.0f);
+    if (level == 0) drawMesh(m_sphereLowVao, m_sphereLowVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
+    else if (level == 1) drawMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
+    else drawMesh(m_sphereVao, m_sphereVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
 }
 
 void MoleculeView::drawBondCap(const QVector3D &center, const QVector3D &axis, float radius, float axialRadius,
@@ -71,13 +71,13 @@ void MoleculeView::drawBondCap(const QVector3D &center, const QVector3D &axis, f
     const int level = sphereMeshLevel(center, radius);
     if (level == 0)
         drawMesh(m_sphereLowVao, m_sphereLowVertexCount, model, firstColor, true,
-                 m_style.bondOpacity, secondColor, colorPosition, colorPosition);
+                 m_style.bondOpacity * m_bondDisplayOpacity, secondColor, colorPosition, colorPosition);
     else if (level == 1)
         drawMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model, firstColor, true,
-                 m_style.bondOpacity, secondColor, colorPosition, colorPosition);
+                 m_style.bondOpacity * m_bondDisplayOpacity, secondColor, colorPosition, colorPosition);
     else
         drawMesh(m_sphereVao, m_sphereVertexCount, model, firstColor, true,
-                 m_style.bondOpacity, secondColor, colorPosition, colorPosition);
+                 m_style.bondOpacity * m_bondDisplayOpacity, secondColor, colorPosition, colorPosition);
 }
 
 QVector3D MoleculeView::stableBondSideVector(const Bond &bond, const QVector3D &axis) const {
@@ -139,7 +139,7 @@ void MoleculeView::drawBondSegment(const QVector3D &start, const QVector3D &end,
             model.rotate(QQuaternion::rotationTo(QVector3D(0, 0, 1), axis));
             model.scale(radius, radius, bodyLength);
             drawMesh(m_cylinderVao, m_cylinderVertexCount, model, firstColor, true,
-                     m_style.bondOpacity, secondColor, colorStart, colorEnd);
+                     m_style.bondOpacity * m_bondDisplayOpacity, secondColor, colorStart, colorEnd);
         }
         if (dashed || roundStart)
             drawBondCap(bodyStart, axis, radius, capDepth, firstColor, secondColor, colorStart);
@@ -152,6 +152,8 @@ void MoleculeView::drawColoredBond(const Bond &bond) {
     if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) return;
     const Atom &first = m_molecule.atoms[bond.first];
     const Atom &second = m_molecule.atoms[bond.second];
+    m_bondDisplayOpacity = qMin(first.displayOpacity, second.displayOpacity) * bond.displayOpacity;
+    if (m_depthPass && m_bondDisplayOpacity < 1.0f) return;
     if (!first.visible || !second.visible || (!m_style.showHydrogen && (first.atomicNumber == 1 || second.atomicNumber == 1))) return;
     const QVector3D vector = second.position - first.position;
     const float length = vector.length();

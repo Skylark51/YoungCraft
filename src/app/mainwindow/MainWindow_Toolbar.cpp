@@ -208,6 +208,19 @@ void MainWindow::createToolBar() {
     auto *spacer = new QWidget(toolbar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolbar->addWidget(spacer);
+    auto *mechanism = new QToolButton(toolbar);
+    mechanism->setObjectName(QStringLiteral("MechanismAnimationButton"));
+    mechanism->setText(QStringLiteral("메커니즘 영상"));
+    mechanism->setToolTip(QStringLiteral("여러 구조·IRC·XYZ 파일로 부드러운 전체 반응 애니메이션 만들기"));
+    connect(mechanism,&QToolButton::clicked,this,&MainWindow::openMechanismAnimation);
+    toolbar->addWidget(mechanism);
+    auto *atomFocus = new QToolButton(toolbar);
+    atomFocus->setObjectName(QStringLiteral("AtomFocusButton"));
+    atomFocus->setText(QStringLiteral("숨김·반투명"));
+    atomFocus->setToolTip(QStringLiteral("선택 원자 강조 · 같은 원자 순서의 열린 창·탭에 함께 적용"));
+    atomFocus->setPopupMode(QToolButton::InstantPopup);
+    atomFocus->setMenu(m_atomFocusMenu);
+    toolbar->addWidget(atomFocus);
     struct Theme { QString name, description, paper, surface, tint, ink, border; };
     const QVector<Theme> themes = {
         {QStringLiteral("구름 소다"), QStringLiteral("맑은 소다빛 종이 · 차분한 블루 잉크"), "#edf4fa", "#fbfdff", "#c5dfee", "#446781", "#c2d3df"},

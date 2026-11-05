@@ -20,6 +20,8 @@ enum class BondColorMode {
     MixedAtoms
 };
 
+enum class SurfacePattern { Solid, Dotted, FineDotted, Mesh, Contour };
+
 struct RenderStyle {
     QString name = QStringLiteral("Youngcraft Studio");
     DisplayMode displayMode = DisplayMode::BallAndStick;
@@ -83,6 +85,7 @@ struct RenderStyle {
     bool showNegativeSurface = true;
     float isoValue = 0.03f;
     float isoOpacity = 0.55f;
+    SurfacePattern surfacePattern = SurfacePattern::Solid;
     QColor positiveSurfaceColor = QColor(70, 130, 240);
     QColor negativeSurfaceColor = QColor(235, 80, 90);
 };

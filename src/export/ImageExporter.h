@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QString>
 #include <QVector>
+#include <functional>
 
 namespace youngcraft {
 
@@ -17,6 +18,10 @@ public:
     static void copyToClipboard(const QImage &image);
     static bool saveGif(const QVector<QImage> &frames, const QString &path, int delayMs = 50,
                         bool transparent = false, bool loop = true, QString *error = nullptr);
+    // One frame at a time, allowing long mechanism movies without retaining bitmaps.
+    static bool saveGifFrames(int count, const QSize &size, const QString &path,
+                             const std::function<QImage(int)> &frameAt, int delayMs = 50,
+                             bool transparent = false, bool loop = true, QString *error = nullptr);
     static bool copyAnimationToClipboard(const QVector<QImage> &frames, int delayMs, QString *error = nullptr);
     static bool ffmpegAvailable();
     static bool saveMp4(const QVector<QImage> &frames, const QString &path, int fps = 20,

@@ -56,7 +56,7 @@ void MoleculeView::renderShadowMap(const QVector3D &lightDirection) {
         for (const Bond &bond : m_molecule.bonds) drawColoredBond(bond);
     }
     for (const Atom &atom : m_molecule.atoms) {
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atom.visible || atom.displayOpacity < 1.0f || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
         // Exactly the same tessellation as the color pass: a finer shadow mesh
         // otherwise sits outside a coarse visible sphere and casts a shadow on it.
         drawAtomSphere(atom);

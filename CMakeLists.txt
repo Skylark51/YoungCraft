@@ -44,6 +44,7 @@ set(YOUNGCRAFT_CORE_SOURCES
     src/analysis/AnalysisEngine.cpp
     src/settings/StyleManager.cpp
     src/animation/AnimationController.cpp
+    src/animation/MechanismTimeline.cpp
     src/export/ImageExporter.cpp
     src/export/ReactionCapture.cpp
     src/render/IsosurfaceBuilder.cpp
@@ -80,6 +81,9 @@ qt_add_executable(Youngcraft WIN32
     src/app/mainwindow/MainWindow_ProjectLibrary.cpp
     src/ui/ReactionCaptureDialog.cpp
     src/ui/MultiCaptureDialog.cpp
+    src/ui/MechanismAnimationDialog.cpp
+    src/ui/ReactionCoordinateWidget.cpp
+    src/ui/ReactionCoordinateWidget.h
     src/ui/MultiCaptureDialog.h
     src/ui/CaptureRotationControls.h
     src/ui/ReactionCaptureDialog.h
@@ -169,6 +173,15 @@ if(YOUNGCRAFT_BUILD_RENDER_PREVIEW)
     target_compile_options(render_quality_preview PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 endif()
 if(BUILD_TESTING)
+    qt_add_executable(test_mechanism tests/animation/test_mechanism.cpp)
+    target_link_libraries(test_mechanism PRIVATE youngcraft_core Qt6::Test)
+    target_compile_options(test_mechanism PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME mechanism_animation COMMAND test_mechanism)
+    set_tests_properties(mechanism_animation PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    if(WIN32)
+        add_custom_command(TARGET test_mechanism POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:test_mechanism> $<TARGET_FILE_DIR:test_mechanism> COMMAND_EXPAND_LISTS VERBATIM)
+    endif()
     qt_add_executable(test_orbitals tests/orbitals/test_orbitals.cpp)
     target_link_libraries(test_orbitals PRIVATE youngcraft_core Qt6::Test)
     target_compile_options(test_orbitals PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
@@ -222,6 +235,9 @@ if(BUILD_TESTING)
     src/app/mainwindow/MainWindow_ProjectLibrary.cpp
     src/ui/ReactionCaptureDialog.cpp
     src/ui/MultiCaptureDialog.cpp
+    src/ui/MechanismAnimationDialog.cpp
+    src/ui/ReactionCoordinateWidget.cpp
+    src/ui/ReactionCoordinateWidget.h
     src/ui/MultiCaptureDialog.h
     src/ui/CaptureRotationControls.h
     src/ui/ReactionCaptureDialog.h

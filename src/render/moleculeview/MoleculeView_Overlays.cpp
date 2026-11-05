@@ -50,15 +50,16 @@ void MoleculeView::drawEditorPreview() {
     painter.setBrush(Qt::NoBrush);
     const QColor neon=selectionNeon(m_style.background);
     const QColor halo=m_style.background.lightnessF()>=0.55?QColor(0,24,82,140):QColor(0,0,0,190);
-    for(int i:m_selection.atoms)if(i>=0&&i<m_molecule.atoms.size()){
+    const auto shown = [this](int i) { return i>=0 && i<m_molecule.atoms.size() && m_molecule.atoms[i].visible && (m_style.showHydrogen || m_molecule.atoms[i].atomicNumber!=1); };
+    for(int i:m_selection.atoms)if(shown(i)){
         const QPointF p=point(m_molecule.atoms[i].position);
         painter.setPen(QPen(halo,6));painter.drawEllipse(p,13,13);
         painter.setPen(QPen(neon,2.8));painter.drawEllipse(p,13,13);
     }
     painter.setPen(QPen(neon,3));
-    for(int i:m_selection.bonds)if(i>=0&&i<m_molecule.bonds.size()){auto b=m_molecule.bonds[i];painter.drawLine(point(m_molecule.atoms[b.first].position),point(m_molecule.atoms[b.second].position));}
-    if(m_hoverAtom>=0&&m_hoverAtom<m_molecule.atoms.size()){painter.setPen(QPen((m_dragButton==Qt::RightButton&&m_drawingMode?QColor(240,70,70,220):QColor(255,190,80,170)),2));painter.drawEllipse(point(m_molecule.atoms[m_hoverAtom].position),16,16);}
-    if(m_hoverBond>=0&&m_hoverBond<m_molecule.bonds.size()){auto b=m_molecule.bonds[m_hoverBond];painter.setPen(QPen((m_dragButton==Qt::RightButton&&m_drawingMode?QColor(240,70,70,220):QColor(255,190,80,150)),5));painter.drawLine(point(m_molecule.atoms[b.first].position),point(m_molecule.atoms[b.second].position));}
+    for(int i:m_selection.bonds)if(i>=0&&i<m_molecule.bonds.size()){auto b=m_molecule.bonds[i];if(shown(b.first)&&shown(b.second))painter.drawLine(point(m_molecule.atoms[b.first].position),point(m_molecule.atoms[b.second].position));}
+    if(shown(m_hoverAtom)){painter.setPen(QPen((m_dragButton==Qt::RightButton&&m_drawingMode?QColor(240,70,70,220):QColor(255,190,80,170)),2));painter.drawEllipse(point(m_molecule.atoms[m_hoverAtom].position),16,16);}
+    if(m_hoverBond>=0&&m_hoverBond<m_molecule.bonds.size()){auto b=m_molecule.bonds[m_hoverBond];if(shown(b.first)&&shown(b.second)){painter.setPen(QPen((m_dragButton==Qt::RightButton&&m_drawingMode?QColor(240,70,70,220):QColor(255,190,80,150)),5));painter.drawLine(point(m_molecule.atoms[b.first].position),point(m_molecule.atoms[b.second].position));}}
     if(m_rectangle){painter.setPen(QPen(neon,1,Qt::DashLine));painter.setBrush(QColor(80,160,250,30));painter.drawRect(QRect(m_pressMouse,m_lastMouse).normalized());painter.setBrush(Qt::NoBrush);}
     if(m_groupDrag&&m_dragging){
         auto ghost=[&](int i){auto p=m_molecule.atoms[i].position;if(m_selection.atoms.contains(i))p=m_groupCenter+m_groupRotation.rotatedVector(p-m_groupCenter)+m_groupTranslation;return point(p);};
@@ -102,6 +103,7 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
         if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
         const QVector3D screen = project(atom.position, vp);
         if (screen.z() < -1.0f || screen.z() > 1.0f) continue;
+        painter.setOpacity(atom.displayOpacity);
         if (m_style.showLabels || i == selectedAtom || m_geometrySelection.contains(i)) {
             QFont numberFont = font;
             numberFont.setBold(true);
@@ -154,6 +156,9 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
     painter.setPen(pen);
     const int count = qMin(m_molecule.atoms.size(), m_frequencyDisplacements.size());
     for (int i = 0; i < count; ++i) {
+        const auto &atom = m_molecule.atoms[i];
+        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        painter.setOpacity(atom.displayOpacity);
         const QVector3D displacement = m_frequencyDisplacements[i];
         if (displacement.length() < m_style.vectorThreshold) continue;
         const QVector3D start3 = i < m_frequencyBase.size() ? m_frequencyBase[i] : m_molecule.atoms[i].position;
@@ -174,6 +179,9 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
 
 void MoleculeView::drawGeometryMeasurements(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     if (m_geometrySelection.isEmpty()) return;
+    for (int i : m_geometrySelection)
+        if (i < 0 || i >= m_molecule.atoms.size() || !m_molecule.atoms[i].visible ||
+            (!m_style.showHydrogen && m_molecule.atoms[i].atomicNumber == 1)) return;
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
     QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
