@@ -1,5 +1,5 @@
 #include "render/MoleculeView.h"
-#include "ui/AppPattern.h"
+#include "settings/AppPattern.h"
 
 
 #include "render/IsosurfaceBuilder.h"

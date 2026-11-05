@@ -1,7 +1,7 @@
 #include "compute/GaussianConnection.h"
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
-#include "ui/AppPattern.h"
+#include "settings/AppPattern.h"
 #include "ui/StartupSplash.h"
 #include "ui/OrbitalStudyWidget.h"
 #include "compute/GaussianTools.h"
