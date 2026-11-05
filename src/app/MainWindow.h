@@ -70,6 +70,7 @@ private slots:
     void showAtom(int index);
     void updateAtomVisibility();
     void setCarbonHydrogensVisible(bool visible);
+    void emphasizeSelectedAtoms(int mode); // 0: hide others, 1: translucent others, 2: restore.
     void updatePanelActions();
     void toggleFrameAnimation();
     void toggleFrequencyAnimation();
@@ -80,6 +81,7 @@ private slots:
     void choosePreset(const QString &name);
     void copyImage();
     void openReactionCapture();
+    void openMechanismAnimation();
     void openMultiCapture();
     void openProjectLibrary();
     void saveImage();
@@ -203,6 +205,8 @@ private:
     RenderStyle m_style;
     QAction *m_atomLabelsAction = nullptr;
     QAction *m_syncViewsAction = nullptr;
+    QMenu *m_atomFocusMenu = nullptr;
+    QAction *m_atomFocusAllWindows = nullptr;
     QHash<int, CameraState> m_sharedCameras;
     QString m_currentFile;
     int m_currentFrequency = -1;

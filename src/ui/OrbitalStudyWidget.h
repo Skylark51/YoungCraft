@@ -34,7 +34,9 @@ private:
     GaussianTools *m_runner;
     QTableWidget *m_orbitals;
     QTabWidget *m_tables;
-    QComboBox *m_resolution, *m_density;
+    QComboBox *m_resolution, *m_density, *m_palette, *m_surfacePattern;
+    QPushButton *m_plusButton, *m_minusButton;
+    void syncPalette();
     QDoubleSpinBox *m_iso, *m_opacity, *m_min, *m_max;
     QCheckBox *m_positive, *m_negative;
     QLabel *m_status, *m_source, *m_legend;

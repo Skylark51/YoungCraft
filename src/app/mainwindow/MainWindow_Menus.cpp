@@ -82,6 +82,8 @@ void MainWindow::createMenus() {
     add(file, QStringLiteral("종료"), {}, [this] { close(); });
 
     QMenu *edit = menuBar()->addMenu(QStringLiteral("편집"));
+    auto *mechanism = add(edit, QStringLiteral("전체 메커니즘 애니메이션…"), {}, [this] { openMechanismAnimation(); });
+    mechanism->setObjectName(QStringLiteral("OpenMechanismAnimation"));
     add(edit, QStringLiteral("실행 취소"), QKeySequence(QStringLiteral("Ctrl+Z")), [this] { undoDrawingEdit(); });
     add(edit, QStringLiteral("다시 실행"), QKeySequence(QStringLiteral("Ctrl+Y")), [this] { redoDrawingEdit(); });
     add(edit, QStringLiteral("다시 실행 (Ctrl+Shift+Z)"), QKeySequence(QStringLiteral("Ctrl+Shift+Z")), [this] { redoDrawingEdit(); });
@@ -205,6 +207,20 @@ void MainWindow::createMenus() {
     auto *vdw = add(view, QStringLiteral("반데르발스 구 표시"), {}, [this] { m_style.showVdwSpheres = !m_style.showVdwSpheres; applyStyle(m_style); }); vdw->setCheckable(true); vdw->setChecked(m_style.showVdwSpheres);
     add(view, QStringLiteral("현재 caption/object를 복제하여 다중 객체 그림 제작"), {}, [this] { setStatus(QStringLiteral("다중 객체 그림 제작")); });
     add(view, QStringLiteral("벡터/등가면을 고정/복제하여 다중 객체 그림 제작"), {}, [this] { setStatus(QStringLiteral("벡터/등가면 객체 복제")); });
+    m_atomFocusMenu = view->addMenu(QStringLiteral("선택 원자 강조"));
+    m_atomFocusMenu->setObjectName(QStringLiteral("AtomFocusMenu"));
+    m_atomFocusAllWindows = m_atomFocusMenu->addAction(QStringLiteral("열린 모든 창·탭에 적용 (같은 원자 수·원소 순서)"));
+    m_atomFocusAllWindows->setObjectName(QStringLiteral("AtomFocusAllWindows"));
+    m_atomFocusAllWindows->setCheckable(true);
+    m_atomFocusAllWindows->setChecked(true);
+    m_atomFocusAllWindows->setToolTip(QStringLiteral("체크 해제 시 현재 탭만 적용. 같은 원소끼리의 실제 원자 대응은 입력 파일의 순서를 따릅니다."));
+    m_atomFocusMenu->addSeparator();
+    auto *focusHide = add(m_atomFocusMenu, QStringLiteral("선택 원자만 표시 (나머지 숨기기)"), {}, [this] { emphasizeSelectedAtoms(0); });
+    focusHide->setObjectName(QStringLiteral("AtomFocusHideOthers"));
+    auto *focusDim = add(m_atomFocusMenu, QStringLiteral("선택 외 원자 반투명 (불투명도 20%)"), {}, [this] { emphasizeSelectedAtoms(1); });
+    focusDim->setObjectName(QStringLiteral("AtomFocusDimOthers"));
+    auto *focusReset = add(m_atomFocusMenu, QStringLiteral("원자 표시·불투명도 모두 복원"), {}, [this] { emphasizeSelectedAtoms(2); });
+    focusReset->setObjectName(QStringLiteral("AtomFocusRestore"));
     QMenu *hideAtoms = view->addMenu(QStringLiteral("특정 원자 숨기기"));
     add(hideAtoms, QStringLiteral("모든 수소 숨기기"), {}, [this, showHydrogen] {
         m_style.showHydrogen = false;

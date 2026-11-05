@@ -39,6 +39,22 @@ void MoleculeView::setAtomVisibility(const QVector<bool> &visibility) {
     if (m_previewOverlay) m_previewOverlay->update();
 }
 
+void MoleculeView::setAnimationMolecule(const Molecule &molecule) {
+    m_molecule = molecule;
+    update();
+    if (m_previewOverlay) m_previewOverlay->update();
+}
+
+void MoleculeView::setAtomDisplay(const Molecule &appearance) {
+    if (appearance.atoms.size() != m_molecule.atoms.size()) return;
+    for (int i = 0; i < appearance.atoms.size(); ++i) {
+        m_molecule.atoms[i].visible = appearance.atoms[i].visible;
+        m_molecule.atoms[i].displayOpacity = qBound(0.0f, appearance.atoms[i].displayOpacity, 1.0f);
+    }
+    update();
+    if (m_previewOverlay) m_previewOverlay->update();
+}
+
 void MoleculeView::setEditedMolecule(const Molecule &molecule) {
     endDrawingChain();
     const bool wasEmpty = m_molecule.atoms.isEmpty();

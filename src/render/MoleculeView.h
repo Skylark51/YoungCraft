@@ -34,7 +34,10 @@ public:
     ~MoleculeView() override;
 
     void setMolecule(const Molecule &molecule);
+    // Update an animation inside already fitted scene bounds, keeping the camera fixed.
+    void setAnimationMolecule(const Molecule &molecule);
     void setAtomVisibility(const QVector<bool> &visibility);
+    void setAtomDisplay(const Molecule &appearance);
     void setEditedMolecule(const Molecule &molecule);
     void setCoordinates(const QVector<QVector3D> &coordinates);
     void setFrequencyMode(const FrequencyMode *mode);
@@ -226,6 +229,7 @@ private:
     QVector3D m_ghostPosition;
     QVector3D m_dragStartPosition;
     RenderStyle m_style;
+    float m_bondDisplayOpacity = 1.0f;
     QOpenGLShaderProgram *m_program = nullptr;
     QOpenGLShaderProgram *m_lineProgram = nullptr;
     QOpenGLShaderProgram *m_depthProgram = nullptr;

@@ -11,6 +11,7 @@
 #include "ui/StyleEditorDialog.h"
 #include "ui/ReactionCaptureDialog.h"
 #include "ui/MultiCaptureDialog.h"
+#include "ui/MechanismAnimationDialog.h"
 #include <QTabWidget>
 #include "export/ReactionCapture.h"
 #include <QInputDialog>
@@ -48,6 +49,22 @@
 #include <functional>
 
 namespace youngcraft {
+
+void MainWindow::openMechanismAnimation() {
+    for(auto *dialog:findChildren<MechanismAnimationDialog *>("MechanismAnimationDialog")) {
+        dialog->show();dialog->raise();dialog->activateWindow();return;
+    }
+    QVector<MechanismStep> steps;
+    auto append=[&](MainWindow *owner){
+        for(int i=0;i<owner->m_documentTabs->count();++i){const auto document=owner->m_documents.value(owner->m_documentTabs->widget(i));
+            if(!document||!document->view||document->view->molecule().isEmpty())continue;
+            MechanismStep step;step.name=owner->m_documentTabs->tabText(i);step.path=document->path;step.molecule=document->view->molecule();steps.push_back(step);
+        }
+    };
+    append(this);
+    for(auto *widget:QApplication::topLevelWidgets())if(auto *owner=qobject_cast<MainWindow *>(widget);owner&&owner!=this)append(owner);
+    (new MechanismAnimationDialog(m_view->style(),steps,this))->show();
+}
 
 void MainWindow::openReactionCapture() {
     if (ReactionCapture::companionPaths(m_currentFile).isEmpty()) {

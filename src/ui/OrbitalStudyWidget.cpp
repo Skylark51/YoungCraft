@@ -23,6 +23,10 @@
 #include <QVBoxLayout>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QPainter>
+#include <QIcon>
+#include <QPixmap>
+#include <array>
 #include <QDir>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -40,6 +44,17 @@ void append(QTableWidget *t, const QStringList &values) {
     const int row=t->rowCount(); t->insertRow(row);
     for(int i=0;i<values.size();++i) t->setItem(row,i,new QTableWidgetItem(values[i]));
 }
+struct OrbitalPalette { const char *name; const char *positive; const char *negative; };
+const std::array<OrbitalPalette, 8> orbitalPalettes{{
+    {"Classic · Blue / Red", "#3c6eeb", "#dc4141"},
+    {"Lagoon · Teal / Coral", "#159a9c", "#eb7865"},
+    {"Iris · Violet / Amber", "#8260c3", "#d9992f"},
+    {"Botanical · Sage / Rose", "#67947c", "#cc708d"},
+    {"Nordic · Slate / Apricot", "#557c9e", "#df9866"},
+    {"Candy · Periwinkle / Pink", "#8494de", "#e78faf"},
+    {"Ocean · Cobalt / Gold", "#306bb3", "#cba238"},
+    {"Editorial · Charcoal / Vermilion", "#4c5564", "#d6654d"}
+}};
 QString num(double x) { return std::isfinite(x)?QString::number(x,'f',5):QStringLiteral("—"); }
 }
 OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_runner(new GaussianTools(this)) {
@@ -142,11 +157,32 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
         showSurface(m_surface,potential);
     });
     auto *surfaceGroup=new QGroupBox(QStringLiteral("Surfaces · 등가면 / 색상"));auto *surfaceForm=new QFormLayout(surfaceGroup);
+    m_palette=new QComboBox;m_palette->setObjectName("OrbitalPalette");
+    m_palette->setIconSize(QSize(40,16));
+    for(const auto &p:orbitalPalettes) {
+        QPixmap swatch(40,16);swatch.fill(Qt::transparent);
+        QPainter painter(&swatch);painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);painter.setBrush(QColor(p.positive));painter.drawEllipse(1,1,14,14);
+        painter.setBrush(QColor(p.negative));painter.drawEllipse(23,1,14,14);painter.end();
+        m_palette->addItem(QIcon(swatch),QString::fromUtf8(p.name));
+    }
+    m_palette->addItem(QStringLiteral("Custom · 사용자 색상"));
+    surfaceForm->addRow(QStringLiteral("MO 색상 테마"),m_palette);
+    m_surfacePattern=new QComboBox;m_surfacePattern->setObjectName("OrbitalSurfacePattern");
+    m_surfacePattern->addItems({QStringLiteral("Solid · 부드러운 면"),QStringLiteral("Dotted · 도트"),QStringLiteral("Fine Dotted · 촘촘한 도트"),QStringLiteral("Mesh · 와이어 메시"),QStringLiteral("Contour · 등고선")});
+    m_surfacePattern->setToolTip(QStringLiteral("색상 테마와 독립적으로 선택합니다. MO와 MEP, 이미지 복사·저장에 적용됩니다."));
+    surfaceForm->addRow(QStringLiteral("표면 표현"),m_surfacePattern);
     auto spin=[surfaceForm](const QString &label,double lo,double hi,double value,int decimals){auto *s=new QDoubleSpinBox;s->setDecimals(decimals);s->setRange(lo,hi);s->setValue(value);s->setSingleStep(value>0?value/10:0.01);surfaceForm->addRow(label,s);return s;};
     m_iso=spin("Isovalue (a.u.)",0.000001,10,0.02,6);m_iso->setObjectName("OrbitalIsovalue");m_opacity=spin(QStringLiteral("불투명도"),0,1,0.75,2);
     m_positive=new QCheckBox(QStringLiteral("양의 위상 / 밀도"));m_positive->setChecked(true);m_negative=new QCheckBox(QStringLiteral("음의 위상"));m_negative->setChecked(true);surfaceForm->addRow(m_positive,m_negative);
-    auto colorButton=[this,surfaceForm](const QString &label,QColor *color){auto *b=new QPushButton(color->name());b->setStyleSheet("border-left:12px solid "+color->name());surfaceForm->addRow(label,b);connect(b,&QPushButton::clicked,this,[this,b,color]{const auto c=QColorDialog::getColor(*color,this);if(c.isValid()){*color=c;b->setText(c.name());b->setStyleSheet("border-left:12px solid "+c.name());applyStyle();}});};
-    colorButton(QStringLiteral("MO 양의 색"),&m_plusColor);colorButton(QStringLiteral("MO 음의 색"),&m_minusColor);
+    auto colorButton=[this,surfaceForm](const QString &label,QColor *color){auto *b=new QPushButton(color->name());b->setStyleSheet("border-left:12px solid "+color->name());surfaceForm->addRow(label,b);connect(b,&QPushButton::clicked,this,[this,b,color]{const auto c=QColorDialog::getColor(*color,this);if(c.isValid()){*color=c;b->setText(c.name());b->setStyleSheet("border-left:12px solid "+c.name());syncPalette();applyStyle();}});return b;};
+    m_plusButton=colorButton(QStringLiteral("MO 양의 색"),&m_plusColor);m_minusButton=colorButton(QStringLiteral("MO 음의 색"),&m_minusColor);
+    connect(m_palette,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){
+        if(index<0 || index>=int(orbitalPalettes.size()))return;
+        m_plusColor=QColor(orbitalPalettes[index].positive);m_minusColor=QColor(orbitalPalettes[index].negative);
+        syncPalette();applyStyle();
+    });
+    connect(m_surfacePattern,qOverload<int>(&QComboBox::currentIndexChanged),this,[this]{applyStyle();});
     m_min=spin("MEP min (a.u.)",-100,100,-0.05,4);m_max=spin("MEP max (a.u.)",-100,100,0.05,4);
     colorButton(QStringLiteral("MEP 낮은 값"),&m_lowColor);colorButton(QStringLiteral("MEP 높은 값"),&m_highColor);
     layout->addWidget(surfaceGroup);
@@ -164,7 +200,21 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     connect(m_runner,&GaussianTools::ready,this,&OrbitalStudyWidget::showSurface);
     setData(CalculationData{});
 }
-void OrbitalStudyWidget::setView(MoleculeView *view) {m_view=view;}
+void OrbitalStudyWidget::syncPalette() {
+    int index=int(orbitalPalettes.size());
+    for(int i=0;i<int(orbitalPalettes.size());++i)
+        if(m_plusColor==QColor(orbitalPalettes[i].positive) && m_minusColor==QColor(orbitalPalettes[i].negative)){index=i;break;}
+    QSignalBlocker blocker(m_palette);m_palette->setCurrentIndex(index);
+    m_plusButton->setText(m_plusColor.name());m_plusButton->setStyleSheet("border-left:12px solid "+m_plusColor.name());
+    m_minusButton->setText(m_minusColor.name());m_minusButton->setStyleSheet("border-left:12px solid "+m_minusColor.name());
+}
+void OrbitalStudyWidget::setView(MoleculeView *view) {
+    m_view=view;if(!view)return;
+    const auto &style=view->style();m_plusColor=style.positiveSurfaceColor;m_minusColor=style.negativeSurfaceColor;
+    syncPalette();
+    QSignalBlocker patternBlocker(m_surfacePattern),opacityBlocker(m_opacity);
+    m_surfacePattern->setCurrentIndex(int(style.surfacePattern));m_opacity->setValue(style.isoOpacity);
+}
 void OrbitalStudyWidget::setData(const CalculationData &data) {
     if(m_runner->busy())m_runner->cancel();
     m_data=data;m_surface.reset();m_potential.reset();m_mep=false;
@@ -240,7 +290,7 @@ void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std
 void OrbitalStudyWidget::applyStyle() {
     if(!m_view)return;
     if(m_mep && m_min->value()>=m_max->value()){m_status->setText(QStringLiteral("MEP min은 max보다 작아야 합니다."));return;}
-    auto style=m_view->style();style.isoValue=float(m_iso->value());style.isoOpacity=float(m_opacity->value());style.showPositiveSurface=m_positive->isChecked();style.showNegativeSurface=!m_mep&&m_negative->isChecked();style.positiveSurfaceColor=m_plusColor;style.negativeSurfaceColor=m_minusColor;m_view->setStyle(style);emit surfaceStyleChanged();
+    auto style=m_view->style();style.surfacePattern=SurfacePattern(m_surfacePattern->currentIndex());style.isoValue=float(m_iso->value());style.isoOpacity=float(m_opacity->value());style.showPositiveSurface=m_positive->isChecked();style.showNegativeSurface=!m_mep&&m_negative->isChecked();style.positiveSurfaceColor=m_plusColor;style.negativeSurfaceColor=m_minusColor;m_view->setStyle(style);emit surfaceStyleChanged();
     m_view->setPotentialGrid(m_potential,m_min->value(),m_max->value(),m_lowColor,m_highColor);
     m_legend->setText(m_mep?QStringLiteral("MEP %1 → %2 a.u. · %3 → 흰색 → %4\n회색: 격자 범위 밖").arg(m_min->value()).arg(m_max->value()).arg(m_lowColor.name(),m_highColor.name()):QStringLiteral("MO: + / − 위상 · isovalue %1 a.u.").arg(m_iso->value()));
 }

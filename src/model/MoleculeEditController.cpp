@@ -124,7 +124,24 @@ bool MoleculeEditController::drawBond(Molecule &m,int a,int b,const DrawState&s)
     m.atoms[a].autoHydrogen=false;m.atoms[b].autoHydrogen=false;
     m.setBond(a,b,order,metal,metal||order==1.5?BondStyle::Dashed:BondStyle::Solid,true);return true;
 }
-void MoleculeEditController::hydrogens(Molecule &m,HydrogenAction action) {
+void MoleculeEditController::hydrogens(Molecule &m,HydrogenAction action,const QSet<int> &selection) {
+    if(action==HydrogenAction::RemoveCarbonBound||action==HydrogenAction::RemoveExceptSelected) {
+        QSet<int> remove, keep;
+        if(action==HydrogenAction::RemoveExceptSelected) {
+            for(int i:selection)if(i>=0&&i<m.atoms.size()&&m.atoms[i].atomicNumber==1)keep.insert(i);
+            if(keep.isEmpty())return;
+        }
+        for(int i=0;i<m.atoms.size();++i)if(m.atoms[i].atomicNumber==1) {
+            bool carbon=false;
+            for(const auto &bond:m.bonds)if(bond.first==i||bond.second==i) {
+                const int neighbor=bond.first==i?bond.second:bond.first;
+                if(neighbor>=0&&neighbor<m.atoms.size()&&m.atoms[neighbor].atomicNumber==6)carbon=true;
+            }
+            if(action==HydrogenAction::RemoveCarbonBound?carbon:!keep.contains(i))remove.insert(i);
+        }
+        for(int i=m.atoms.size()-1;i>=0;--i)if(remove.contains(i))m.removeAtom(i);
+        return;
+    }
     if(action==HydrogenAction::RemoveAll) { for(int i=m.atoms.size()-1;i>=0;--i)if(m.atoms[i].atomicNumber==1)m.removeAtom(i);return; }
     if(action==HydrogenAction::Add){m.reconcileAutoHydrogens(true,false);return;}
     // Explicit adjustment can replace singly bound main-group hydrogen.

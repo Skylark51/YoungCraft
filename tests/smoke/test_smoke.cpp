@@ -23,6 +23,12 @@
 #include "ui/ScanResultsDialog.h"
 #include "ui/ReactionCaptureDialog.h"
 #include "ui/MultiCaptureDialog.h"
+#include "ui/MechanismAnimationDialog.h"
+#include "ui/ReactionCoordinateWidget.h"
+#include <QBuffer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QProgressDialog>
 #include "export/ReactionCapture.h"
 #include "io/XYZParser.h"
 #include <QDialogButtonBox>
@@ -84,6 +90,12 @@ using namespace youngcraft;
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void reactionCoordinatePresentationWorkflow();
+    void hydrogenRemovalActions();
+    void wholeMechanismAnimationWorkflow();
+    void suppliedMechanismPreview();
+    void atomFocusAcrossWindowsAndTabs();
+    void atomFocusTransparentExport();
     void projectLibraryOpensOnDemand();
     void additionalInteractionRequests();
     void directGeometryToolsAndFixedCore();
@@ -95,6 +107,7 @@ private slots:
     void sidebarPatternContinuity();
     void dialogThemeSynchronization();
     void orbitalStudyControlsAndRendering();
+    void orbitalThemesAndPatterns();
     void realRemoteOrbitalResults();
     void automaticRemoteConnectionAndHomo();
     void pastedXYZWorkflow();
@@ -1285,6 +1298,9 @@ void SmokeTest::atomVisibilityPreservesViewAndScroll() {
     const auto center = v->m_center; const auto radius = v->m_radius;
     w.setPerspective(perspective);
     w.m_analysis->setCurrentTab(1);
+    // This assertion requires the explorer even when the saved layout hides it.
+    w.m_explorerDock->show();
+    w.m_explorer->show();
     for (int i=0; i<120; ++i) w.m_explorer->addTopLevelItem(new QTreeWidgetItem({QString::number(i)}));
     QTest::qWait(100);
     auto *scroll = w.m_explorer->verticalScrollBar();
@@ -3308,6 +3324,73 @@ void SmokeTest::realRemoteOrbitalResults() {
     remote->setChecked(true);QVERIFY(QSettings().value("orbitals/remoteEnabled").toBool());
 }
 
+void SmokeTest::orbitalThemesAndPatterns() {
+    MoleculeView view;view.resize(640,480);view.show();
+    auto style=StyleManager::preset("Youngcraft Studio");
+    style.background=Qt::white;style.isoValue=.04f;style.isoOpacity=.85f;
+    view.setStyle(style);
+    Molecule molecule;Atom atom;atom.index=1;atom.atomicNumber=6;atom.element="C";atom.radiusScale=.4f;
+    molecule.atoms.push_back(atom);view.setMolecule(molecule);
+    OrbitalStudyWidget panel;panel.setView(&view);
+    auto *palette=panel.findChild<QComboBox*>("OrbitalPalette");
+    auto *pattern=panel.findChild<QComboBox*>("OrbitalSurfacePattern");
+    QVERIFY(palette);QVERIFY(pattern);QCOMPARE(palette->count(),9);QCOMPARE(pattern->count(),5);
+    QSignalSpy changed(&panel,&OrbitalStudyWidget::surfaceStyleChanged);
+    auto grid=std::make_shared<CubeGrid>();grid->valid=true;
+    grid->nx=grid->ny=grid->nz=41;grid->origin={-4,-4,-4};
+    grid->axisX={.2f,0,0};grid->axisY={0,.2f,0};grid->axisZ={0,0,.2f};
+    for(int z=0;z<41;++z)for(int y=0;y<41;++y)for(int x=0;x<41;++x){
+        const auto p=grid->origin+x*grid->axisX+y*grid->axisY+z*grid->axisZ;
+        grid->values.push_back(p.x()*std::exp(-p.lengthSquared()));
+    }
+    auto *runner=panel.findChild<GaussianTools*>();QVERIFY(runner);runner->ready(grid,{});
+    QTRY_VERIFY_WITH_TIMEOUT(view.m_positiveSurfaceVertexCount>0 && view.m_negativeSurfaceVertexCount>0,10000);
+    QVERIFY(view.isValid());QVERIFY(view.m_program->isLinked());
+    const auto generation=view.m_surfaceGeneration;
+    for(int i=0;i<8;++i){
+        palette->setCurrentIndex(i);QCOMPARE(palette->currentIndex(),i);
+        QVERIFY(view.style().positiveSurfaceColor!=view.style().negativeSurfaceColor);
+    }
+    palette->setCurrentIndex(1);QCOMPARE(view.style().positiveSurfaceColor,QColor("#159a9c"));
+    QCOMPARE(view.style().negativeSurfaceColor,QColor("#eb7865"));
+    const auto capture=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_THEMES_PREVIEW");
+    QImage sheet(1280,1440,QImage::Format_RGB32);sheet.fill(Qt::white);
+    QPainter painter(&sheet);painter.setPen(QColor("#323a46"));
+    const QStringList titles={"Solid / Classic","Dotted / Lagoon","Fine Dotted / Iris","Mesh / Botanical","Contour / Nordic","Dotted / Candy"};
+    QList<QImage> images;
+    for(int i=0;i<6;++i){
+        palette->setCurrentIndex(i);pattern->setCurrentIndex(i<5?i:1);
+        QCOMPARE(int(view.style().surfacePattern),i<5?i:1);
+        const auto shot=view.imageAtSize(QSize(640,440),false,true);
+        QVERIFY(!shot.isNull());
+        if(!images.isEmpty())QVERIFY(shot!=images.last());
+        images.append(shot);
+        const int x=(i%2)*640,y=(i/2)*480;
+        painter.drawText(QRect(x+20,y,600,40),Qt::AlignVCenter,titles[i]);
+        painter.drawImage(x,y+40,shot);
+    }
+    painter.end();if(!capture.isEmpty())QVERIFY(sheet.save(capture));
+    palette->setCurrentIndex(1);
+    QList<QImage> patternImages;
+    for(int i=0;i<5;++i){
+        pattern->setCurrentIndex(i);
+        const auto shot=view.imageAtSize(QSize(640,440),false,true);
+        for(const auto &previous:patternImages)QVERIFY(shot!=previous);
+        patternImages.append(shot);
+    }
+    QCOMPARE(view.m_surfaceGeneration,generation); // Appearance changes never recompute the cube.
+    QVERIFY(changed.count()>8);
+    auto custom=view.style();custom.positiveSurfaceColor=QColor("#123456");custom.surfacePattern=SurfacePattern::Contour;
+    view.setStyle(custom);panel.setView(&view);QCOMPARE(palette->currentIndex(),8);QCOMPARE(pattern->currentIndex(),4);
+    palette->setCurrentIndex(2);QCOMPARE(view.style().surfacePattern,SurfacePattern::Contour);
+    // MEP retains its potential mapping while the same pattern controls apply.
+    auto potential=std::make_shared<CubeGrid>(*grid);for(auto &value:potential->values)value=.025f;
+    runner->ready(grid,potential);pattern->setCurrentIndex(1);
+    QVERIFY(view.m_potentialGrid);QVERIFY(!view.style().showNegativeSurface);
+    QVERIFY(!view.imageAtSize(QSize(1280,960),true,true).isNull());
+    view.makeCurrent();QCOMPARE(view.glGetError(),GLenum(GL_NO_ERROR));view.doneCurrent();
+}
+
 void SmokeTest::orbitalStudyControlsAndRendering() {
     MainWindow w;w.resize(1450,1000);w.show();
     auto loaded=FileDispatcher::load("tests/data/mvp.out",{});QVERIFY(loaded.parseResult.success);
@@ -3359,6 +3442,260 @@ void SmokeTest::projectLibraryOpensOnDemand() {
     });
     action->trigger();
     QVERIFY(appeared);
+}
+
+void SmokeTest::atomFocusAcrossWindowsAndTabs() {
+    MainWindow source, other;
+    Molecule molecule;
+    molecule.atoms = {{1,6,"C",{}},{2,8,"O",{1.4f,0,0}},{3,1,"H",{-1,0,0}}};
+    molecule.setBond(0,1,1); molecule.setBond(0,2,1);
+    source.newDrawingDocument(molecule); source.setDrawingMode(false);
+    auto *origin = source.m_view;
+    source.newDrawingDocument(molecule); source.setDrawingMode(false);
+    auto *inactive = origin;
+    origin = source.m_view;
+    other.newDrawingDocument(molecule); other.setDrawingMode(false);
+    auto *matching = other.m_view;
+    auto reordered = molecule;
+    std::swap(reordered.atoms[0], reordered.atoms[1]);
+    other.newDrawingDocument(reordered); other.setDrawingMode(false);
+    auto *wrongOrder = other.m_view;
+    auto shorter = molecule; shorter.atoms.removeLast(); shorter.bonds.clear();
+    other.newDrawingDocument(shorter); other.setDrawingMode(false);
+    auto *wrongCount = other.m_view;
+    const auto camera = matching->cameraState();
+    QVector<QVector3D> live{{2,3,4},{3.4f,3,4},{1,3,4}};
+    matching->setCoordinates(live);
+    source.applyAtomSelection({0,2});
+    auto *hide = source.findChild<QAction *>("AtomFocusHideOthers");
+    auto *dim = source.findChild<QAction *>("AtomFocusDimOthers");
+    auto *reset = source.findChild<QAction *>("AtomFocusRestore");
+    QVERIFY(hide); QVERIFY(dim); QVERIFY(reset);
+    QVERIFY(source.m_atomFocusAllWindows->isChecked());
+    hide->trigger();
+    for (auto *view : {origin,inactive,matching}) {
+        QVERIFY(view->molecule().atoms[0].visible);
+        QVERIFY(!view->molecule().atoms[1].visible);
+        QVERIFY(view->molecule().atoms[2].visible);
+    }
+    for (auto *view : {wrongOrder,wrongCount}) for (const auto &atom : view->molecule().atoms) QVERIFY(atom.visible);
+    dim->trigger();
+    for (auto *view : {origin,inactive,matching}) {
+        QCOMPARE(view->molecule().atoms[0].displayOpacity, 1.0f);
+        QCOMPARE(view->molecule().atoms[1].displayOpacity, 0.2f);
+        QCOMPARE(view->molecule().atoms[2].displayOpacity, 1.0f);
+        for (const auto &atom : view->molecule().atoms) QVERIFY(atom.visible);
+    }
+    QCOMPARE(matching->cameraState().rotation, camera.rotation);
+    QCOMPARE(matching->cameraState().distance, camera.distance);
+    for (int i=0;i<live.size();++i) QCOMPARE(matching->molecule().atoms[i].position,live[i]);
+    QCOMPARE(origin->selection().atoms, QSet<int>({0,2}));
+    if (const auto path=qEnvironmentVariable("YOUNGCRAFT_ATOM_FOCUS_PREVIEW"); !path.isEmpty()) {
+        source.resize(1400,900); source.show(); QTest::qWait(150);
+        QVERIFY(source.grab().save(path+"-window.png"));
+    }
+    // Switching tabs must retain the inactive document's new flags.
+    const int first = source.m_documentTabs->currentIndex() == 0 ? 1 : 0;
+    source.activateDocument(first);
+    QCOMPARE(source.m_data.molecule.atoms[1].displayOpacity, 0.2f);
+    source.m_atomFocusAllWindows->setChecked(false);
+    reset->trigger();
+    QCOMPARE(source.m_view->molecule().atoms[1].displayOpacity, 1.0f);
+    QCOMPARE(matching->molecule().atoms[1].displayOpacity, 0.2f);
+    // No selection is a no-op for emphasis; restore needs no selection.
+    source.applyAtomSelection({}); source.clearGeometrySelection();
+    hide->trigger();
+    for (const auto &atom : source.m_view->molecule().atoms) QVERIFY(atom.visible);
+    source.m_atomFocusAllWindows->setChecked(true);
+    reset->trigger();
+    for (auto *view : {origin,inactive,matching,wrongOrder,wrongCount})
+        for (const auto &atom : view->molecule().atoms) { QVERIFY(atom.visible); QCOMPARE(atom.displayOpacity,1.0f); }
+    // Selection from normal measurement clicks is also usable.
+    source.handleGeometryPick(1); hide->trigger();
+    QVERIFY(!source.m_view->molecule().atoms[0].visible);
+    QVERIFY(source.m_view->molecule().atoms[1].visible);
+    Frame frame; frame.coordinates=live; source.m_data.frames.push_back(frame);
+    source.showFrame(0);
+    QVERIFY(!source.m_view->molecule().atoms[0].visible);
+    QCOMPARE(source.m_view->molecule().atoms[1].position,live[1]);
+}
+
+void SmokeTest::atomFocusTransparentExport() {
+    MoleculeView view;
+    view.resize(400,300); view.show();
+    Molecule molecule; molecule.atoms = {{1,8,"O",{}}};
+    auto style = view.style(); style.showAxes=false; style.showLabels=false;
+    style.showProperties=false; style.shadows=false; style.antiAliasing=false;
+    view.setStyle(style); view.setMolecule(molecule);
+    QTest::qWait(100);
+    if (!view.isValid()) QSKIP("OpenGL context unavailable");
+    const auto solid = view.imageAtSize({400,300},true,true);
+    QVERIFY(!solid.isNull());
+    molecule.atoms[0].displayOpacity=0.2f; view.setAtomDisplay(molecule);
+    const auto faded = view.imageAtSize({400,300},true,true);
+    QVERIFY(!faded.isNull());
+    const QPoint center(200,150);
+    QVERIFY(qAlpha(solid.pixel(center)) > 250);
+    QVERIFY(qAlpha(faded.pixel(center)) >= 45 && qAlpha(faded.pixel(center)) <= 58);
+    const auto solidColor=solid.pixelColor(center), fadedColor=faded.pixelColor(center);
+    QVERIFY(qAbs(solidColor.red()-fadedColor.red()) < 12);
+    QVERIFY(qAbs(solidColor.green()-fadedColor.green()) < 12);
+    QVERIFY(qAbs(solidColor.blue()-fadedColor.blue()) < 12);
+    if (const auto path=qEnvironmentVariable("YOUNGCRAFT_ATOM_FOCUS_PREVIEW"); !path.isEmpty()) {
+        QVERIFY(solid.save(path+"-solid.png")); QVERIFY(faded.save(path+"-faded.png"));
+    }
+    molecule.atoms[0].visible=false; view.setAtomDisplay(molecule);
+    const auto hidden = view.imageAtSize({400,300},true,true);
+    QCOMPARE(qAlpha(hidden.pixel(center)),0);
+}
+
+void SmokeTest::reactionCoordinatePresentationWorkflow() {
+    MainWindow window;window.resize(1450,1000);window.show();
+    window.findChild<QAction *>("OpenMechanismAnimation")->trigger();
+    auto *dialog=window.findChild<MechanismAnimationDialog *>();QVERIFY(dialog);
+    MechanismStep a;a.name="Reactant";a.seconds=1;
+    a.molecule.atoms={{1,6,"C",{}},{2,8,"O",{1.4f,0,0}}};a.molecule.setBond(0,1,1);
+    auto b=a;b.name="TS";b.molecule.atoms[1].position={2,0,0};auto c=a;c.name="Product";c.molecule.atoms[1].position={1.2f,1,0};
+    QVERIFY(dialog->setSteps({a,b,c}));QVERIFY(!dialog->m_coordinateMode->isEnabled());QCOMPARE(dialog->m_coordinate->mappedTime(.5),.5);
+    QImage artwork(320,200,QImage::Format_ARGB32);artwork.fill(Qt::white);
+    {QPainter p(&artwork);p.setPen(QPen(QColor(55,60,80),4));p.drawLine(70,100,230,100);p.setFont(QFont("Arial",24));p.drawText(30,110,"C");p.drawText(240,110,"O");}
+    QByteArray png;QBuffer buffer(&png);buffer.open(QIODevice::WriteOnly);QVERIFY(artwork.save(&buffer,"PNG"));
+    const QString encoded=QString::fromLatin1(png.toBase64());
+    a.presentation={{"image",encoded},{"energy",0},{"coordinate",0}};
+    b.presentation={{"image",encoded},{"energy",35},{"coordinate",1},{"dashed",true},{"mode",1},
+        {"annotations",QJsonArray{QJsonObject{{"type","form"},{"points",QJsonArray{.2,.5,.7,.5}}},QJsonObject{{"type","break"},{"points",QJsonArray{.2,.6,.7,.6}}},QJsonObject{{"type","density"},{"points",QJsonArray{.2,.3,.7,.3}}},QJsonObject{{"type","orbital"},{"points",QJsonArray{.2,.8,.7,.8}}}}}};
+    c.presentation={{"image",encoded},{"energy",-8},{"coordinate",2}};
+    QVERIFY(dialog->setSteps({a,b,c}));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(!dialog->m_coordinate->active());
+    dialog->m_coordinateMode->click();QVERIFY(dialog->m_coordinate->active());
+    QTest::qWait(80);QVERIFY(dialog->m_player->isVisible());QCOMPARE(dialog->m_coordinate->window(),dialog->m_player);
+    QVERIFY(!dialog->m_player->isModal());QVERIFY(dialog->m_coordinate->width()>1000);QVERIFY(dialog->m_coordinate->height()>400);
+    QCOMPARE(dialog->m_view->maximumHeight(),QWIDGETSIZE_MAX);
+    dialog->m_playerSlider->setValue(2500);QCOMPARE(dialog->m_slider->value(),2500);
+    dialog->m_playerLoop->setChecked(true);QVERIFY(dialog->m_loop->isChecked());dialog->m_loop->setChecked(false);QVERIFY(!dialog->m_playerLoop->isChecked());
+    dialog->m_player->findChild<QPushButton *>("ReactionPlaybackStart")->click();QCOMPARE(dialog->m_time,0.);
+    dialog->m_playerPlay->click();QTest::qWait(60);QVERIFY(dialog->m_timer.isActive());
+    dialog->m_player->close();QVERIFY(!dialog->m_timer.isActive());QVERIFY(!dialog->m_player->isVisible());QVERIFY(dialog->m_coordinate->active());
+    const auto pausedTime=dialog->m_time;dialog->m_playerOpen->click();QVERIFY(dialog->m_player->isVisible());QCOMPARE(dialog->m_time,pausedTime);
+    dialog->m_player->showMaximized();QTest::qWait(60);QVERIFY(dialog->m_player->isMaximized());dialog->m_player->showNormal();
+    QCOMPARE(dialog->m_coordinate->mappedTime(0),0.);QCOMPARE(dialog->m_coordinate->mappedTime(1),1.);QCOMPARE(dialog->m_coordinate->mappedTime(2),2.);
+    QVERIFY(std::abs(dialog->m_coordinate->mappedTime(.5)-.5)>.1);
+    QVERIFY(dialog->m_coordinate->position(.5).collision);QVERIFY(!dialog->m_coordinate->position(1.5).collision);
+    dialog->seek(.5);const auto sampled=dialog->m_timeline.sample(dialog->m_coordinate->mappedTime(.5));
+    QCOMPARE(dialog->m_view->molecule().atoms[1].position,sampled.atoms[1].position);
+    const auto start=dialog->m_coordinate->imageAtTime({900,420},0),middle=dialog->m_coordinate->imageAtTime({900,420},.5),end=dialog->m_coordinate->imageAtTime({900,420},2);
+    QVERIFY(start!=middle);QVERIFY(middle!=end);QVERIFY(qAlpha(middle.pixel(10,10))==255);
+    QTemporaryDir dir;QVERIFY(dialog->saveProject(dir.filePath("coordinate.ycmechanism")));
+    dialog->m_coordinateMode->click();QVERIFY(!dialog->m_coordinate->active());
+    QVERIFY(dialog->openProject(dir.filePath("coordinate.ycmechanism")));QVERIFY(dialog->m_coordinate->active());
+    QCOMPARE(dialog->m_steps[1].presentation["annotations"].toArray().size(),4);QCOMPARE(dialog->m_coordinate->imageAtTime({900,420},.5),middle);
+    auto invalid=dialog->m_steps;invalid[1].presentation.remove("energy");QVERIFY(dialog->setSteps(invalid));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(!dialog->m_coordinate->position(.5).collision);
+    invalid[1]=b;invalid[1].presentation["coordinate"]=0;QVERIFY(dialog->setSteps(invalid));QVERIFY(!dialog->m_coordinateMode->isEnabled());
+    // Either input is sufficient, including partially populated presentations.
+    auto imagesOnly=QVector<MechanismStep>{a,b,c};for(auto &step:imagesOnly)step.presentation.remove("energy");
+    QVERIFY(dialog->setSteps(imagesOnly));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());
+    QVERIFY(dialog->m_coordinate->hasImages());QVERIFY(!dialog->m_coordinate->hasEnergies());QCOMPARE(dialog->m_coordinate->mappedTime(.5),.5);
+    const auto pictureOnly=dialog->m_coordinate->imageAtTime({900,420},.5);QVERIFY(pictureOnly!=middle);
+    QVERIFY(dialog->saveProject(dir.filePath("pictures-only.ycmechanism")));QVERIFY(dialog->openProject(dir.filePath("pictures-only.ycmechanism")));QVERIFY(dialog->m_coordinate->active());QVERIFY(!dialog->m_coordinate->hasEnergies());
+    if(dialog->m_view->isValid())QVERIFY(dialog->exportAnimation(dir.filePath("pictures-only.gif"),"gif",480,3));
+    auto energiesOnly=QVector<MechanismStep>{a,b,c};for(auto &step:energiesOnly)step.presentation.remove("image");
+    QVERIFY(dialog->setSteps(energiesOnly));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());
+    QVERIFY(!dialog->m_coordinate->hasImages());QVERIFY(dialog->m_coordinate->hasEnergies());QVERIFY(dialog->m_coordinate->position(.5).collision);
+    const auto energyOnly=dialog->m_coordinate->imageAtTime({900,420},.5);QVERIFY(energyOnly!=pictureOnly);
+    QVERIFY(dialog->saveProject(dir.filePath("energies-only.ycmechanism")));QVERIFY(dialog->openProject(dir.filePath("energies-only.ycmechanism")));QVERIFY(dialog->m_coordinate->active());QVERIFY(!dialog->m_coordinate->hasImages());
+    if(dialog->m_view->isValid())QVERIFY(dialog->exportAnimation(dir.filePath("energies-only.gif"),"gif",480,3));
+    auto partial=imagesOnly;partial[1].presentation.remove("image");partial[2].presentation.remove("image");
+    QVERIFY(dialog->setSteps(partial));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());
+    for(auto &step:partial)step.presentation.remove("image");partial[1].presentation["energy"]=35;
+    QVERIFY(dialog->setSteps(partial));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());QVERIFY(!dialog->m_coordinate->position(.5).collision);
+    for(auto &step:partial)step.presentation.remove("energy");
+    QVERIFY(dialog->setSteps(partial));QVERIFY(!dialog->m_coordinateMode->isEnabled());QVERIFY(!dialog->m_coordinate->active());
+    if(const auto path=qEnvironmentVariable("YOUNGCRAFT_COORDINATE_PREVIEW");!path.isEmpty()){QVERIFY(pictureOnly.save(path+".pictures-only.png"));QVERIFY(energyOnly.save(path+".energies-only.png"));}
+    QVERIFY(dialog->setSteps({a,b,c}));dialog->m_coordinate->setEnabledPresentation(true);
+    // Exercise the actual two-click annotation editor and transactional cancel.
+    QTimer::singleShot(0,dialog,[&]{auto *editor=dialog->findChild<QDialog *>("ReactionCoordinateEditor");QVERIFY(editor);auto *canvas=editor->findChild<QWidget *>("ReactionAnnotationCanvas");QVERIFY(canvas);QTest::mouseClick(canvas,Qt::LeftButton,Qt::NoModifier,QPoint(canvas->width()/3,canvas->height()/2));QTest::mouseClick(canvas,Qt::LeftButton,Qt::NoModifier,QPoint(2*canvas->width()/3,canvas->height()/2));editor->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();});
+    dialog->m_coordinate->edit();QCOMPARE(dialog->m_steps[0].presentation["annotations"].toArray().size(),1);
+    QTimer::singleShot(0,dialog,[&]{auto *editor=dialog->findChild<QDialog *>("ReactionCoordinateEditor");editor->findChild<QTableWidget *>("ReactionCoordinateStages")->item(0,2)->setText("999");editor->reject();});
+    dialog->m_coordinate->edit();QCOMPARE(dialog->m_steps[0].presentation["energy"].toDouble(),0.);
+    dialog->seek(.5);QTest::qWait(150);
+    if(const auto path=qEnvironmentVariable("YOUNGCRAFT_COORDINATE_PREVIEW");!path.isEmpty()){QVERIFY(dialog->grab().save(path));QVERIFY(dialog->m_player->grab().save(path+".player.png"));QVERIFY(middle.save(path+".graph.png"));}
+    if(dialog->m_view->isValid()){
+        QVERIFY(dialog->exportAnimation(dir.filePath("coordinate.gif"),"gif",480,3));QImageReader reader(dir.filePath("coordinate.gif"));QVERIFY(reader.canRead());QCOMPARE(reader.imageCount(),7);
+    }
+    dialog->close();
+}
+
+void SmokeTest::hydrogenRemovalActions() {
+    Molecule source;source.atoms={{1,6,"C",{}},{2,1,"H",{1,0,0}},{3,8,"O",{0,1,0}},{4,1,"H",{0,2,0}},{5,7,"N",{0,0,1}},{6,1,"H",{0,0,2}},{7,1,"H",{3,3,3}}};
+    source.setBond(0,1,1);source.setBond(0,2,1);source.setBond(2,3,1);source.setBond(0,4,1);source.setBond(4,5,1);
+    auto carbon=source;MoleculeEditController::hydrogens(carbon,HydrogenAction::RemoveCarbonBound);QCOMPARE(carbon.atoms.size(),6);QCOMPARE(carbon.atoms[1].element,QString("O"));QCOMPARE(carbon.atoms[2].position,source.atoms[3].position);QVERIFY(MoleculeEditController::validate(carbon));
+    auto keep=source;MoleculeEditController::hydrogens(keep,HydrogenAction::RemoveExceptSelected,{3,0});QCOMPARE(keep.atoms.size(),4);QCOMPARE(keep.atoms[2].element,QString("H"));QCOMPARE(keep.atoms[2].position,source.atoms[3].position);QVERIFY(MoleculeEditController::validate(keep));
+    auto none=source;MoleculeEditController::hydrogens(none,HydrogenAction::RemoveExceptSelected,{0,-1,100});QCOMPARE(none.atoms.size(),source.atoms.size());
+    auto all=source;MoleculeEditController::hydrogens(all,HydrogenAction::RemoveAll);QCOMPARE(all.atoms.size(),3);QVERIFY(MoleculeEditController::validate(all));
+    MainWindow window;window.newDrawingDocument(source);const int count=window.m_view->molecule().atoms.size();
+    auto *carbonAction=window.findChild<QAction *>("RemoveCarbonHydrogens"),*keepAction=window.findChild<QAction *>("RemoveUnselectedHydrogens");QVERIFY(carbonAction);QVERIFY(keepAction);
+    window.applyAtomSelection({});keepAction->trigger();QCOMPARE(window.m_view->molecule().atoms.size(),count);
+    {const QSignalBlocker block(window.m_autoHButton);window.m_autoHButton->setChecked(true);}carbonAction->trigger();
+    QCOMPARE(window.m_view->molecule().atoms.size(),count-1);
+    window.undoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),count);window.redoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),count-1);
+    window.undoDrawingEdit();window.applyAtomSelection({3});keepAction->trigger();QCOMPARE(window.m_view->molecule().atoms.size(),4);window.undoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),count);
+}
+
+void SmokeTest::wholeMechanismAnimationWorkflow() {
+    MainWindow window;window.resize(1450,900);window.show();
+    auto *action=window.findChild<QAction *>("OpenMechanismAnimation");QVERIFY(action);action->trigger();
+    auto *dialog=window.findChild<MechanismAnimationDialog *>("MechanismAnimationDialog");QVERIFY(dialog);
+    Molecule molecule;molecule.atoms={{1,6,"C",{}},{2,8,"O",{1.4f,0,0}},{3,7,"N",{0,1.4f,0}}};molecule.setBond(0,1,1);molecule.setBond(0,2,1);
+    MechanismStep a;a.name="Reactant";a.molecule=molecule;a.seconds=.2;
+    auto b=a;b.name="Intermediate";b.molecule.atoms[1].position={1.8f,0,.4f};
+    auto c=b;c.name="Product";c.molecule.atoms[1].position={2.1f,0,.8f};
+    QVERIFY(dialog->setSteps({a,b,c}));QTest::qWait(100);
+    const auto camera=dialog->m_view->cameraState();const auto first=dialog->m_view->molecule();
+    dialog->seek(.3);QVERIFY((dialog->m_view->molecule().atoms[1].position-first.atoms[1].position).length()>.1f);
+    QCOMPARE(dialog->m_view->cameraState().rotation,camera.rotation);QCOMPARE(dialog->m_view->cameraState().centerOffset,camera.centerOffset);
+    dialog->seek(0);dialog->play(true);QTest::qWait(120);QVERIFY(dialog->m_time>0);dialog->play(false);
+    dialog->m_view->selection().atoms={0};dialog->emphasize(1);dialog->seek(.2);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
+    QTemporaryDir dir;QVERIFY(dialog->saveProject(dir.filePath("mechanism.ycmechanism")));
+    QVERIFY(dialog->openProject(dir.filePath("mechanism.ycmechanism")));QCOMPARE(dialog->m_focusMode,1);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
+    if(dialog->m_view->isValid()) {
+        const auto gif=dir.filePath("mechanism.gif");QVERIFY2(dialog->exportAnimation(gif,"gif",320,10),qPrintable(dialog->m_status->text()));
+        QImageReader reader(gif);QVERIFY(reader.canRead());QCOMPARE(reader.imageCount(),5);const auto firstImage=reader.read();reader.jumpToImage(4);const auto lastImage=reader.read();QVERIFY(!firstImage.isNull());QVERIFY(!lastImage.isNull());QVERIFY(firstImage!=lastImage);
+        QVERIFY(dialog->exportAnimation(dir.path(),"png",320,10));const auto directories=QDir(dir.path()).entryList({"Youngcraft-Mechanism-*"},QDir::Dirs);QCOMPARE(directories.size(),1);QCOMPARE(QDir(dir.filePath(directories.first())).entryList({"*.png"},QDir::Files).size(),5);
+        QFile original(gif);QVERIFY(original.open(QIODevice::ReadOnly));const auto bytes=original.readAll();original.close();
+        QTimer cancel;cancel.setInterval(1);connect(&cancel,&QTimer::timeout,dialog,[&]{for(auto *progress:dialog->findChildren<QProgressDialog *>())progress->cancel();});cancel.start();
+        QVERIFY(!dialog->exportAnimation(gif,"gif",320,10));cancel.stop();QVERIFY(original.open(QIODevice::ReadOnly));QCOMPARE(original.readAll(),bytes);
+    }
+    a.molecule.atoms[1].visible=false;a.molecule.atoms[2].displayOpacity=.2f;
+    QVERIFY(dialog->setSteps({a,b,c}));QVERIFY(!dialog->m_view->molecule().atoms[1].visible);
+    dialog->emphasize(2);QVERIFY(dialog->m_view->molecule().atoms[1].visible);
+    dialog->m_parked={1};dialog->m_parkStart=0;dialog->m_timeline.park({1},0);dialog->fitTimeline();dialog->seek(.3);
+    const auto savedTarget=dialog->m_view->m_target;
+    QVERIFY(dialog->saveProject(dir.filePath("restored.ycmechanism")));QVERIFY(dialog->openProject(dir.filePath("restored.ycmechanism")));
+    QVERIFY(dialog->m_view->molecule().atoms[1].visible);QCOMPARE(dialog->m_view->molecule().atoms[2].displayOpacity,1.f);
+    QCOMPARE(dialog->m_parked,QSet<int>({1}));QVERIFY((dialog->m_view->m_target-savedTarget).length()<1e-5f);
+    QFile input(dir.filePath("reaction.xyz"));QVERIFY(input.open(QIODevice::WriteOnly));
+    const auto xyz=StructureTools::xyz(molecule).toUtf8();QCOMPARE(input.write(xyz),xyz.size());input.close();
+    dialog->setSteps({});dialog->addFiles({input.fileName()});
+    QTRY_VERIFY_WITH_TIMEOUT(!dialog->m_loading,5000);QVERIFY(dialog->m_valid);QCOMPARE(dialog->m_steps.size(),1);
+    QCOMPARE(dialog->m_steps.first().molecule.atoms.size(),3);
+    dialog->close();
+}
+
+void SmokeTest::suppliedMechanismPreview() {
+    const auto project=qEnvironmentVariable("YOUNGCRAFT_MECHANISM_PROJECT");if(project.isEmpty())QSKIP("User preview project is optional");
+    MainWindow window;window.openMechanismAnimation();auto *dialog=window.findChild<MechanismAnimationDialog *>("MechanismAnimationDialog");QVERIFY(dialog);QVERIFY(dialog->openProject(project));
+    dialog->resize(1420,860);dialog->show();QTest::qWait(200);QVERIFY(dialog->m_view->isValid());
+    QSet<int> keep;const auto molecule=dialog->m_timeline.sample(0);
+    for(int i=0;i<molecule.atoms.size();++i)if(isMetal(molecule.atoms[i].atomicNumber)||molecule.atoms[i].atomicNumber==8)keep.insert(i);
+    const auto core=keep;for(const auto &bond:molecule.bonds){if(core.contains(bond.first))keep.insert(bond.second);if(core.contains(bond.second))keep.insert(bond.first);}
+    dialog->m_view->selection().atoms=keep;dialog->emphasize(1);dialog->m_view->selection().clear();
+    QVERIFY(dialog->saveProject(project));
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_MECHANISM_PREVIEW");
+    if(!preview.isEmpty()) {
+        dialog->seek(dialog->m_timeline.duration()*.5);QTest::qWait(100);QVERIFY(dialog->grab().save(preview+"-window.png"));
+        for(int i=0;i<3;++i){dialog->seek(dialog->m_timeline.duration()*i/2.);QVERIFY(dialog->m_view->imageAtSize({960,540},false,true).save(preview+QStringLiteral("-%1.png").arg(i)));}
+        QVERIFY2(dialog->exportAnimation(preview+".gif","gif",640,25),qPrintable(dialog->m_status->text()));
+    }
+    dialog->close();
 }
 
 int main(int argc, char **argv) {

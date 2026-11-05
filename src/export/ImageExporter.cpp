@@ -7,6 +7,7 @@
 #include <QColorSpace>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
 #include <QHash>
 #include <QMimeData>
 #include <QPainter>
@@ -259,16 +260,22 @@ bool ImageExporter::copyAnimationToClipboard(const QVector<QImage> &frames, int 
 
 bool ImageExporter::saveGif(const QVector<QImage> &frames, const QString &path, int delayMs,
                             bool transparent, bool loop, QString *error) {
-    if (frames.isEmpty()) {
+    return saveGifFrames(frames.size(),frames.isEmpty()?QSize():frames.first().size(),path,
+        [&](int index){return frames[index];},delayMs,transparent,loop,error);
+}
+
+bool ImageExporter::saveGifFrames(int count, const QSize &size, const QString &path,
+                                  const std::function<QImage(int)> &frameAt, int delayMs,
+                                  bool transparent, bool loop, QString *error) {
+    if (count<=0) {
         if (error) *error = QStringLiteral("내보낼 애니메이션 프레임이 없습니다.");
         return false;
     }
-    const QSize size = frames.first().size();
     if (size.isEmpty() || size.width() > 65535 || size.height() > 65535) {
         if (error) *error = QStringLiteral("GIF 크기가 지원 범위를 벗어났습니다.");
         return false;
     }
-    QFile file(path);
+    QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
         if (error) *error = QStringLiteral("GIF 파일을 열 수 없습니다: %1").arg(file.errorString());
         return false;
@@ -306,7 +313,9 @@ bool ImageExporter::saveGif(const QVector<QImage> &frames, const QString &path, 
     }
 
     const int centiseconds = qBound(1, (delayMs + 5) / 10, 65535);
-    for (const QImage &frame : frames) {
+    for (int frameIndex=0;frameIndex<count;++frameIndex) {
+        const QImage frame=frameAt(frameIndex);
+        if(frame.isNull()) {if(error)*error=QStringLiteral("GIF 프레임 렌더링 실패 또는 저장 취소");return false;}
         QByteArray graphicsControl("\x21\xf9\x04", 3);
         graphicsControl.append(char(transparent ? 0x09 : 0x04));
         appendWord(graphicsControl, centiseconds);
@@ -348,6 +357,7 @@ bool ImageExporter::saveGif(const QVector<QImage> &frames, const QString &path, 
         if (error) *error = file.errorString();
         return false;
     }
+    if(!file.commit()){if(error)*error=file.errorString();return false;}
     return true;
 }
 

@@ -224,6 +224,7 @@ void StyleManager::save(const RenderStyle &style) {
     settings.setValue(QStringLiteral("showNegativeSurface"), style.showNegativeSurface);
     settings.setValue(QStringLiteral("isoValue"), style.isoValue);
     settings.setValue(QStringLiteral("isoOpacity"), style.isoOpacity);
+    settings.setValue(QStringLiteral("surfacePattern"), int(style.surfacePattern));
     settings.setValue(QStringLiteral("positiveSurfaceColor"), style.positiveSurfaceColor);
     settings.setValue(QStringLiteral("negativeSurfaceColor"), style.negativeSurfaceColor);
     settings.setValue(QStringLiteral("showVibrationVectors"), style.showVibrationVectors);
@@ -318,6 +319,7 @@ RenderStyle StyleManager::load() {
     style.showNegativeSurface = settings.value(QStringLiteral("showNegativeSurface"), style.showNegativeSurface).toBool();
     style.isoValue = settings.value(QStringLiteral("isoValue"), style.isoValue).toFloat();
     style.isoOpacity = settings.value(QStringLiteral("isoOpacity"), style.isoOpacity).toFloat();
+    style.surfacePattern = SurfacePattern(qBound(0, settings.value(QStringLiteral("surfacePattern"), 0).toInt(), 4));
     style.positiveSurfaceColor = settings.value(QStringLiteral("positiveSurfaceColor"), style.positiveSurfaceColor).value<QColor>();
     style.negativeSurfaceColor = settings.value(QStringLiteral("negativeSurfaceColor"), style.negativeSurfaceColor).value<QColor>();
     style.showVibrationVectors = settings.value(QStringLiteral("showVibrationVectors"), style.showVibrationVectors).toBool();

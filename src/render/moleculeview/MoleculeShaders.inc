@@ -33,6 +33,8 @@ in vec4 vLightPosition;
 in float vAxialPosition;
 in vec3 vSurfaceColor;
 uniform bool uSurfaceColor;
+uniform int uSurfacePattern;
+uniform float uPatternScale;
 uniform vec3 uColor;
 uniform vec3 uSecondColor;
 uniform bool uColorBlend;
@@ -68,6 +70,23 @@ uniform float uShadowFilterRadius;
 uniform sampler2DShadow uShadowMap;
 out vec4 fragColor;
 void main() {
+    // A screen-space stipple keeps dots evenly spaced across curved lobes.
+    // Scale with the render target so image exports retain the same texture.
+    float coverage = 1.0;
+    if (uSurfacePattern == 1 || uSurfacePattern == 2) {
+        float pitch = (uSurfacePattern == 1 ? 7.0 : 4.0) * uPatternScale;
+        vec2 cell = mod(gl_FragCoord.xy, pitch) - 0.5 * pitch;
+        float distanceToDot = length(cell);
+        float radius = pitch * 0.27;
+        float edge = max(fwidth(distanceToDot), 0.5);
+        coverage = 1.0 - smoothstep(radius - edge, radius + edge, distanceToDot);
+    } else if (uSurfacePattern == 4) {
+        float band = vWorld.z * 6.0;
+        float distanceToLine = abs(fract(band + 0.5) - 0.5);
+        float edge = max(fwidth(band), 0.01);
+        coverage = 1.0 - smoothstep(0.12, 0.12 + edge, distanceToLine);
+    }
+    if (coverage < 0.01) discard;
     vec3 materialColor = uSurfaceColor ? vSurfaceColor : uColor;
     if (uColorBlend) {
         float t = mix(uColorStart, uColorEnd, vAxialPosition);
@@ -153,7 +172,7 @@ void main() {
         float depth = 0.5 - dot(vWorld - uDepthCenter, uViewDirection) / max(uDepthSpan, 0.001);
         color = mix(color, uBackground, smoothstep(0.15, 1.0, depth) * clamp(uDepthCueStrength, 0.0, 0.85));
     }
-    fragColor = vec4(color, uOpacity);
+    fragColor = vec4(color, uOpacity * coverage);
 }
 )GLSL";
 

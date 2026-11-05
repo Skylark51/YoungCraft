@@ -179,10 +179,62 @@ void MainWindow::setCarbonHydrogensVisible(bool visible) {
 }
 
 void MainWindow::updateAtomVisibility() {
-    QVector<bool> visibility;
-    visibility.reserve(m_data.molecule.atoms.size());
-    for (const Atom &atom : m_data.molecule.atoms) visibility.push_back(atom.visible);
-    m_view->setAtomVisibility(visibility);
+    m_view->setAtomDisplay(m_data.molecule);
+}
+
+void MainWindow::emphasizeSelectedAtoms(int mode) {
+    const Molecule source = m_view->molecule();
+    if (source.isEmpty()) { setStatus(QStringLiteral("먼저 분자 구조를 열어주세요.")); return; }
+    auto selected = selectedStructureAtoms();
+    if (selected.isEmpty()) for (int i : m_geometrySelection)
+        if (i >= 0 && i < source.atoms.size()) selected.insert(i);
+    const int picked = m_view->selectedAtom();
+    if (selected.isEmpty() && picked >= 0 && picked < source.atoms.size()) selected.insert(picked);
+    if (mode != 2 && selected.isEmpty()) {
+        setStatus(QStringLiteral("먼저 강조할 원자를 선택하세요. Shift: 추가 · Ctrl: 선택 반전 · 드래그: 영역 선택"));
+        return;
+    }
+    const bool all = m_atomFocusAllWindows->isChecked();
+    int applied = 0, skipped = 0;
+    auto apply = [&](MainWindow *owner, const std::shared_ptr<DocumentSession> &document) {
+        auto *view = document->view;
+        if (!view || view->molecule().isEmpty()) return;
+        if (!all && view != m_view) return;
+        const auto &atoms = view->molecule().atoms;
+        bool matches = atoms.size() == source.atoms.size();
+        for (int i = 0; matches && i < atoms.size(); ++i)
+            matches = atoms[i].atomicNumber == source.atoms[i].atomicNumber;
+        if (!matches) { ++skipped; return; }
+        auto appearance = view->molecule();
+        auto &data = document == owner->m_activeDocument ? owner->m_data : document->data;
+        for (int i = 0; i < appearance.atoms.size(); ++i) {
+            auto &atom = appearance.atoms[i];
+            atom.visible = mode != 0 || selected.contains(i);
+            atom.displayOpacity = mode == 1 && !selected.contains(i) ? 0.2f : 1.0f;
+            if (i < data.molecule.atoms.size()) {
+                data.molecule.atoms[i].visible = atom.visible;
+                data.molecule.atoms[i].displayOpacity = atom.displayOpacity;
+            }
+        }
+        document->data = data;
+        view->setAtomDisplay(appearance);
+        auto style = view->style(); style.showHydrogen = true;
+        // Preserve every camera setting and the currently displayed animation frame.
+        view->setStyle(style); document->style = style;
+        if (document == owner->m_activeDocument) {
+            owner->m_style = style;
+            for (auto *action : owner->findChildren<QAction *>())
+                if (action->text() == QStringLiteral("수소 표시")) action->setChecked(true);
+        }
+        ++applied;
+    };
+    for (auto *widget : QApplication::topLevelWidgets()) {
+        auto *owner = qobject_cast<MainWindow *>(widget);
+        if (!owner || (!all && owner != this)) continue;
+        for (const auto &document : owner->m_documents) apply(owner, document);
+        if (owner->m_documents.isEmpty() && owner->m_emptyDocument) apply(owner, owner->m_emptyDocument);
+    }
+    setStatus(QStringLiteral("원자 표시: %1개 구조에 적용 · 원자 수/원소 순서가 다른 %2개 제외").arg(applied).arg(skipped));
 }
 
 void MainWindow::showAtom(int index) {

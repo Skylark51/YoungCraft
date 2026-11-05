@@ -72,6 +72,7 @@ ReactionCaptureDialog::ReactionCaptureDialog(const CalculationData &data, Molecu
     for(int i=0;i<m_data.molecule.atoms.size();++i) {
         const auto atom=source->molecule().atoms.value(i);
         m_data.molecule.atoms[i].visible=atom.visible;
+        m_data.molecule.atoms[i].displayOpacity=atom.displayOpacity;
         m_data.molecule.atoms[i].colorOverride=atom.colorOverride;
         m_data.molecule.atoms[i].radiusScale=atom.radiusScale;
         m_initialVisibility.push_back(atom.visible);
@@ -199,6 +200,8 @@ ReactionCaptureDialog::ReactionCaptureDialog(const CalculationData &data, Molecu
             }
             const auto style=m_views[1]->style();
             molecule.rebuildBonds(style.recountCutoffScale,style.recountHydrogen,style.recountMetalCoordination,false);
+            for(int i=0;i<molecule.atoms.size();++i)
+                molecule.atoms[i].displayOpacity=m_data.molecule.atoms[i].displayOpacity;
             m_views[index]->setMolecule(molecule);m_names[index]->setText(QFileInfo(paths[side]).fileName());
         }
         synchronize(m_camera);m_ready=true;updateHydrogenVisibility();
