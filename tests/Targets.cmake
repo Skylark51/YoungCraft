@@ -51,10 +51,10 @@ set_tests_properties(gui_smoke PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}
 qt_add_executable(mock_mm_worker tests/mm/mock_mm_worker.cpp)
 target_link_libraries(mock_mm_worker PRIVATE Qt6::Core)
 target_compile_definitions(test_smoke PRIVATE YOUNGCRAFT_TESTING)
-add_dependencies(test_smoke mock_mm_worker)
 
 qt_add_executable(mock_xtb tests/xtb/mock_xtb.cpp)
 target_link_libraries(mock_xtb PRIVATE Qt6::Core)
+add_dependencies(test_smoke mock_mm_worker mock_xtb)
 qt_add_executable(test_xtb tests/xtb/test_xtb.cpp)
 target_link_libraries(test_xtb PRIVATE youngcraft_compute Qt6::Test)
 target_compile_options(test_xtb PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
