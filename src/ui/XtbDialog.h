@@ -4,6 +4,7 @@
 class QComboBox;
 class QCheckBox;
 class QSpinBox;
+class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
 namespace youngcraft {
@@ -34,6 +35,11 @@ private:
     XtbRunner runner;
     QComboBox *kind,*method,*solvation,*solvent,*level,*threads,*energyMode;
     QSpinBox *charge,*multiplicity,*cycles;
+    QWidget *scanSettings = nullptr;
+    QComboBox *scanType = nullptr;
+    QSpinBox *scanAtoms[4] = {nullptr,nullptr,nullptr,nullptr};
+    QDoubleSpinBox *scanFrom = nullptr, *scanTo = nullptr;
+    QSpinBox *scanPoints = nullptr;
     QCheckBox *preserveFramework, *preserveBonds;
     ConstraintEditor *constraints;
     QLabel *status;

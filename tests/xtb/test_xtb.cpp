@@ -113,6 +113,55 @@ private slots:
     }
  }
  void fragmentedTrajectory(){XtbTrajectoryParser p;auto m=water();QByteArray frame="3\n energy: -5.2 gnorm: 0.01\nO 0 0 0\nH 1 0 0\nH 0 1 0\n";for(int i=0;i<frame.size()-1;++i)QVERIFY(p.append(frame.mid(i,1),m).isEmpty());auto f=p.append(frame.right(1),m);QCOMPARE(f.size(),1);QCOMPARE(f[0].energy,-5.2);QCOMPARE(f[0].gradient,0.01);QVERIFY(p.append({},m).isEmpty());QCOMPARE(p.append(frame+frame,m).size(),2);QVERIFY(p.error.isEmpty());p.append("2\n",m);QVERIFY(!p.error.isEmpty());}
+ void scanTrajectoryComments(){
+    XtbTrajectoryParser parser;const auto m=water();
+    QByteArray payload="3\nSCF done   -5.5001000\nO 0 0 0\nH 1 0 0\nH 0 1 0\n";
+    QVERIFY(parser.append(payload.left(9),m).isEmpty());
+    auto frames=parser.append(payload.mid(9),m);
+    QCOMPARE(frames.size(),1);QCOMPARE(frames[0].energy,-5.5001);
+    QVERIFY(parser.error.isEmpty());
+ }
+ void invalidScanSettings(){
+    const auto m=water();
+    for(const auto &s:QVector<XtbScan>{{"distance",{0,0},1.0,1.5,5},
+        {"distance",{0,1},1.0,1.5,2},{"angle",{0,1,2},90.0,180.0,5}}){
+        XtbOptions o;o.scan=s;XtbRunner r;
+        QSignalSpy done(&r,&XtbRunner::completed);
+        QVERIFY(!r.start(m,o,runtime()));
+        QCOMPARE(r.state,XtbRunner::State::Failed);QCOMPARE(done.size(),1);
+    }
+    XtbOptions fixed;fixed.scan=XtbScan{"distance",{0,1},1.0,1.5,5};
+    fixed.constraints={{"distance",{1,0},1.2}};
+    XtbRunner r;QVERIFY(!r.start(m,fixed,runtime()));
+    QVERIFY(r.error.contains("이미"));
+ }
+ void relaxedScanAndCandidateSelection(){
+    auto m=water();m.setBond(0,1,1);m.setBond(0,2,1);
+    XtbOptions o;o.method=2;o.cycles=250;o.level="normal";
+    o.preserveBondLengths=true;
+    o.scan=XtbScan{"distance",{0,1},1.0,1.4,5};
+    XtbRunner r;QSignalSpy done(&r,&XtbRunner::completed);
+    QVERIFY2(r.start(m,o,runtime()),qPrintable(r.error));
+    QFile control(r.directory+"/framework.inp");QVERIFY(control.open(QIODevice::ReadOnly));
+    const QByteArray input=control.readAll();
+    QVERIFY(input.contains("$scan\n"));
+    QVERIFY(input.contains("distance: 1, 2, 1.00000000; 1.00000000, 1.40000000, 5"));
+    // Bond-retention constraints must not pin the coordinate being scanned.
+    QVERIFY(!input.contains("distance: 1, 2, 1.20000000"));
+    QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,120000);
+    QVERIFY2(r.state==XtbRunner::State::Finished,qPrintable(r.output.right(2000)+r.error));
+    QCOMPARE(r.scanFrames.size(),5);
+    for(const auto &frame:r.scanFrames)QVERIFY(std::isfinite(frame.energy));
+    if(r.tsCandidateIndex>=0) {
+        const int i=r.tsCandidateIndex;
+        QVERIFY(i>0 && i+1<r.scanFrames.size());
+        QVERIFY(r.scanFrames[i].energy>r.scanFrames[i-1].energy);
+        QVERIFY(r.scanFrames[i].energy>r.scanFrames[i+1].energy);
+    }
+    QVERIFY(r.selectScanFrame(0));QCOMPARE(r.cycle,1);
+    QVERIFY(std::abs(r.energy-r.scanFrames[0].energy)<1e-10);
+    QVERIFY(!r.selectScanFrame(5));
+ }
  void missingRuntime(){XtbRunner r;QSignalSpy done(&r,&XtbRunner::completed);QVERIFY(!r.start(water(),{},"Z:/absent-runtime"));QCOMPARE(r.state,XtbRunner::State::Failed);QCOMPARE(done.size(),1);QVERIFY(r.error.contains("xtb.exe"));}
  void neutralSP(){runSP(water(),{});}
  void chargedSP(){auto m=water();m.atoms.push_back({4,1,"H",{-0.3f,-0.9f,0}});XtbOptions o;o.charge=1;runSP(m,o);}
