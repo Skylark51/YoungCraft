@@ -20,6 +20,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -38,6 +39,12 @@ bool hasEnergy(const MechanismStep &step) {
     return value.isDouble()&&std::isfinite(value.toDouble());
 }
 double coordinate(const MechanismStep &step, int index) { return step.presentation["coordinate"].toDouble(index); }
+bool isTransitionState(const MechanismStep &step) {
+    static const QRegularExpression namePattern(
+        QStringLiteral("(?:^|[^\\p{L}\\p{N}])(?:TS\\d*|transition[ _-]+state)(?![\\p{L}\\p{N}])|전이\\s*상태"),
+        QRegularExpression::CaseInsensitiveOption);
+    return step.presentation["transitionState"].toBool(namePattern.match(step.name).hasMatch());
+}
 QRectF fitImage(const QImage &image, QRectF bounds) {
     if(image.isNull())return bounds;
     const QSizeF size=QSizeF(image.size()).scaled(bounds.size(),Qt::KeepAspectRatio);
@@ -110,7 +117,7 @@ public:
 }
 
 ReactionCoordinateWidget::ReactionCoordinateWidget(QVector<MechanismStep> *steps,QWidget *parent):QWidget(parent),m_steps(steps) {
-    setObjectName("ReactionCoordinatePreview");setMinimumHeight(120);setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);hide();
+    setObjectName("ReactionCoordinatePreview");setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);hide();
 }
 bool ReactionCoordinateWidget::ready() const {
     if(m_steps->size()<2||m_images.size()!=m_steps->size())return false;
@@ -199,6 +206,105 @@ void ReactionCoordinateWidget::restoreSettings(const QJsonObject &s) {
     refresh();
 }
 void ReactionCoordinateWidget::paintEvent(QPaintEvent *){QPainter p(this);draw(p,rect(),m_time);}
+void ReactionCoordinateWidget::setSeparateArtwork(bool separate) {
+    m_separateArtwork=separate;
+    update();
+}
+
+ReactionCoordinateWidget::Artwork ReactionCoordinateWidget::artworkAt(double seconds,const Position &pos) const {
+    const int current=pos.fraction<.5?pos.from:pos.to;
+    Artwork artwork{pos.from,pos.to,isTransitionState(m_steps->at(current))?current:-1,pos.fraction,pos.fraction};
+    auto missingTs=[&](int i){return m_images[i].isNull()&&isTransitionState(m_steps->at(i));};
+    if(!missingTs(pos.from)&&!missingTs(pos.to))return artwork;
+
+    int left=pos.from,right=pos.to;
+    while(left>=0&&missingTs(left))--left;
+    while(right<m_images.size()&&missingTs(right))++right;
+    if(left<0||right>=m_images.size()||m_images[left].isNull()||m_images[right].isNull())return artwork;
+    const auto times=stageTimes();
+    const double departure=times[left]+m_steps->at(left).holdSeconds();
+    return {left,right,artwork.ts,qBound(0.,(seconds-departure)/(times[right]-departure),1.),
+            pos.to==right?pos.fraction:-1.};
+}
+
+void ReactionCoordinateWidget::drawArtwork(QPainter &p,const QRectF &bounds,double seconds,bool transparent) const {
+    if(!ready()||!hasImages()||bounds.isEmpty())return;
+    const auto pos=position(seconds);
+    if(!transparent)p.fillRect(bounds,QColor(250,251,255));
+    drawArtwork(p,bounds,artworkAt(pos.time,pos));
+}
+
+void ReactionCoordinateWidget::drawArtwork(QPainter &p,const QRectF &bounds,const Artwork &artwork) const {
+    p.save();
+    p.setClipRect(bounds,Qt::IntersectClip);
+    p.setRenderHints(QPainter::Antialiasing|QPainter::SmoothPixmapTransform);
+    const double scale=qMin(bounds.width()/300.,bounds.height()/180.);
+    const double captionHeight=36*scale;
+    const QRectF imageBounds=bounds.adjusted(12*scale,4*scale,-12*scale,-captionHeight);
+    const auto &first=m_images[artwork.from],&last=m_images[artwork.to];
+    const double eased=smooth(artwork.fraction);
+    const double shift=artwork.from==artwork.to?0:18*scale;
+    const auto start=fitImage(first,imageBounds).translated(-shift*eased,0);
+    const auto end=fitImage(last,imageBounds).translated(shift*(1-eased),0);
+    if(artwork.from==artwork.to) {
+        p.drawImage(start,first);
+    } else if(!first.isNull()&&!last.isNull()&&eased>0&&eased<1) {
+        // Blend premultiplied pixels so overlapping opaque areas stay opaque.
+        const QRect area=start.united(end).toAlignedRect();
+        const qreal pixelScale=p.deviceTransform().mapRect(QRectF(0,0,1,1)).width();
+        const auto size=(QSizeF(area.size())*pixelScale).toSize().expandedTo({1,1});
+        auto weighted=[&](const QImage &image,const QRectF &target,double weight){
+            QImage layer(size,QImage::Format_ARGB32_Premultiplied);
+            layer.fill(Qt::transparent);
+            QPainter painter(&layer);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            painter.scale(pixelScale,pixelScale);
+            painter.translate(-area.topLeft());
+            painter.setOpacity(weight);
+            painter.drawImage(target,image);
+            painter.end();
+            return layer;
+        };
+        auto blend=weighted(first,start,1-eased);
+        const auto incoming=weighted(last,end,eased);
+        if(!blend.isNull()&&!incoming.isNull()) {
+            QPainter painter(&blend);
+            painter.setCompositionMode(QPainter::CompositionMode_Plus);
+            painter.drawImage(0,0,incoming);
+            painter.end();
+            p.drawImage(QRectF(area),blend);
+        }
+    } else {
+        p.save();p.setOpacity(1-eased);p.drawImage(start,first);p.restore();
+        p.save();p.setOpacity(eased);p.drawImage(end,last);p.restore();
+    }
+    if(artwork.annotationFraction>=0&&!last.isNull()) {
+        p.save();
+        p.translate(end.topLeft());
+        p.scale(scale,scale);
+        annotations(p,m_steps->at(artwork.to).presentation["annotations"].toArray(),
+                    QRectF(QPointF(),end.size()/scale),artwork.annotationFraction);
+        p.restore();
+    }
+    if(artwork.ts>=0) {
+        QFont font=m_textFont;font.setPixelSize(qMax(1,qRound(17*scale)));p.setFont(font);
+        p.setPen(m_textColor);
+        const QRectF caption(bounds.left(),bounds.bottom()-captionHeight,bounds.width(),captionHeight);
+        if(m_showCaption)p.drawText(caption,Qt::AlignCenter|Qt::TextWordWrap,QStringLiteral("TS · %1").arg(m_steps->at(artwork.ts).name));
+    } else if(first.isNull()&&last.isNull()) {
+        p.setPen(m_textColor);
+        p.drawText(imageBounds,Qt::AlignCenter,QStringLiteral("이 구간의 2D 그림 미삽입"));
+    }
+    p.restore();
+}
+
+void ReactionCoordinateWidget::setTextStyle(const QFont &font, const QColor &color, bool showCaption) {
+    m_textFont=font;
+    m_textColor=color;
+    m_showCaption=showCaption;
+    update();
+}
+
 QImage ReactionCoordinateWidget::imageAtTime(QSize size,double seconds,bool transparent,bool force) const {
     QImage result(size,QImage::Format_ARGB32_Premultiplied);result.fill(Qt::transparent);QPainter p(&result);draw(p,QRectF(QPointF(),QSizeF(size)),seconds,transparent,force);return result;
 }
@@ -206,10 +312,11 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
     if(!active()&&!(force&&ready()))return;
     p.save();p.setRenderHints(QPainter::Antialiasing|QPainter::SmoothPixmapTransform);
     if(!transparent)p.fillRect(bounds,QColor(250,251,255));
-    const double scale=qMin(bounds.width()/900.,bounds.height()/420.);
-    p.translate(bounds.topLeft()+QPointF((bounds.width()-900*scale)/2,(bounds.height()-420*scale)/2));p.scale(scale,scale);
+    const double logicalHeight=m_separateArtwork?325:420;
+    const double scale=qMin(bounds.width()/900.,bounds.height()/logicalHeight);
+    p.translate(bounds.topLeft()+QPointF((bounds.width()-900*scale)/2,(bounds.height()-logicalHeight*scale)/2));p.scale(scale,scale);
     const auto pos=position(seconds);const auto &a=(*m_steps)[pos.from],&b=(*m_steps)[pos.to];
-    const bool showEnergy=hasEnergies(),showImages=hasImages();
+    const bool showEnergy=hasEnergies(),showImages=!m_separateArtwork&&hasImages();
     const double u=pos.fraction;const int mode=b.presentation["mode"].toInt();
     auto yFraction=[](int shape,double t){if(shape==0)return smooth(t);if(shape==1)return smooth(qBound(0.,(t-.22)/.56,1.));return t;};
     const double e=energy(a)+(energy(b)-energy(a))*yFraction(mode,u);
@@ -224,10 +331,11 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
     }
     const double displayedEnergy=(u>=1?energy(b):(u<=0?energy(a):e))-reference;
     const double x=coordinate(a,pos.from)+(coordinate(b,pos.to)-coordinate(a,pos.from))*u;
-    p.setFont(QFont("Arial",force?14:11,QFont::Bold));p.setPen(QColor(64,54,120));
+    QFont font=m_textFont;
+    font.setPointSize(force?14:11);p.setFont(font);p.setPen(m_textColor);
     const QString heading=showEnergy?(currentEnergy?QStringLiteral("Energetics   ΔE = %1 kcal/mol").arg(displayedEnergy,0,'f',2):QStringLiteral("Energetics   ΔE 미입력 구간")):QStringLiteral("2D 단계 애니메이션");
     p.drawText(QRectF(18,10,850,26),Qt::AlignLeft,heading+QStringLiteral("    ·    coordinate = %1").arg(x,0,'f',2));
-    p.setFont(QFont("Arial",force?11:9));p.setPen(QColor(100,102,120));p.drawText(QRectF(18,37,550,20),Qt::AlignLeft,showEnergy?QStringLiteral("사용자 지정 에너지 · 입력한 에너지 구간만 표시"):QStringLiteral("결합 / 전자 이동 모식도"));
+    font.setPointSize(force?11:9);p.setFont(font);p.drawText(QRectF(18,37,550,20),Qt::AlignLeft,showEnergy?QStringLiteral("사용자 지정 에너지 · 입력한 에너지 구간만 표시"):QStringLiteral("결합 / 전자 이동 모식도"));
     const double xmin=coordinate(m_steps->first(),0),xmax=coordinate(m_steps->last(),m_steps->size()-1);
     auto drawImpact=[&](const QPointF &hit) {
         if(pos.impact>=1)return;
@@ -256,14 +364,14 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
     const int lastTick=qMax(firstTick+1,int(std::ceil(high/tickStep)));
     low=firstTick*tickStep;
     high=lastTick*tickStep;
-    const QRectF graph(72,85,showImages?473:763,260);
+    const QRectF graph(72,85,showImages?473:763,m_separateArtwork?165:260);
     auto screen=[&](double cx,double cy){return QPointF(graph.left()+(cx-xmin)/(xmax-xmin)*graph.width(),graph.bottom()-(cy-low)/(high-low)*graph.height());};
     for(int tick=firstTick;tick<=lastTick;++tick) {
         const double value=tick*tickStep;
         const auto at=screen(xmin,value);
         p.setPen(QPen(tick==0?QColor(135,137,160):QColor(195,199,215),1));
         p.drawLine(at,QPointF(m_grid||tick==0?graph.right():at.x()-4,at.y()));
-        p.setPen(QColor(70,65,100));
+        p.setPen(m_textColor);
         p.drawText(QRectF(0,at.y()-10,65,20),Qt::AlignRight|Qt::AlignVCenter,QString::number(value,'g',5));
     }
     p.setPen(QPen(QColor(94,95,112),1.5));p.drawLine(graph.bottomLeft(),graph.topLeft());p.drawLine(graph.bottomLeft(),graph.bottomRight());
@@ -271,18 +379,21 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
         for(int k=0;k<=100;++k){const double t=k/100.;const auto pt=screen(coordinate(left,i-1)+(coordinate(right,i)-coordinate(left,i-1))*t,energy(left)-reference+(energy(right)-energy(left))*yFraction(shape,t));if(k==0)path.moveTo(pt);else path.lineTo(pt);}
         p.setPen(QPen(QColor(112,104,167),2.7,right.presentation["dashed"].toBool()?Qt::DashLine:Qt::SolidLine));p.drawPath(path);
     }
-    for(int i=0;i<m_steps->size();++i){const auto &step=(*m_steps)[i];const auto at=screen(coordinate(step,i),hasEnergy(step)?energy(step)-reference:low);p.setBrush(Qt::white);p.setPen(QPen(QColor(125,119,160),1.5));
+    for(int i=0;i<m_steps->size();++i){const auto &step=(*m_steps)[i];const auto at=screen(coordinate(step,i),hasEnergy(step)?energy(step)-reference:low);
         if(hasEnergy(step)) {
+            p.setBrush(Qt::white);p.setPen(QPen(QColor(125,119,160),1.5));
             p.drawEllipse(at,3.5,3.5);
+            p.setPen(m_textColor);
             if(m_values)p.drawText(QRectF(at.x()-40,at.y()-22,80,16),Qt::AlignCenter,QString::number(energy(step)-reference,'g',5));
         }
-        p.drawText(QRectF(at.x()-42,graph.bottom()+9,84,32),Qt::AlignHCenter|Qt::TextWordWrap,(*m_steps)[i].name.left(24));}
+        p.setPen(m_textColor);
+        if(m_showCaption)p.drawText(QRectF(at.x()-42,graph.bottom()+9,84,32),Qt::AlignHCenter|Qt::TextWordWrap,step.name.left(24));}
     const auto current=screen(x,currentEnergy?displayedEnergy:low);p.setPen(QPen(QColor(133,104,225,125),1.5,Qt::DashLine));p.drawLine(QPointF(current.x(),graph.bottom()),QPointF(current.x(),graph.top()));
     if(currentEnergy) {
     p.setBrush(QColor(132,102,235,35));p.setPen(Qt::NoPen);p.drawEllipse(current,19,19);p.setBrush(QColor(113,77,228));p.drawEllipse(current,7,7);
     const double barY=screen(xmin,displayedEnergy).y();p.setPen(QPen(QColor(113,77,228),5,Qt::SolidLine,Qt::RoundCap));p.drawLine(QPointF(18,screen(xmin,0).y()),QPointF(18,barY));p.setBrush(QColor(113,77,228));p.setPen(Qt::NoPen);p.drawEllipse(QPointF(18,barY),6,6);
     }
-    p.setPen(QColor(70,65,100));p.drawText(QRectF(graph.left(),390,graph.width(),22),Qt::AlignCenter,QStringLiteral("Reaction coordinate"));
+    p.setPen(m_textColor);p.drawText(QRectF(graph.left(),graph.bottom()+45,graph.width(),22),Qt::AlignCenter,QStringLiteral("Reaction coordinate"));
     if(pos.collision) {
         const double t=qBound(.1,b.presentation["impactAt"].toDouble(.38),.7);
         const double hitX=coordinate(a,pos.from)+(coordinate(b,pos.to)-coordinate(a,pos.from))*t;
@@ -291,25 +402,25 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
     }
     } else {
         // With artwork alone the horizontal tracker represents progress, never energy.
-        const double progress=(x-xmin)/(xmax-xmin);p.setPen(QPen(QColor(190,185,211),3));p.drawLine(QPointF(65,350),QPointF(835,350));
-        p.setBrush(QColor(113,77,228));p.setPen(Qt::NoPen);p.drawEllipse(QPointF(65+770*progress,350),7,7);
+        const double trackerY=logicalHeight-70;
+        const double progress=(x-xmin)/(xmax-xmin);p.setPen(QPen(QColor(190,185,211),3));p.drawLine(QPointF(65,trackerY),QPointF(835,trackerY));
+        p.setBrush(QColor(113,77,228));p.setPen(Qt::NoPen);p.drawEllipse(QPointF(65+770*progress,trackerY),7,7);
         if(pos.collision) {
             const double t=qBound(.1,b.presentation["impactAt"].toDouble(.38),.7);
             const double hit=coordinate(a,pos.from)*(1-t)+coordinate(b,pos.to)*t;
-            drawImpact(QPointF(65+770*(hit-xmin)/(xmax-xmin),350));
+            drawImpact(QPointF(65+770*(hit-xmin)/(xmax-xmin),trackerY));
         }
-        p.setPen(QColor(70,65,100));p.drawText(QRectF(65,365,770,22),Qt::AlignCenter,QStringLiteral("Reaction coordinate"));
+        p.setPen(m_textColor);p.drawText(QRectF(65,trackerY+15,770,22),Qt::AlignCenter,QStringLiteral("Reaction coordinate"));
     }
     if(showImages) {
-    const QRectF artwork=showEnergy?QRectF(590,95,285,230):QRectF(190,70,520,250);const double eased=smooth(u);
-    // Two supplied drawings slide and cross-fade together; no invented atom correspondence.
-    auto imageRect=fitImage(m_images[pos.from],artwork);p.save();p.setOpacity(1-eased);p.drawImage(imageRect.translated(-26*eased,0),m_images[pos.from]);p.restore();
-    p.save();p.setOpacity(eased);p.drawImage(fitImage(m_images[pos.to],artwork).translated(26*(1-eased),0),m_images[pos.to]);p.restore();
-    if(!m_images[pos.to].isNull())annotations(p,b.presentation["annotations"].toArray(),fitImage(m_images[pos.to],artwork).translated(26*(1-eased),0),u);
-    if(m_images[pos.from].isNull()&&m_images[pos.to].isNull()){p.setPen(QColor(100,102,120));p.drawText(artwork,Qt::AlignCenter,QStringLiteral("이 구간의 2D 그림 미삽입"));}
+        const QRectF artwork=showEnergy?QRectF(590,85,285,255):QRectF(190,70,520,270);
+        drawArtwork(p,artwork,artworkAt(pos.time,pos));
     }
-    const QRectF caption=showEnergy?(showImages?QRectF(575,345,310,36):QRectF(575,37,310,36)):QRectF(190,390,520,26);
-    p.setFont(QFont("Arial",10,QFont::Bold));p.setPen(pos.collision?QColor(210,122,32):QColor(64,54,120));p.drawText(caption,Qt::AlignCenter|Qt::TextWordWrap,pos.collision?QStringLiteral("높은 장벽 · 충돌 / 재시도"):a.name+(pos.from==pos.to?QString():QStringLiteral(" → ")+b.name));
+    const QRectF caption=showEnergy?(showImages?QRectF(575,345,310,36):QRectF(575,37,310,36)):QRectF(190,logicalHeight-30,520,26);
+    if(m_showCaption||pos.collision) {
+        font.setPointSize(10);p.setFont(font);p.setPen(m_textColor);
+        p.drawText(caption,Qt::AlignCenter|Qt::TextWordWrap,pos.collision?QStringLiteral("높은 장벽 · 충돌 / 재시도"):a.name+(pos.from==pos.to?QString():QStringLiteral(" → ")+b.name));
+    }
     p.restore();
 }
 
@@ -319,6 +430,8 @@ void ReactionCoordinateWidget::edit(int selectedStage) {
     auto draft=*m_steps;auto *layout=new QVBoxLayout(&dialog);
     auto *help=new QLabel(QStringLiteral("2D 그림 또는 에너지(kcal/mol) 중 하나만 입력해도 사용할 수 있습니다. 둘 다 입력하면 함께 움직입니다. 비어 있는 에너지 값은 그래프에서 연결하지 않습니다. 좌표는 단계 순서대로 증가해야 합니다.\n결합·전자 효과는 도착 단계 그림에서 시작점과 끝점을 차례로 클릭해 지정합니다. 오른쪽 클릭은 지정 취소입니다."));help->setWordWrap(true);layout->addWidget(help);
     auto *table=new QTableWidget(draft.size(),7);table->setObjectName("ReactionCoordinateStages");table->setHorizontalHeaderLabels({QStringLiteral("단계"),QStringLiteral("좌표"),QStringLiteral("ΔE (kcal/mol)"),QStringLiteral("2D 그림"),QStringLiteral("구간 모양"),QStringLiteral("파선"),QStringLiteral("진입 장벽")});table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);table->setSelectionBehavior(QAbstractItemView::SelectRows);table->setSelectionMode(QAbstractItemView::SingleSelection);layout->addWidget(table,1);
+    table->setColumnCount(8);
+    table->setHorizontalHeaderItem(7,new QTableWidgetItem(QStringLiteral("전이 상태 (TS)")));
     auto *canvas=new AnnotationCanvas;layout->addWidget(canvas,2);
     auto *row=new QHBoxLayout;layout->addLayout(row);
     auto *insert=new QPushButton(QStringLiteral("2D 그림 삽입…")),*paste=new QPushButton(QStringLiteral("그림 붙여넣기")),*remove=new QPushButton(QStringLiteral("그림 제거"));row->addWidget(insert);row->addWidget(paste);row->addWidget(remove);
@@ -390,6 +503,11 @@ void ReactionCoordinateWidget::edit(int selectedStage) {
         auto *mode=new QComboBox;mode->addItems({QStringLiteral("곡선"),QStringLiteral("평평한 준위"),QStringLiteral("직선"),QStringLiteral("점만 표시")});mode->setCurrentIndex(qBound(0,draft[i].presentation["mode"].toInt(),3));table->setCellWidget(i,4,mode);auto *dash=new QCheckBox;dash->setChecked(draft[i].presentation["dashed"].toBool());table->setCellWidget(i,5,dash);
         auto *barrier=new QCheckBox;barrier->setEnabled(i>0);barrier->setChecked(i>0&&draft[i].presentation["impactBarrier"].toBool());
         barrier->setToolTip(QStringLiteral("이 단계로 진입할 때 충돌 후 반동을 연출합니다."));table->setCellWidget(i,6,barrier);
+        auto *ts=new QCheckBox;
+        ts->setChecked(isTransitionState(draft[i]));
+        ts->setToolTip(QStringLiteral("2D 그림이 비어 있으면 앞뒤 그림을 부드럽게 전환하고 이 단계 이름을 표시합니다."));
+        table->setCellWidget(i,7,ts);
+        connect(ts,&QCheckBox::toggled,&dialog,[&,i](bool on){draft[i].presentation["transitionState"]=on;});
     }
     connect(table,&QTableWidget::currentCellChanged,&dialog,[&](int,int,int,int){select();});
     canvas->changed=[&]{const int i=table->currentRow();if(i>=0)draft[i].presentation["annotations"]=canvas->marks;};

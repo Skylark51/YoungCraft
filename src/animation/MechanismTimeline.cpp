@@ -123,6 +123,9 @@ MechanismStep MechanismStep::fromCalculation(const CalculationData &data,bool us
     if(!energies.isEmpty())step.presentation["sourceEnergiesHartree"]=energies;
     if(!relative.isEmpty())step.presentation["sourceEnergiesKcal"]=relativeEnergies;
     if(step.frames.isEmpty()) { QVector<QVector3D> frame;for(const auto&a:step.molecule.atoms)frame.push_back(a.position);step.frames.push_back(frame); }
+    if(step.frames.size()==1&&std::count_if(data.frequencies.cbegin(),data.frequencies.cend(),
+        [](const FrequencyMode &mode){return mode.imaginary;})==1)
+        step.presentation["transitionState"]=true;
     if(!step.frames.isEmpty())for(int i=0;i<step.molecule.atoms.size();++i)step.molecule.atoms[i].position=step.frames.last()[i];
     return step;
 }
@@ -132,6 +135,9 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
     if(steps.isEmpty()||steps.size()>300)return fail(QStringLiteral("1–300개의 반응 단계를 넣어주세요."));
     MechanismTimeline built;built.m_options=options;
     if(!std::isfinite(options.lift)||options.lift<0||options.lift>100)return fail(QStringLiteral("조각 이동 거리는 0–100 Å입니다."));
+    for (float opacity : {options.departedOpacity, options.parkedOpacity, options.dimmedOpacity})
+        if (!std::isfinite(opacity) || opacity < 0 || opacity > 1)
+            return fail(QStringLiteral("불투명도는 0–100%입니다."));
     QVector<QVector<QVector<QVector3D>>> allFrames;
     QVector<QVector3D> reference;QVector<bool> present;
     qsizetype nodeCount=1;
@@ -182,8 +188,8 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
         const auto &frames=allFrames[stage];const auto &map=built.m_mappings[stage];
         for(int f=0;f<frames.size();++f) {
             if(stage>0||f>0)time+=steps[stage].travelSeconds()/qMax(1,int(frames.size())-(stage==0?1:0));
-            Node node;node.time=time;node.step=stage;node.positions.resize(built.trackCount());node.presence.fill(0,built.trackCount());
-            for(int i=0;i<map.size();++i){node.positions[map[i]]=frames[f][i];node.presence[map[i]]=1;}
+            Node node;node.time=time;node.step=stage;node.positions.resize(built.trackCount());node.presence.fill(Presence::Absent,built.trackCount());
+            for(int i=0;i<map.size();++i){node.positions[map[i]]=frames[f][i];node.presence[map[i]]=Presence::Present;}
             auto topology=steps[stage].molecule;
             if(frames.size()>1){for(int i=0;i<map.size();++i)topology.atoms[i].position=frames[f][i];topology.rebuildBonds(1.25,true,true,false);}
             for(auto bond:topology.bonds)if(bond.first>=0&&bond.second>=0&&bond.first<map.size()&&bond.second<map.size()) {
@@ -201,13 +207,13 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
     if(built.m_nodes.size()==1){auto last=built.m_nodes.first();last.time=steps.first().travelSeconds();built.m_nodes.push_back(last);}
     for(int track=0;track<built.trackCount();++track) {
         int last=-1,first=-1;
-        for(int n=0;n<built.m_nodes.size();++n)if(built.m_nodes[n].presence[track]>0){first=n;break;}
+        for(int n=0;n<built.m_nodes.size();++n)if(built.m_nodes[n].presence[track]==Presence::Present){first=n;break;}
         for(int n=0;n<built.m_nodes.size();++n) {
             auto &node=built.m_nodes[n];
-            if(node.presence[track]>0){last=n;continue;}
+            if(node.presence[track]==Presence::Present){last=n;continue;}
             const int anchor=last>=0?last:first;
             node.positions[track]=built.m_nodes[anchor].positions[track]+QVector3D(0,options.lift,0);
-            node.presence[track]=last>=0&&options.keepDeparted?.18f:0.f;
+            if(last>=0&&options.keepDeparted)node.presence[track]=Presence::Departed;
         }
     }
     // Preserve internal bonds of departing fragments, never their link to the reacting core.
@@ -218,7 +224,7 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
         for(const auto &bond:node.bonds)current.insert(key(bond),bond);
         for(auto it=previous.cbegin();it!=previous.cend();++it) {
             const auto &b=it.value();
-            if(node.presence[b.first]<1&&node.presence[b.second]<1&&node.presence[b.first]>0&&node.presence[b.second]>0&&!current.contains(it.key())) {
+            if(node.presence[b.first]==Presence::Departed&&node.presence[b.second]==Presence::Departed&&!current.contains(it.key())) {
                 node.bonds.push_back(b);
                 current.insert(it.key(),b);
             }
@@ -311,6 +317,10 @@ Molecule MechanismTimeline::sample(double time) const {
     const auto &a=m_nodes[left],&b=m_nodes[right];const double dt=b.time-a.time;
     const float u=float(qBound(0.,(time-a.time)/dt,1.)),e=smooth(u);
     const float h00=2*u*u*u-3*u*u+1,h10=u*u*u-2*u*u+u,h01=-2*u*u*u+3*u*u,h11=u*u*u-u*u;
+    const auto opacity = [this](Presence presence) {
+        if (presence == Presence::Departed) return m_options.departedOpacity;
+        return presence == Presence::Present ? 1.0f : 0.0f;
+    };
     for(int i=0;i<result.atoms.size();++i) {
         QVector3D va,vb;
         for(int axis=0;axis<3;++axis) {
@@ -319,7 +329,7 @@ Molecule MechanismTimeline::sample(double time) const {
             if(right+1<m_nodes.size()){const auto&n=m_nodes[right+1];vb[axis]=tangent(delta,float((n.positions[i][axis]-b.positions[i][axis])/(n.time-b.time)),dt,n.time-b.time);}
         }
         auto &atom=result.atoms[i];atom.position=a.positions[i]*h00+va*float(dt)*h10+b.positions[i]*h01+vb*float(dt)*h11;
-        atom.displayOpacity=((1-e)*a.presence[i]+e*b.presence[i])*m_opacity[i];
+        atom.displayOpacity=((1-e)*opacity(a.presence[i])+e*opacity(b.presence[i]))*m_opacity[i];
         atom.visible=m_visible[i]&&atom.displayOpacity>.001f;
     }
     QHash<quint64,float> flashes;
@@ -349,7 +359,8 @@ Molecule MechanismTimeline::sample(double time) const {
             const auto newer=newBonds.constFind(iter.key());const auto &bond=iter.value();
             if(newer==newBonds.cend()||bond.coordination||std::abs(bond.order-newer->order)>.1)continue;
             const int i=bond.first,j=bond.second;
-            if(a.presence[i]<.99f||a.presence[j]<.99f||b.presence[i]<.99f||b.presence[j]<.99f)continue;
+            if(a.presence[i]!=Presence::Present||a.presence[j]!=Presence::Present||
+               b.presence[i]!=Presence::Present||b.presence[j]!=Presence::Present)continue;
             const float length=(1-u)*(a.positions[i]-a.positions[j]).length()+u*(b.positions[i]-b.positions[j]).length();
             const auto vector=result.atoms[j].position-result.atoms[i].position;const float distance=vector.length();
             if(distance<1e-6f)continue;
@@ -359,7 +370,8 @@ Molecule MechanismTimeline::sample(double time) const {
     const float lift=smooth(float(qBound(0.,(time-m_parkStart)/qMax(.001,m_parkEnd-m_parkStart),1.)));
     for(int i:m_parked)if(i>=0&&i<result.atoms.size()){
         result.atoms[i].position+=QVector3D(0,m_options.lift*lift,0);
-        result.atoms[i].displayOpacity*=1-.65f*lift;
+        result.atoms[i].displayOpacity*=1-(1-m_options.parkedOpacity)*lift;
+        result.atoms[i].visible &= result.atoms[i].displayOpacity > .001f;
     }
     for(auto &bond:result.bonds)if(m_parked.contains(bond.first)!=m_parked.contains(bond.second))bond.displayOpacity*=1-lift;
     return result;
@@ -371,7 +383,9 @@ Molecule MechanismTimeline::envelope() const {
     Molecule result;if(m_nodes.isEmpty())return result;
     QVector3D minimum,maximum;bool initialized=false;
     auto include=[&](const QVector3D &p){if(!initialized){minimum=maximum=p;initialized=true;}for(int axis=0;axis<3;++axis){minimum[axis]=qMin(minimum[axis],p[axis]);maximum[axis]=qMax(maximum[axis],p[axis]);}};
-    for(const auto &node:m_nodes)for(int i=0;i<node.positions.size();++i)if(node.presence[i]>0&&m_visible[i])include(node.positions[i]);
+    for(const auto &node:m_nodes)for(int i=0;i<node.positions.size();++i)
+        if(m_visible[i]&&(node.presence[i]==Presence::Present||
+           (node.presence[i]==Presence::Departed&&m_options.departedOpacity>0)))include(node.positions[i]);
     for(int i=0;i<=100;++i){const auto frame=sample(duration()*i/100.);for(const auto &a:frame.atoms)if(a.visible)include(a.position);}
     if(!initialized)return result;
     // Eight corners fit the entire movie without storing a duplicate atom cloud.
@@ -391,7 +405,7 @@ QString MechanismTimeline::caption(double time) const {
 }
 void MechanismTimeline::emphasize(const QSet<int>&keep,int mode) {
     m_visible.resize(trackCount());m_opacity.resize(trackCount());
-    for(int i=0;i<trackCount();++i){m_visible[i]=mode!=0||keep.contains(i);m_opacity[i]=mode==1&&!keep.contains(i)?.2f:1.f;}
+    for(int i=0;i<trackCount();++i){m_visible[i]=mode!=0||keep.contains(i);m_opacity[i]=mode==1&&!keep.contains(i)?m_options.dimmedOpacity:1.f;}
 }
 QByteArray MechanismTimeline::saveProject(const QVector<MechanismStep>&steps,const MechanismOptions&options) {
     QJsonArray array;
@@ -403,7 +417,8 @@ QByteArray MechanismTimeline::saveProject(const QVector<MechanismStep>&steps,con
             {"frames",frames},{"mapping",mapping},{"opacity",opacity},{"seconds",step.seconds},{"reversed",step.reversed},{"presentation",step.presentation}});
     }
     return QJsonDocument(QJsonObject{{"format","YoungcraftMechanism"},{"version",1},{"steps",array},
-        {"align",options.align},{"preserveBonds",options.preserveBonds},{"keepDeparted",options.keepDeparted},{"lift",options.lift}}).toJson();
+        {"align",options.align},{"preserveBonds",options.preserveBonds},{"keepDeparted",options.keepDeparted},{"lift",options.lift},
+        {"departedOpacity",options.departedOpacity},{"parkedOpacity",options.parkedOpacity},{"dimmedOpacity",options.dimmedOpacity}}).toJson();
 }
 bool MechanismTimeline::loadProject(const QByteArray &bytes,QVector<MechanismStep>&steps,MechanismOptions&options,QString *error) {
     auto fail=[&]{if(error)*error=QStringLiteral("유효한 Youngcraft 메커니즘 프로젝트가 아닙니다.");return false;};
@@ -428,6 +443,9 @@ bool MechanismTimeline::loadProject(const QByteArray &bytes,QVector<MechanismSte
     }
     MechanismOptions settings;settings.align=root["align"].toBool(true);settings.preserveBonds=root["preserveBonds"].toBool(true);
     settings.keepDeparted=root["keepDeparted"].toBool(true);settings.lift=float(root["lift"].toDouble(6));
+    settings.departedOpacity=float(root["departedOpacity"].toDouble(settings.departedOpacity));
+    settings.parkedOpacity=float(root["parkedOpacity"].toDouble(settings.parkedOpacity));
+    settings.dimmedOpacity=float(root["dimmedOpacity"].toDouble(settings.dimmedOpacity));
     MechanismTimeline check;if(!check.build(loaded,settings,error))return false;
     steps=std::move(loaded);options=settings;return true;
 }

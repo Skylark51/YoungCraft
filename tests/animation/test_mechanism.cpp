@@ -48,7 +48,10 @@ private slots:
         QVERIFY(!start.atoms[3].visible);QCOMPARE(middle.atoms[3].position,QVector3D(4,0,0));
         QCOMPARE(end.atoms[3].position,QVector3D(4,6,0));QCOMPARE(end.atoms[3].displayOpacity,.18f);
         QVERIFY(end.bondIndex(3,4)>=0);QVERIFY(qAbs((end.atoms[3].position-end.atoms[4].position).length()-1.5f)<1e-5f);
-        auto options=raw();options.keepDeparted=false;QVERIFY(t.build({a,b,c},options));QVERIFY(!t.sample(4).atoms[3].visible);
+        auto options=raw();options.departedOpacity=1.f;QVERIFY(t.build({a,b,c},options));
+        QCOMPARE(t.sample(4).atoms[3].displayOpacity,1.f);QVERIFY(t.sample(4).bondIndex(3,4)>=0);
+        options.departedOpacity=0.f;QVERIFY(t.build({a,b,c},options));QVERIFY(!t.sample(4).atoms[3].visible);
+        options.keepDeparted=false;QVERIFY(t.build({a,b,c},options));QVERIFY(!t.sample(4).atoms[3].visible);
         auto broken=b;broken.molecule.bonds.removeLast();
         QVERIFY(t.build({b,broken,c},raw()));QVERIFY(t.sample(4).bondIndex(1,2)<0); // Never restore a bond broken before departure.
     }
@@ -144,6 +147,36 @@ private slots:
         QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto original=file.readAll();file.close();
         QVERIFY(!ImageExporter::saveGifFrames(5,{64,48},path,[&](int i){return i==2?QImage():make(i);},40,false,false,&error));
         QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),original);
+    }
+    void transparentGifKeepsLowOpacityAndClearsPreviousFrame() {
+        QTemporaryDir dir;
+        const auto path=dir.filePath("coverage.gif");
+        const QSize size(24,8);
+        auto make=[&](int frame) {
+            QImage image(size,QImage::Format_ARGB32);
+            image.fill(Qt::transparent);
+            for (int y=0;y<size.height();++y)
+                for (int x=0;x<8;++x)
+                    image.setPixelColor(frame*8+x,y,QColor(255,0,0,frame?128:46));
+            return image;
+        };
+        QVERIFY(ImageExporter::saveGifFrames(2,size,path,make,40,true,true,nullptr,true));
+        QImageReader reader(path);
+        for (int frame=0;frame<2;++frame) {
+            const auto decoded=reader.read();
+            QCOMPARE(decoded.size(),size);
+            int covered=0;
+            for (int y=0;y<size.height();++y) {
+                for (int x=0;x<size.width();++x) {
+                    const auto pixel=decoded.pixelColor(x,y);
+                    if (!pixel.alpha()) continue;
+                    QVERIFY(x/8==frame);
+                    QCOMPARE(pixel,QColor(Qt::red));
+                    ++covered;
+                }
+            }
+            QCOMPARE(covered,frame?32:12);
+        }
     }
     void suppliedDeformylationPath() {
         const auto directory=qEnvironmentVariable("YOUNGCRAFT_DEFORMYLATION_DIR");if(directory.isEmpty())QSKIP("User dataset is optional");

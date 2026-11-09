@@ -4,10 +4,10 @@
 #include "settings/StyleManager.h"
 #include <QDialog>
 #include <QElapsedTimer>
+#include <QFont>
 #include <QTimer>
 
 class QTableWidget;
-class QBoxLayout;
 class QLabel;
 class QSlider;
 class QPushButton;
@@ -64,9 +64,16 @@ private:
     void updateControls();
     void fitTimeline();
     void showPlaybackWindow();
+    void editAppearance(QWidget *parent);
+    void applyTextStyle();
+    void saveGifAs();
+    void addFilesByName(const QString &folder, const QString &names);
     QVector<MechanismStep> m_steps, m_openSteps;
     MechanismTimeline m_timeline;
     MechanismOptions m_options;
+    QFont m_videoFont{QStringLiteral("Arial"), 10, QFont::Bold};
+    QColor m_videoTextColor{35, 45, 55};
+    bool m_transparentGif=true;
     MoleculeView *m_view=nullptr,*m_playerView=nullptr;
     ReactionCoordinateWidget *m_coordinate=nullptr;
     QPushButton *m_coordinateMode=nullptr,*m_coordinateEdit=nullptr;
@@ -76,7 +83,7 @@ private:
     QCheckBox *m_playerLoop=nullptr,*m_playerBarrier=nullptr;
     QComboBox *m_playerStages=nullptr,*m_timelineEvents=nullptr;
     QDoubleSpinBox *m_exactTime=nullptr;
-    QBoxLayout *m_shotLayout=nullptr;
+    QWidget *m_shotArtwork=nullptr;
     QWidget *m_shotViewport=nullptr;
     QPushButton *m_playerPhoto=nullptr,*m_playerPreviewBarrier=nullptr;
     QLabel *m_playerHint=nullptr;
@@ -96,7 +103,7 @@ private:
     bool m_loading=false,m_exporting=false,m_valid=false;
     QVector<double> m_presentationStops;
     QSet<int> m_focus,m_keptHydrogens,m_shotAtoms;
-    int m_shotArrangement=0,m_shotAspect=0;
+    int m_shotArrangement=3,m_shotAspect=1;
     float m_shotZoom=2;
     bool m_savedCameraEnabled=false;
     CameraState m_savedCamera;

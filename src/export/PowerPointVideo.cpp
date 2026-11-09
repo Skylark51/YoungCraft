@@ -99,7 +99,9 @@ bool writePowerPointVideo(const QString &path,QSize size,int fps,int frames,
     IMFMediaType *rawOutput=nullptr,*rawInput=nullptr;
     if(SUCCEEDED(result))result=videoType(&rawOutput,MFVideoFormat_H264,size,fps);
     Interface<IMFMediaType> output(rawOutput);
-    if(SUCCEEDED(result))result=output->SetUINT32(MF_MT_AVG_BITRATE,qBound(1500000,int(qint64(size.width())*size.height()*fps*42/100),100000000));
+    // Reaction scenes mostly contain stationary backgrounds and linework.
+    const int bitrate=qBound(750000,int(qint64(size.width())*size.height()*fps/10),40000000);
+    if(SUCCEEDED(result))result=output->SetUINT32(MF_MT_AVG_BITRATE,bitrate);
     DWORD stream=0;
     if(SUCCEEDED(result))result=writer->AddStream(output.get(),&stream);
     if(SUCCEEDED(result))result=videoType(&rawInput,MFVideoFormat_NV12,size,fps);

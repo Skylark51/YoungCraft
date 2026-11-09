@@ -9,6 +9,7 @@
 #include <QBuffer>
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -17,6 +18,7 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QFileInfo>
+#include <QFontComboBox>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QInputDialog>
@@ -31,8 +33,10 @@
 #include <QProcess>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QScreen>
+#include <QSettings>
 #include <QScrollArea>
 #include <QShowEvent>
 #include <QScopeGuard>
@@ -77,9 +81,56 @@ private:
     QVector<QPair<double,QColor>> m_marks;
 };
 
+constexpr int presentationArrangement=3;
+constexpr auto gifDirectoryKey="mechanism/lastGifDirectory";
+
+double shotAspect(int aspect) {
+    return aspect==2?9./16:aspect==1?1.:16./9;
+}
+
+QSize outputSize(int width,int aspect) {
+    const int height=aspect==2?width*16/9:aspect==1?width:width*9/16;
+    return {(width+1)/2*2,(height+1)/2*2};
+}
+
+struct ShotRegions { QRect structure,graph,artwork; };
+
+ShotRegions shotRegions(QSize size,int arrangement,bool combined,bool hasArtwork,bool forceGraph=false) {
+    const int w=size.width(),h=size.height();
+    if(!combined)return {{0,0,w,h},{},{}};
+    if(arrangement==presentationArrangement) {
+        const int top=h*58/100;
+        const int inset=hasArtwork?w*24/100:0;
+        return {{inset,0,w-2*inset,top},{0,top,w,h-top},
+                hasArtwork?QRect(w-inset,top/20,inset,top*72/100):QRect()};
+    }
+    if(arrangement==1) {
+        const int split=w*5/9;
+        return {{0,0,split,h},{split,0,w-split,h},{}};
+    }
+    const int split=forceGraph?h/2:h*5/9;
+    return {{0,0,w,split},{0,split,w,h-split},{}};
+}
+
+class ShotArtwork final : public QWidget {
+public:
+    ShotArtwork(ReactionCoordinateWidget *coordinate,QWidget *parent)
+        :QWidget(parent),m_coordinate(coordinate) {}
+    void setTime(double seconds) {m_time=seconds;update();}
+protected:
+    void paintEvent(QPaintEvent *) override {
+        QPainter painter(this);
+        m_coordinate->drawArtwork(painter,rect(),m_time,false);
+    }
+private:
+    ReactionCoordinateWidget *m_coordinate;
+    double m_time=0;
+};
+
 class ShotViewport final : public QWidget {
 public:
     QWidget body{this};
+    std::function<void(QSize)> arrange;
     void setAspect(double aspect) {m_aspect=aspect;fit();}
 protected:
     void resizeEvent(QResizeEvent *) override {fit();}
@@ -91,6 +142,7 @@ private:
             else size.setHeight(qRound(size.width()/m_aspect));
         }
         body.setGeometry(QRect(QPoint((width()-size.width())/2,(height()-size.height())/2),size));
+        if(arrange)arrange(size);
     }
     double m_aspect=0;
 };
@@ -121,8 +173,23 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     m_controls=new QWidget;auto *left=new QVBoxLayout(m_controls);left->setContentsMargins(0,0,0,0);splitter->addWidget(m_controls);
     auto *files=new QHBoxLayout;left->addLayout(files);
     auto *add=new QPushButton(QStringLiteral("파일 추가…"));add->setObjectName("MechanismAddFiles");files->addWidget(add);
+    auto *addByName = new QPushButton(QStringLiteral("폴더·파일명 추가…"));
+    addByName->setObjectName("MechanismAddFilesByName");
+    files->addWidget(addByName);
     auto *opened=new QPushButton(QStringLiteral("열린 탭 가져오기"));opened->setEnabled(!openSteps.isEmpty());files->addWidget(opened);
     connect(add,&QPushButton::clicked,this,[this]{addFiles(QFileDialog::getOpenFileNames(this,QStringLiteral("반응 경로 파일 — 추가 후 순서를 조절하세요"),{},FileDispatcher::openFilter()));});
+    connect(addByName, &QPushButton::clicked, this, [this] {
+        const QString folder = QFileDialog::getExistingDirectory(this, QStringLiteral("반응 경로 파일이 있는 폴더 선택"));
+        if (folder.isEmpty()) return;
+
+        bool accepted = false;
+        const QString names = QInputDialog::getMultiLineText(
+            this, QStringLiteral("파일명으로 추가"),
+            QStringLiteral("폴더: %1\n확장자를 포함한 파일명을 한 줄에 하나씩 입력하거나 Excel 셀을 붙여넣으세요.\n위에서 아래로, 같은 줄은 왼쪽에서 오른쪽 순서로 추가합니다.")
+                .arg(QDir::toNativeSeparators(folder)),
+            {}, &accepted);
+        if (accepted) addFilesByName(folder, names);
+    });
     connect(opened,&QPushButton::clicked,this,[this]{m_steps+=m_openSteps;populate();rebuild();});
     auto *projectRow=new QHBoxLayout;left->addLayout(projectRow);
     auto *load=new QPushButton(QStringLiteral("프로젝트 열기…")),*save=new QPushButton(QStringLiteral("프로젝트 저장…"));projectRow->addWidget(load);projectRow->addWidget(save);
@@ -186,8 +253,10 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     connect(photoSelection,&QPushButton::clicked,this,[this]{editPhotoSelection(m_playerView);});
     auto *editSegmentButton=new QPushButton(QStringLiteral("구간·충돌 조절…"));tools->addWidget(editSegmentButton);
     connect(editSegmentButton,&QPushButton::clicked,this,&MechanismAnimationDialog::editSegment);
-    auto *shot=new QPushButton(QStringLiteral("카메라·광고용 클로즈업…"));tools->addWidget(shot);
+    auto *shot=new QPushButton(QStringLiteral("카메라·구도…"));tools->addWidget(shot);
     connect(shot,&QPushButton::clicked,this,&MechanismAnimationDialog::editShot);
+    auto *playerAppearance=new QPushButton(QStringLiteral("불투명도·글자…"));tools->addWidget(playerAppearance);
+    connect(playerAppearance,&QPushButton::clicked,this,[this]{editAppearance(m_player);});
     m_playerBarrier=new QCheckBox(QStringLiteral("이 단계 진입 시 충돌"));m_playerBarrier->setObjectName("ReactionPlaybackImpact");tools->addWidget(m_playerBarrier);
     connect(m_playerBarrier,&QCheckBox::toggled,this,[this](bool on){setImpactBarrier(m_table->currentRow(),on);});
     m_playerPreviewBarrier=new QPushButton(QStringLiteral("진입 구간 미리 보기"));tools->addWidget(m_playerPreviewBarrier);
@@ -221,11 +290,24 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     m_playerHint=new QLabel;m_playerHint->setWordWrap(true);tools->addWidget(m_playerHint);
     tools->addStretch();toolsScroll->setWidget(toolsPanel);
     m_playerView=new MoleculeView(m_player);m_playerView->setObjectName("ReactionPlaybackStructure");
-    m_playerView->setMinimumSize(120,100);m_playerView->setStyle(presentation);
+    m_playerView->setMinimumSize(0,0);m_playerView->setStyle(presentation);
     auto *viewport=new ShotViewport;m_shotViewport=viewport;playerLayout->addWidget(viewport,1);
-    m_shotLayout=new QVBoxLayout(&viewport->body);m_shotLayout->setContentsMargins(0,0,0,0);
-    m_shotLayout->addWidget(m_playerView,5);
-    m_coordinate=new ReactionCoordinateWidget(&m_steps,m_player);m_shotLayout->addWidget(m_coordinate,4);
+    auto backdrop=viewport->body.palette();
+    backdrop.setColor(QPalette::Window,presentation.background);
+    viewport->body.setPalette(backdrop);
+    viewport->body.setAutoFillBackground(true);
+    m_playerView->setParent(&viewport->body);
+    m_coordinate=new ReactionCoordinateWidget(&m_steps,&viewport->body);
+    m_shotArtwork=new ShotArtwork(m_coordinate,&viewport->body);
+    m_shotArtwork->setObjectName("ReactionPlaybackArtwork");
+    viewport->arrange=[this](QSize size){
+        const auto regions=shotRegions(size,m_shotArrangement,m_coordinate->active()&&m_shotArrangement!=2,m_coordinate->hasImages());
+        m_playerView->setGeometry(regions.structure);
+        m_coordinate->setGeometry(regions.graph);
+        m_coordinate->setVisible(!regions.graph.isEmpty());
+        m_shotArtwork->setGeometry(regions.artwork);
+        m_shotArtwork->setVisible(!regions.artwork.isEmpty());
+    };
     connect(m_view,&MoleculeView::cameraChanged,this,[this]{m_playerView->setCameraState(shotCamera(m_view->molecule(),m_view->cameraState()));});
     connect(m_playerView,&MoleculeView::cameraChanged,this,[this]{if(m_shotAtoms.isEmpty()&&!m_savedCameraEnabled)m_view->setCameraState(m_playerView->cameraState());});
     m_playerCaption=new QLabel;m_playerCaption->setWordWrap(true);
@@ -341,8 +423,11 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     auto *exportSettings=new QHBoxLayout;rightLayout->addLayout(exportSettings);
     m_resolution=new QComboBox;for(int width:{640,960,1280,1920})m_resolution->addItem(QStringLiteral("%1 × %2").arg(width).arg(width*9/16),width);m_resolution->setCurrentIndex(1);exportSettings->addWidget(m_resolution);
     m_fps=new QSpinBox;m_fps->setRange(10,60);m_fps->setValue(25);m_fps->setSuffix(" fps");exportSettings->addWidget(m_fps);
-    auto *alpha=new QLabel(QStringLiteral("PNG·GIF 투명 배경"));exportSettings->addWidget(alpha);
     m_captions=new QCheckBox(QStringLiteral("단계 이름"));m_captions->setChecked(true);exportSettings->addWidget(m_captions);
+    connect(m_captions,&QCheckBox::toggled,this,&MechanismAnimationDialog::applyTextStyle);
+    auto *appearance=new QPushButton(QStringLiteral("불투명도·글자…"));exportSettings->addWidget(appearance);
+    appearance->setObjectName("MechanismAppearance");
+    connect(appearance,&QPushButton::clicked,this,[this]{editAppearance(this);});
     auto *exports=new QHBoxLayout;rightLayout->addLayout(exports);
     m_gif=new QPushButton(QStringLiteral("GIF 저장…"));m_mp4=new QPushButton(QStringLiteral("MP4 저장…"));m_png=new QPushButton(QStringLiteral("PNG 시퀀스…"));
     m_pptx=new QPushButton(QStringLiteral("발표용 장면…"));m_pptx->setObjectName("MechanismPowerPointExport");
@@ -354,8 +439,13 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
         auto *format=new QComboBox;format->addItems({QStringLiteral("PowerPoint (.pptx)"),QStringLiteral("장면 묶음 (.zip · MP4 + PNG)")});
         form->addRow(QStringLiteral("형식"),format);
         auto *resolution=new QComboBox;
-        for(int width:{1280,1920,2560,3840})resolution->addItem(QStringLiteral("%1 × %2").arg(width).arg(width*9/16),width);
-        resolution->setCurrentIndex(1);form->addRow(QStringLiteral("해상도"),resolution);
+        const QVector<int> widths=m_shotAspect==2?QVector<int>{608,720,1080,1280}
+            :m_shotAspect==1?QVector<int>{1080,1440,1920,2160}
+            :QVector<int>{1280,1920,2560,3840};
+        for(int width:widths)
+            resolution->addItem(QStringLiteral("%1 × %2").arg(width).arg(outputSize(width,m_shotAspect).height()),width);
+        resolution->setCurrentIndex(m_shotAspect==2?2:m_shotAspect==1?0:1);
+        form->addRow(QStringLiteral("해상도"),resolution);
         auto *fps=new QSpinBox;fps->setRange(10,60);fps->setValue(qMax(30,m_fps->value()));fps->setSuffix(" fps");
         form->addRow(QStringLiteral("프레임 속도"),fps);
         auto *buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);form->addRow(buttons);
@@ -370,13 +460,93 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
         if(!path.endsWith(extension,Qt::CaseInsensitive))path+=extension;
         exportPowerPoint(path,resolution->currentData().toInt(),fps->value(),bundle);
     });
-    connect(m_gif,&QPushButton::clicked,this,[this]{const auto p=QFileDialog::getSaveFileName(this,QStringLiteral("메커니즘 GIF"),"mechanism.gif","GIF (*.gif)");if(!p.isEmpty())exportAnimation(p,"gif",m_resolution->currentData().toInt(),m_fps->value());});
+    connect(m_gif,&QPushButton::clicked,this,&MechanismAnimationDialog::saveGifAs);
     connect(m_mp4,&QPushButton::clicked,this,[this]{const auto p=QFileDialog::getSaveFileName(this,QStringLiteral("메커니즘 MP4"),"mechanism.mp4","MP4 (*.mp4)");if(!p.isEmpty())exportAnimation(p,"mp4",m_resolution->currentData().toInt(),m_fps->value());});
     connect(m_png,&QPushButton::clicked,this,[this]{const auto p=QFileDialog::getExistingDirectory(this,QStringLiteral("PNG 시퀀스 저장 폴더"));if(!p.isEmpty())exportAnimation(p,"png",m_resolution->currentData().toInt(),m_fps->value());});
     splitter->setSizes({500,760});
     m_status=new QLabel;m_status->setWordWrap(true);m_status->setObjectName("MechanismStatus");layout->addWidget(m_status);
     scroll->setWidget(content);
+    applyTextStyle();
     updateControls();
+}
+
+void MechanismAnimationDialog::saveGifAs() {
+    auto *parent=m_player->isActiveWindow()?m_player:static_cast<QDialog*>(this);
+    QFileDialog dialog(parent,QStringLiteral("메커니즘 GIF 저장"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setNameFilter(QStringLiteral("GIF (*.gif)"));
+    dialog.setDefaultSuffix(QStringLiteral("gif"));
+    const QString folder=QSettings().value(gifDirectoryKey).toString();
+    if (QFileInfo(folder).isDir()) dialog.setDirectory(folder);
+    dialog.selectFile(QStringLiteral("mechanism.gif"));
+    if (dialog.exec()==QDialog::Accepted)
+        exportAnimation(dialog.selectedFiles().first(),"gif",m_resolution->currentData().toInt(),m_fps->value());
+}
+
+void MechanismAnimationDialog::editAppearance(QWidget *parent) {
+    if (m_loading || m_exporting) return;
+    play(false);
+    QDialog dialog(parent);
+    dialog.setWindowTitle(QStringLiteral("메커니즘 불투명도·글자"));
+    auto *form=new QFormLayout(&dialog);
+    auto addOpacity=[&](const QString &label, float opacity) {
+        auto *spin=new QSpinBox(&dialog);
+        spin->setRange(0,100);
+        spin->setSuffix(QStringLiteral(" %"));
+        spin->setValue(qRound(100*opacity));
+        form->addRow(label,spin);
+        return spin;
+    };
+    auto *departed=addOpacity(QStringLiteral("자동 이탈 조각"),m_options.departedOpacity);
+    auto *parked=addOpacity(QStringLiteral("위로 이동한 선택 조각"),m_options.parkedOpacity);
+    auto *dimmed=addOpacity(QStringLiteral("‘나머지 반투명’ 원자"),m_options.dimmedOpacity);
+    auto *font=new QFontComboBox(&dialog);
+    font->setCurrentFont(m_videoFont);
+    form->addRow(QStringLiteral("영상 글꼴"),font);
+    auto *color=new QPushButton(m_videoTextColor.name(),&dialog);
+    QColor textColor=m_videoTextColor;
+    connect(color,&QPushButton::clicked,&dialog,[&] {
+        const QColor choice=QColorDialog::getColor(textColor,&dialog,QStringLiteral("영상 글자 색"));
+        if (!choice.isValid()) return;
+        textColor=choice;
+        color->setText(textColor.name());
+    });
+    form->addRow(QStringLiteral("영상 글자 색"),color);
+    auto *transparent=new QCheckBox(QStringLiteral("GIF 배경 투명"),&dialog);
+    transparent->setChecked(m_transparentGif);
+    form->addRow(transparent);
+    auto *note=new QLabel(QStringLiteral("투명 GIF는 픽셀 패턴으로 반투명 효과를 표현합니다.\n체크를 끄면 현재 배경색에 합성해 저장합니다."),&dialog);
+    form->addRow(note);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,&dialog);
+    form->addRow(buttons);
+    connect(buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    if (dialog.exec()!=QDialog::Accepted) return;
+    const float departedOpacity=departed->value()/100.f;
+    const float parkedOpacity=parked->value()/100.f;
+    const float dimmedOpacity=dimmed->value()/100.f;
+    const bool opacityChanged=departedOpacity!=m_options.departedOpacity ||
+        parkedOpacity!=m_options.parkedOpacity || dimmedOpacity!=m_options.dimmedOpacity;
+    m_options.departedOpacity=departedOpacity;
+    m_options.parkedOpacity=parkedOpacity;
+    m_options.dimmedOpacity=dimmedOpacity;
+    m_videoFont.setFamily(font->currentFont().family());
+    m_videoTextColor=textColor;
+    m_transparentGif=transparent->isChecked();
+    applyTextStyle();
+    if (opacityChanged && m_valid) rebuild(false);
+}
+
+void MechanismAnimationDialog::applyTextStyle() {
+    for (auto *label : {m_caption,m_playerCaption}) {
+        label->setTextFormat(Qt::PlainText);
+        label->setFont(m_videoFont);
+        auto colors=label->palette();
+        colors.setColor(QPalette::WindowText,m_videoTextColor);
+        label->setPalette(colors);
+    }
+    m_coordinate->setTextStyle(m_videoFont,m_videoTextColor,m_captions->isChecked());
+    m_shotArtwork->update();
 }
 
 void MechanismAnimationDialog::updateControls() {
@@ -398,8 +568,13 @@ void MechanismAnimationDialog::updateControls() {
     m_pptx->setEnabled(false);
 #endif
     m_pptx->setToolTip(QStringLiteral("Windows에서 PPTX 또는 MP4·PNG 묶음을 만듭니다. 두 형식 모두 3D 구조와 에너지 그래프를 포함합니다."));
-    m_gif->setEnabled(ready);m_png->setEnabled(ready);m_mp4->setEnabled(ready&&ImageExporter::ffmpegAvailable());
-    m_mp4->setToolTip(ImageExporter::ffmpegAvailable()?QStringLiteral("MP4는 배경색을 포함하여 저장합니다. 투명 배경은 PNG·GIF를 사용하세요."):QStringLiteral("MP4 저장에는 ffmpeg가 필요합니다. GIF·PNG 시퀀스는 바로 저장할 수 있습니다."));
+    m_gif->setEnabled(ready);m_png->setEnabled(ready);
+#ifdef Q_OS_WIN
+    m_mp4->setEnabled(ready);
+#else
+    m_mp4->setEnabled(ready&&ImageExporter::ffmpegAvailable());
+#endif
+    m_mp4->setToolTip(QStringLiteral("발표 자료에 삽입할 수 있는 H.264 MP4 영상입니다. 배경색을 포함합니다."));
 }
 void MechanismAnimationDialog::populate() {
     const QSignalBlocker block(m_table),stageBlock(m_playerStages);
@@ -457,6 +632,25 @@ void MechanismAnimationDialog::addFiles(const QStringList &paths) {
     connect(worker,&QThread::finished,this,[this,results]{m_loading=false;m_steps+=results->steps;populate();rebuild();if(!results->errors.isEmpty())m_status->setText(QStringLiteral("읽지 못한 파일:\n")+results->errors.join('\n'));updateControls();});
     worker->start();
 }
+void MechanismAnimationDialog::addFilesByName(const QString &folder, const QString &names) {
+    static const QRegularExpression separator(QStringLiteral("[\\r\\n\\t]+"));
+    const QDir directory(folder);
+    QStringList paths;
+    for (const QString &cell : names.split(separator, Qt::SkipEmptyParts)) {
+        QString name=cell.trimmed();
+        if (name.size()>=2 && name.startsWith(u'"') && name.endsWith(u'"'))
+            name=name.mid(1,name.size()-2).replace(QStringLiteral("\"\""),QStringLiteral("\""));
+        if (name.isEmpty()) continue;
+        if (name.contains(u'/') || name.contains(u'\\') || name.contains(u':') ||
+            name==QStringLiteral(".") || name==QStringLiteral("..")) {
+            QMessageBox::warning(this,QStringLiteral("파일명 확인"),
+                                 QStringLiteral("경로를 제외한 파일명만 입력하세요.\n%1").arg(name));
+            return;
+        }
+        paths.append(directory.filePath(name));
+    }
+    addFiles(paths);
+}
 void MechanismAnimationDialog::fitTimeline() {
     const auto envelope=m_timeline.envelope();
     m_fittedCenter={};
@@ -478,6 +672,7 @@ void MechanismAnimationDialog::seek(double time) {
     }
     {const QSignalBlocker block(m_exactTime);m_exactTime->setValue(m_time);}
     m_coordinate->setTime(m_time);
+    static_cast<ShotArtwork*>(m_shotArtwork)->setTime(m_time);
     {const QSignalBlocker block(m_slider);m_slider->setValue(qRound(10000*m_time/m_timeline.duration()));}
     {const QSignalBlocker block(m_playerSlider);m_playerSlider->setValue(m_slider->value());}
     m_caption->setText(QStringLiteral("%1   ·   %2 / %3 s").arg(m_timeline.caption(mapped)).arg(m_time,0,'f',2).arg(m_timeline.duration(),0,'f',2));
@@ -731,12 +926,12 @@ void MechanismAnimationDialog::editPhotoSelection(MoleculeView *view) {
 void MechanismAnimationDialog::editShot() {
     if(!m_valid||m_exporting)return;
     play(false);
-    QDialog dialog(m_player);dialog.setWindowTitle(QStringLiteral("카메라와 광고용 클로즈업"));
+    QDialog dialog(m_player);dialog.setWindowTitle(QStringLiteral("카메라·구도"));
     auto *form=new QFormLayout(&dialog);
-    auto *layout=new QComboBox;layout->addItems({QStringLiteral("위아래"),QStringLiteral("나란히"),QStringLiteral("3D 구조만")});
+    auto *layout=new QComboBox;layout->addItems({QStringLiteral("위아래"),QStringLiteral("나란히"),QStringLiteral("3D 구조만"),QStringLiteral("발표용 · 중앙 3D / 우상단 2D / 하단 그래프")});
     layout->setCurrentIndex(m_shotArrangement);form->addRow(QStringLiteral("화면 배치"),layout);
     auto *aspect=new QComboBox;aspect->addItems({"16:9","1:1","9:16"});aspect->setCurrentIndex(m_shotAspect);
-    form->addRow(QStringLiteral("저장 화면 비율"),aspect);
+    form->addRow(QStringLiteral("재생·저장 화면 비율"),aspect);
     auto *camera=new QComboBox;
     camera->addItems({QStringLiteral("편집 창 카메라"),QStringLiteral("저장한 카메라"),QStringLiteral("현재 재생 창 카메라 저장")});
     camera->setCurrentIndex(m_savedCameraEnabled?1:0);
@@ -768,14 +963,12 @@ void MechanismAnimationDialog::editShot() {
 }
 
 void MechanismAnimationDialog::applyShotLayout() {
-    static_cast<ShotViewport*>(m_shotViewport)->setAspect(m_shotAspect==2?9./16:m_shotAspect==1?1.:0.);
-    m_shotLayout->setDirection(m_shotArrangement==1?QBoxLayout::LeftToRight:QBoxLayout::TopToBottom);
-    m_coordinate->setVisible(m_coordinate->active()&&m_shotArrangement!=2);
+    m_coordinate->setSeparateArtwork(m_shotArrangement==presentationArrangement);
+    static_cast<ShotViewport*>(m_shotViewport)->setAspect(shotAspect(m_shotAspect));
     const auto ratio=m_shotAspect==2?QStringLiteral("9:16"):m_shotAspect==1?QStringLiteral("1:1"):QStringLiteral("16:9");
     for(int i=0;i<m_resolution->count();++i) {
         const int width=m_resolution->itemData(i).toInt();
-        const int height=m_shotAspect==2?width*16/9:m_shotAspect==1?width:width*9/16;
-        m_resolution->setItemText(i,QStringLiteral("%1 × %2 · %3").arg(width).arg((height+1)/2*2).arg(ratio));
+        m_resolution->setItemText(i,QStringLiteral("%1 × %2 · %3").arg(width).arg(outputSize(width,m_shotAspect).height()).arg(ratio));
     }
 }
 
@@ -833,6 +1026,9 @@ bool MechanismAnimationDialog::saveProject(const QString &path) {
     if(!m_valid||m_loading||m_exporting)return false;
     auto root=QJsonDocument::fromJson(MechanismTimeline::saveProject(m_steps,m_options)).object();
     root["reactionCoordinate"]=m_coordinate->settings();
+    root["videoFontFamily"]=m_videoFont.family();
+    root["videoTextColor"]=m_videoTextColor.name();
+    root["transparentGif"]=m_transparentGif;
     QJsonArray stops;for(double time:m_presentationStops)stops.append(time);root["presentationStops"]=stops;
     const auto c=m_view->cameraState();QJsonArray keep;for(int id:m_focus)keep.append(id);
     QJsonArray parked;for(int id:m_parked)parked.append(id);root["parked"]=parked;root["parkStart"]=m_parkStart;
@@ -857,8 +1053,13 @@ bool MechanismAnimationDialog::openProject(const QString &path) {
     if(!file.open(QIODevice::ReadOnly)||file.size()>128*1024*1024){m_status->setText(QStringLiteral("프로젝트 파일을 읽을 수 없습니다."));return false;}
     const auto bytes=file.readAll();if(!MechanismTimeline::loadProject(bytes,steps,options,&error)){m_status->setText(error);return false;}
     {const QSignalBlocker a(m_align),b(m_preserve),c(m_keep),d(m_lift);m_align->setChecked(options.align);m_preserve->setChecked(options.preserveBonds);m_keep->setChecked(options.keepDeparted);m_lift->setValue(options.lift);}
+    m_options=options;
     if(!setSteps(steps))return false;
     const auto root=QJsonDocument::fromJson(bytes).object();m_focusMode=root["focusMode"].toInt(-1);if(m_focusMode < -1||m_focusMode>2)m_focusMode=-1;
+    m_videoFont.setFamily(root["videoFontFamily"].toString(QStringLiteral("Arial")));
+    const QColor textColor(root["videoTextColor"].toString());
+    m_videoTextColor=textColor.isValid()?textColor:QColor(35,45,55);
+    m_transparentGif=root["transparentGif"].toBool(true);
     for(const auto &value:root["presentationStops"].toArray()) {
         const double time=value.toDouble(-1);
         if(time>0&&std::isfinite(time))m_presentationStops.push_back(time);
@@ -869,6 +1070,7 @@ bool MechanismAnimationDialog::openProject(const QString &path) {
     m_parked.clear();for(const auto &v:root["parked"].toArray())if(v.isDouble()&&v.toInt()>=0&&v.toInt()<m_timeline.trackCount())m_parked.insert(v.toInt());
     m_parkStart=root["parkStart"].toDouble();m_timeline.park(m_parked,m_parkStart);
     m_labels->setChecked(root["labels"].toBool());m_captions->setChecked(root["captions"].toBool(true));m_hideHydrogen->setChecked(root["hideHydrogen"].toBool());
+    applyTextStyle();
     if(!m_hideHydrogen->isChecked()) {
         const auto atoms=m_timeline.sample(0).atoms;
         for(const auto &v:root["keptHydrogens"].toArray()) {
@@ -881,7 +1083,7 @@ bool MechanismAnimationDialog::openProject(const QString &path) {
     const auto center=root["cameraCenter"].toArray();
     if(center.size()==3){const QVector3D oldCenter(float(center[0].toDouble()),float(center[1].toDouble()),float(center[2].toDouble()));if(std::isfinite(oldCenter.x())&&std::isfinite(oldCenter.y())&&std::isfinite(oldCenter.z())){auto c=m_view->cameraState();c.centerOffset+=oldCenter-m_fittedCenter;m_view->setCameraState(c);}}
     const auto shot=root["shot"].toObject();
-    m_shotArrangement=qBound(0,shot["arrangement"].toInt(),2);
+    m_shotArrangement=qBound(0,shot["arrangement"].toInt(),presentationArrangement);
     m_shotAspect=qBound(0,shot["aspect"].toInt(),2);
     m_shotZoom=float(qBound(1.,shot["zoom"].toDouble(2),8.));
     for(const auto &value:shot["atoms"].toArray()) {
@@ -942,35 +1144,33 @@ void MechanismAnimationDialog::editPresentationStops(QWidget *anchor) {
 
 QImage MechanismAnimationDialog::renderOutputFrame(double time,QSize size,bool transparent,const CameraState &baseCamera,bool forceGraph) {
     const bool combined=forceGraph||(m_coordinate->active()&&m_shotArrangement!=2);
-    const bool sideBySide=combined&&m_shotArrangement==1;
+    const auto regions=shotRegions(size,m_shotArrangement,combined,m_coordinate->hasImages(),forceGraph);
     const int width=size.width(),height=size.height();
-    const int structureHeight=combined&&!sideBySide?(forceGraph?height/2:height*5/9):height;
-    const int structureWidth=sideBySide?width*5/9:width;
     const auto molecule=playbackFrame(time);
     m_view->setAnimationMolecule(molecule);
     auto camera=shotCamera(molecule,baseCamera);
     if(!m_shotAtoms.isEmpty()&&!camera.perspective&&m_view->height()>0) {
         const float screenAspect=float(m_view->width())/m_view->height();
-        const float outputAspect=float(structureWidth)/structureHeight;
+        const float outputAspect=float(regions.structure.width())/regions.structure.height();
         camera.orthoScale/=qMax(1.f,screenAspect/outputAspect);
     }
     m_view->setCameraState(camera);
-    auto image=m_view->imageAtSize({structureWidth,structureHeight},transparent,true);
+    auto image=m_view->imageAtSize(regions.structure.size(),transparent,true);
     if(image.isNull())return {};
     if(combined) {
         QImage full(size,QImage::Format_ARGB32_Premultiplied);
-        full.fill(Qt::transparent);
+        full.fill(transparent?QColor(Qt::transparent):image.pixelColor(0,0));
         QPainter painter(&full);
-        painter.drawImage(0,0,image);
-        if(sideBySide)painter.drawImage(structureWidth,0,m_coordinate->imageAtTime({width-structureWidth,height},time,transparent,forceGraph));
-        else painter.drawImage(0,structureHeight,m_coordinate->imageAtTime({width,height-structureHeight},time,transparent,forceGraph));
+        painter.drawImage(regions.structure.topLeft(),image);
+        painter.drawImage(regions.graph.topLeft(),m_coordinate->imageAtTime(regions.graph.size(),time,transparent,forceGraph));
+        if(!regions.artwork.isEmpty())m_coordinate->drawArtwork(painter,regions.artwork,time,transparent);
         return full;
     }
     if(m_captions->isChecked()) {
-        QPainter painter(&image);QFont font=painter.font();font.setPixelSize(qMax(14,height/30));painter.setFont(font);
+        QPainter painter(&image);QFont font=m_videoFont;font.setPixelSize(qMax(14,height/30));painter.setFont(font);
         const QString text=m_timeline.caption(m_coordinate->mappedTime(time));const QRect box(12,height-qMax(60,height/9),width-24,qMax(48,height/10));
         if(!transparent)painter.fillRect(box,QColor(255,255,255,210));
-        painter.setPen(QColor(35,45,55));painter.drawText(box.adjusted(10,2,-10,-2),Qt::AlignCenter|Qt::TextWordWrap,text);
+        painter.setPen(m_videoTextColor);painter.drawText(box.adjusted(10,2,-10,-2),Qt::AlignCenter|Qt::TextWordWrap,text);
     }
     return image;
 }
@@ -1000,7 +1200,7 @@ bool MechanismAnimationDialog::exportPowerPoint(const QString &path,int width,in
         m_view->setCameraState(baseCamera);
         m_exporting=false;m_view->setEnabled(true);seek(originalTime);updateControls();
     });
-    const QSize size((width+1)/2*2,((width*9/16)+1)/2*2);
+    const QSize size=outputSize(width,m_shotAspect);
     QProgressDialog progress(QStringLiteral("PowerPoint 장면 렌더링…"),QStringLiteral("취소"),0,total,this);
     progress.setWindowModality(Qt::WindowModal);progress.setMinimumDuration(0);progress.setAutoClose(false);progress.setAutoReset(false);
     if(!renderOutputFrame(0,size,false,baseCamera,true).save(temp.filePath("start.png")))
@@ -1061,36 +1261,47 @@ bool MechanismAnimationDialog::exportAnimation(const QString &path,const QString
     if(format!="gif"&&format!="png"&&format!="mp4")return false;
     play(false);const double originalTime=m_time;m_exporting=true;updateControls();m_view->setEnabled(false);
     auto restore=qScopeGuard([&]{m_exporting=false;m_view->setEnabled(true);seek(originalTime);updateControls();});
-    const int height=(((m_shotAspect==2?width*16/9:m_shotAspect==1?width:width*9/16))+1)/2*2;
-    width=(width+1)/2*2;
+    const QSize size=outputSize(width,m_shotAspect);
     const auto baseCamera=m_view->cameraState();
     auto restoreCamera=qScopeGuard([&]{m_view->setCameraState(baseCamera);});
     const int intervals=qMax(1,qCeil(m_timeline.duration()*fps)),count=intervals+1;
     if(count>18000){m_status->setText(QStringLiteral("한 번에 18,000프레임까지 저장합니다. fps나 구간 시간을 줄이거나 영상을 나누어 저장하세요."));return false;}
-    if(format=="mp4"&&!ImageExporter::ffmpegAvailable()){m_status->setText(QStringLiteral("MP4 저장에는 ffmpeg가 필요합니다."));return false;}
+    const bool hasFfmpeg=format=="mp4"&&ImageExporter::ffmpegAvailable();
+#ifndef Q_OS_WIN
+    if(format=="mp4"&&!hasFfmpeg){m_status->setText(QStringLiteral("MP4 저장에는 ffmpeg가 필요합니다."));return false;}
+#endif
     QTemporaryDir temporary;if(!temporary.isValid()){m_status->setText(QStringLiteral("임시 폴더 생성 실패"));return false;}
     QString directory=temporary.path();
     if(format=="png"){directory=path+"/Youngcraft-Mechanism-"+QUuid::createUuid().toString(QUuid::WithoutBraces);if(!QDir().mkpath(directory)){m_status->setText(QStringLiteral("PNG 폴더 생성 실패"));return false;}}
     QProgressDialog progress(QStringLiteral("전체 메커니즘 렌더링…"),QStringLiteral("취소"),0,count,this);progress.setWindowModality(Qt::WindowModal);progress.setMinimumDuration(0);progress.setAutoClose(false);progress.setAutoReset(false);
-    const bool transparent=format!="mp4";
+    const bool transparent=format=="png" || (format=="gif" && m_transparentGif);
     auto renderFrame=[&](int frame)->QImage {
         progress.setValue(frame);QApplication::processEvents();
         if(progress.wasCanceled())return {};
-        return renderOutputFrame(m_timeline.duration()*frame/intervals,{width,height},transparent,baseCamera);
+        return renderOutputFrame(m_timeline.duration()*frame/intervals,size,transparent,baseCamera);
     };
     QString error;
+    const auto movie=temporary.filePath("mechanism.mp4");
     if(format=="gif") {
-        if(!ImageExporter::saveGifFrames(count,{width,height},path,renderFrame,qRound(1000./fps),transparent,m_loop->isChecked(),&error)){m_status->setText(error);return false;}
+        if(!ImageExporter::saveGifFrames(count,size,path,renderFrame,qRound(1000./fps),transparent,m_loop->isChecked(),&error,true)){m_status->setText(error);return false;}
+        QSettings().setValue(gifDirectoryKey,QFileInfo(path).absolutePath());
+    } else if(format=="mp4"&&!hasFfmpeg) {
+        if(!writePowerPointVideo(movie,size,fps,count,renderFrame,error)) {
+            m_status->setText(progress.wasCanceled()?QStringLiteral("MP4 저장을 취소했습니다."):error);
+            return false;
+        }
     } else {
         for(int frame=0;frame<count;++frame){const auto image=renderFrame(frame);if(image.isNull()){m_status->setText(progress.wasCanceled()?QStringLiteral("저장 취소 · PNG 시퀀스의 완료된 프레임은 보존됩니다."):QStringLiteral("프레임 렌더링 실패"));return false;}if(!image.save(directory+QStringLiteral("/frame_%1.png").arg(frame,6,10,QChar('0')))){m_status->setText(QStringLiteral("프레임 파일 저장 실패"));return false;}}
     }
     progress.setLabelText(QStringLiteral("영상 인코딩 중…"));progress.setValue(count);
-    if(format=="mp4") {
-        const auto movie=temporary.path()+"/mechanism.mp4";QProcess encoder;
+    if(format=="mp4"&&hasFfmpeg) {
+        QProcess encoder;
         encoder.start("ffmpeg",{"-y","-framerate",QString::number(fps),"-i",directory+"/frame_%06d.png","-c:v","libx264","-pix_fmt","yuv420p","-crf","20","-movflags","+faststart",movie});
         QEventLoop loop;QTimer poll;poll.setInterval(50);connect(&poll,&QTimer::timeout,&loop,[&]{if(progress.wasCanceled())encoder.kill();if(encoder.state()==QProcess::NotRunning)loop.quit();});
         connect(&encoder,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),&loop,&QEventLoop::quit);poll.start();loop.exec();
-        if(progress.wasCanceled()||encoder.exitStatus()!=QProcess::NormalExit||encoder.exitCode()!=0){m_status->setText(QStringLiteral("MP4 저장 실패/취소: ")+QString::fromLocal8Bit(encoder.readAllStandardError()).right(1200));return false;}
+        if(progress.wasCanceled()||encoder.error()==QProcess::FailedToStart||encoder.exitStatus()!=QProcess::NormalExit||encoder.exitCode()!=0){m_status->setText(QStringLiteral("MP4 저장 실패/취소: ")+QString::fromLocal8Bit(encoder.readAllStandardError()).right(1200));return false;}
+    }
+    if(format=="mp4") {
         QFile input(movie);QSaveFile output(path);if(!input.open(QIODevice::ReadOnly)||!output.open(QIODevice::WriteOnly)){m_status->setText(QStringLiteral("MP4 파일 저장 실패"));return false;}
         while(!input.atEnd()){const auto data=input.read(1024*1024);if(data.isEmpty()||output.write(data)!=data.size()){m_status->setText(QStringLiteral("MP4 파일 쓰기 실패"));return false;}}
         if(!output.commit()){m_status->setText(output.errorString());return false;}

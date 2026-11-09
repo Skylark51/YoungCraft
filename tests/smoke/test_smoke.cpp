@@ -47,6 +47,7 @@
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
 #include <QSettings>
 #include <QComboBox>
 #include <QMenuBar>
@@ -3618,10 +3619,63 @@ void SmokeTest::reactionCoordinatePresentationWorkflow() {
     if(dialog->m_view->isValid())QVERIFY(dialog->exportAnimation(dir.filePath("energies-only.gif"),"gif",480,3));
     auto partial=imagesOnly;partial[1].presentation.remove("image");partial[2].presentation.remove("image");
     QVERIFY(dialog->setSteps(partial));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());
+    QCOMPARE(dialog->m_coordinate->artworkAt(1,dialog->m_coordinate->position(1)).to,1);
     for(auto &step:partial)step.presentation.remove("image");partial[1].presentation["energy"]=35;
     QVERIFY(dialog->setSteps(partial));QVERIFY(dialog->m_coordinateMode->isEnabled());QVERIFY(dialog->m_coordinate->active());QVERIFY(!dialog->m_coordinate->position(.5).collision);
     for(auto &step:partial)step.presentation.remove("energy");
     QVERIFY(dialog->setSteps(partial));QVERIFY(!dialog->m_coordinateMode->isEnabled());QVERIFY(!dialog->m_coordinate->active());
+    auto bridge=QVector<MechanismStep>{a,b,c};
+    bridge[1].name="Barrier B";
+    bridge[1].presentation.remove("image");
+    bridge[1].presentation.remove("impactBarrier");
+    bridge[1].presentation["transitionState"]=true;
+    bridge[1].presentation["hold"]=1.;
+    auto colorImage=[](QColor color){
+        QImage image(160,100,QImage::Format_ARGB32);image.fill(color);
+        QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);image.save(&buffer,"PNG");
+        return QString::fromLatin1(bytes.toBase64());
+    };
+    bridge[0].presentation["image"]=colorImage(Qt::red);
+    bridge[2].presentation["image"]=colorImage(Qt::blue);
+    QVERIFY(dialog->setSteps(bridge));
+    for(double time:{.99,1.,1.5,2.,2.01}) {
+        const auto state=dialog->m_coordinate->artworkAt(time,dialog->m_coordinate->position(time));
+        QCOMPARE(state.from,0);QCOMPARE(state.to,2);QCOMPARE(state.ts,1);
+        QVERIFY(qAbs(state.fraction-time/3)<1e-8);
+        if(time<=2)QCOMPARE(state.annotationFraction,-1.);
+        else QVERIFY(state.annotationFraction>0);
+    }
+    QImage blend(300,210,QImage::Format_ARGB32_Premultiplied);blend.fill(Qt::transparent);
+    {QPainter painter(&blend);dialog->m_coordinate->drawArtwork(painter,blend.rect(),1.5,true);}
+    const auto color=blend.pixelColor(150,85);
+    QVERIFY(color.alpha()>=250&&color.red()>115&&color.blue()>115);
+    bool labelVisible=false;
+    for(int y=174;y<blend.height();++y)
+        for(int x=0;x<blend.width();++x)
+            labelVisible|=qAlpha(blend.pixel(x,y))>0;
+    QVERIFY(labelVisible);
+    QVERIFY(dialog->saveProject(dir.filePath("bridge.ycmechanism")));
+    QVERIFY(dialog->openProject(dir.filePath("bridge.ycmechanism")));
+    QVERIFY(dialog->m_steps[1].presentation["transitionState"].toBool());
+    dialog->m_coordinate->setEnabledPresentation(true);
+    QTest::qWait(50);
+    QCOMPARE(dialog->m_shotAspect,1);
+    QCOMPARE(dialog->m_shotArrangement,3);
+    const auto artworkRegion=dialog->m_shotArtwork->geometry();
+    QVERIFY(dialog->m_shotArtwork->isVisible());
+    QVERIFY(artworkRegion.left()>dialog->m_playerView->geometry().right());
+    QVERIFY(dialog->m_coordinate->geometry().top()>artworkRegion.bottom());
+    if(dialog->m_view->isValid()) {
+        const auto frame=dialog->renderOutputFrame(1.5,{640,640},false,dialog->m_view->cameraState());
+        QCOMPARE(frame.size(),QSize(640,640));
+        const auto overlay=frame.pixelColor(560,140);
+        QVERIFY(overlay.red()>100&&overlay.blue()>100&&overlay.green()<20);
+#ifdef Q_OS_WIN
+        const auto movie=dir.filePath("square.mp4");
+        QVERIFY2(dialog->exportAnimation(movie,"mp4",320,10),qPrintable(dialog->m_status->text()));
+        QFile file(movie);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.read(12).mid(4,4),QByteArray("ftyp"));
+#endif
+    }
     if(const auto path=qEnvironmentVariable("YOUNGCRAFT_COORDINATE_PREVIEW");!path.isEmpty()){QVERIFY(pictureOnly.save(path+".pictures-only.png"));QVERIFY(energyOnly.save(path+".energies-only.png"));}
     QVERIFY(dialog->setSteps({a,b,c}));dialog->m_coordinate->setEnabledPresentation(true);
     // Exercise the actual two-click annotation editor and transactional cancel.
@@ -3663,9 +3717,30 @@ void SmokeTest::hydrogenRemovalActions() {
 }
 
 void SmokeTest::wholeMechanismAnimationWorkflow() {
+    const auto org=QCoreApplication::organizationName(),app=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");
+    QCoreApplication::setApplicationName("MechanismAnimationWorkflow");
+    QSettings().clear();
+    auto restoreSettings=qScopeGuard([&] {
+        QSettings().clear();
+        QCoreApplication::setOrganizationName(org);
+        QCoreApplication::setApplicationName(app);
+    });
     MainWindow window;window.resize(1450,900);window.show();
     auto *action=window.findChild<QAction *>("OpenMechanismAnimation");QVERIFY(action);action->trigger();
     auto *dialog=window.findChild<MechanismAnimationDialog *>("MechanismAnimationDialog");QVERIFY(dialog);
+    QTemporaryDir inputs;
+    QVERIFY(inputs.isValid());
+    for (const auto &name : {"03 product.xyz","01 reactant.xyz","02 TS.xyz"}) {
+        QFile file(inputs.filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write("2\nCO\nC 0 0 0\nO 1.4 0 0\n")>0);
+    }
+    dialog->addFilesByName(inputs.path(),QStringLiteral("\"03 product.xyz\"\t01 reactant.xyz\r\n\r\n02 TS.xyz"));
+    QTRY_COMPARE(dialog->m_steps.size(),3);
+    QCOMPARE(dialog->m_steps[0].name,QStringLiteral("03 product"));
+    QCOMPARE(dialog->m_steps[1].name,QStringLiteral("01 reactant"));
+    QCOMPARE(dialog->m_steps[2].name,QStringLiteral("02 TS"));
     Molecule molecule;molecule.atoms={{1,6,"C",{}},{2,8,"O",{1.4f,0,0}},{3,7,"N",{0,1.4f,0}}};molecule.setBond(0,1,1);molecule.setBond(0,2,1);
     MechanismStep a;a.name="Reactant";a.molecule=molecule;a.seconds=.2;
     auto b=a;b.name="Intermediate";b.molecule.atoms[1].position={1.8f,0,.4f};
@@ -3718,11 +3793,48 @@ void SmokeTest::wholeMechanismAnimationWorkflow() {
     QCOMPARE(dialog->m_view->cameraState().rotation,camera.rotation);QCOMPARE(dialog->m_view->cameraState().centerOffset,camera.centerOffset);
     dialog->seek(0);dialog->play(true);QTest::qWait(120);QVERIFY(dialog->m_time>0);dialog->play(false);
     dialog->m_view->selection().atoms={0};dialog->emphasize(1);dialog->seek(.2);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
+    dialog->m_options.dimmedOpacity=.4f;
+    dialog->m_options.parkedOpacity=.65f;
+    dialog->m_videoFont.setFamily(QStringLiteral("Consolas"));
+    dialog->m_videoTextColor=Qt::red;
     QTemporaryDir dir;QVERIFY(dialog->saveProject(dir.filePath("mechanism.ycmechanism")));
-    QVERIFY(dialog->openProject(dir.filePath("mechanism.ycmechanism")));QCOMPARE(dialog->m_focusMode,1);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
+    dialog->m_videoFont.setFamily(QStringLiteral("Arial"));
+    dialog->m_videoTextColor=Qt::black;
+    QVERIFY(dialog->openProject(dir.filePath("mechanism.ycmechanism")));
+    QCOMPARE(dialog->m_focusMode,1);
+    QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.4f);
+    QCOMPARE(dialog->m_options.parkedOpacity,.65f);
+    QCOMPARE(dialog->m_playerCaption->font().family(),QStringLiteral("Consolas"));
+    QCOMPARE(dialog->m_playerCaption->palette().color(QPalette::WindowText),QColor(Qt::red));
     if(dialog->m_view->isValid()) {
         const auto gif=dir.filePath("mechanism.gif");QVERIFY2(dialog->exportAnimation(gif,"gif",320,10),qPrintable(dialog->m_status->text()));
+        QCOMPARE(QSettings().value("mechanism/lastGifDirectory").toString(),dir.path());
+        QVERIFY(!dialog->exportAnimation(dir.filePath("missing/fail.gif"),"gif",320,10));
+        QCOMPARE(QSettings().value("mechanism/lastGifDirectory").toString(),dir.path());
+        const bool nativeDialogsDisabled=QCoreApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+        QString reopenedDirectory;
+        QTimer::singleShot(0,dialog,[&] {
+            if (auto *chooser=dialog->findChild<QFileDialog *>()) {
+                reopenedDirectory=chooser->directory().absolutePath();
+                chooser->reject();
+            }
+        });
+        dialog->m_gif->click();
+        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs,nativeDialogsDisabled);
+        QCOMPARE(reopenedDirectory,dir.path());
         QImageReader reader(gif);QVERIFY(reader.canRead());QCOMPARE(reader.imageCount(),5);const auto firstImage=reader.read();reader.jumpToImage(4);const auto lastImage=reader.read();QVERIFY(!firstImage.isNull());QVERIFY(!lastImage.isNull());QVERIFY(firstImage!=lastImage);
+        QCOMPARE(firstImage.pixelColor(0,0).alpha(),0);
+        bool redCaption=false;
+        for (int y=firstImage.height()-50;y<firstImage.height();++y)
+            for (int x=0;x<firstImage.width();++x)
+                redCaption|=firstImage.pixelColor(x,y)==QColor(Qt::red);
+        QVERIFY(redCaption);
+        dialog->m_transparentGif=false;
+        const auto opaqueGif=dir.filePath("opaque.gif");
+        QVERIFY(dialog->exportAnimation(opaqueGif,"gif",320,10));
+        QCOMPARE(QImage(opaqueGif).pixelColor(0,0).alpha(),255);
+        dialog->m_transparentGif=true;
         QVERIFY(dialog->exportAnimation(dir.path(),"png",320,10));const auto directories=QDir(dir.path()).entryList({"Youngcraft-Mechanism-*"},QDir::Dirs);QCOMPARE(directories.size(),1);QCOMPARE(QDir(dir.filePath(directories.first())).entryList({"*.png"},QDir::Files).size(),5);
         QTemporaryDir portrait;
         dialog->m_shotAspect=2;dialog->m_shotArrangement=2;dialog->m_shotAtoms={0,1};
@@ -3797,7 +3909,6 @@ void SmokeTest::mechanismPowerPointWorkflow() {
     const auto projectPath=project.filePath("stops.ycmechanism");
     QVERIFY(dialog->saveProject(projectPath));QVERIFY(dialog->openProject(projectPath));
     QCOMPARE(dialog->presentationBoundaries(),QVector<double>({0,.5,1,2}));
-    dialog->m_shotArrangement=2;
     const int width=qEnvironmentVariableIntValue("YOUNGCRAFT_PPTX_TEST_WIDTH");
     QVERIFY2(dialog->exportPowerPoint(path,width>0?width:1920,15),qPrintable(dialog->m_status->text()));
     QVERIFY(QFileInfo(path).size()>0);
@@ -3816,7 +3927,7 @@ void SmokeTest::mechanismPowerPointWorkflow() {
     poster.start("tar",{"-xOf",bundle,"003-end.png"});
     QVERIFY(poster.waitForFinished(10000));
     QCOMPARE(poster.exitCode(),0);
-    QCOMPARE(QImage::fromData(poster.readAllStandardOutput(),"PNG").size(),QSize(1280,720));
+    QCOMPARE(QImage::fromData(poster.readAllStandardOutput(),"PNG").size(),QSize(1280,1280));
 }
 
 void SmokeTest::suppliedMechanismPreview() {

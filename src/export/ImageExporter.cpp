@@ -99,7 +99,16 @@ QByteArray gifLzw(const QVector<quint8> &pixels) {
     return bytes;
 }
 
-QVector<quint8> quantizeGifFrame(const QImage &source, const QSize &size, bool transparent) {
+QVector<quint8> quantizeGifFrame(const QImage &source, const QSize &size, bool transparent,
+                                bool ditherTransparency) {
+    // GIF stores one transparent index. Distribute coverage across neighboring pixels.
+    static constexpr int bayer[8][8] = {
+        { 0,48,12,60, 3,51,15,63}, {32,16,44,28,35,19,47,31},
+        { 8,56, 4,52,11,59, 7,55}, {40,24,36,20,43,27,39,23},
+        { 2,50,14,62, 1,49,13,61}, {34,18,46,30,33,17,45,29},
+        {10,58, 6,54, 9,57, 5,53}, {42,26,38,22,41,25,37,21}
+    };
+    const bool dither = transparent && ditherTransparency;
     const QImage image = source.size() == size
                              ? source.convertToFormat(QImage::Format_ARGB32)
                              : source.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
@@ -111,13 +120,14 @@ QVector<quint8> quantizeGifFrame(const QImage &source, const QSize &size, bool t
         for (int x = 0; x < image.width(); ++x) {
             const QRgb pixel = line[x];
             const int alpha = qAlpha(pixel);
-            if (transparent && alpha < 128) {
+            const int threshold = dither ? bayer[y % 8][x % 8] * 4 + 2 : 128;
+            if (transparent && alpha < threshold) {
                 pixels[y * image.width() + x] = 255;
                 continue;
             }
-            const int red = (qRed(pixel) * alpha + 255 * (255 - alpha)) / 255;
-            const int green = (qGreen(pixel) * alpha + 255 * (255 - alpha)) / 255;
-            const int blue = (qBlue(pixel) * alpha + 255 * (255 - alpha)) / 255;
+            const int red = dither ? qRed(pixel) : (qRed(pixel) * alpha + 255 * (255 - alpha)) / 255;
+            const int green = dither ? qGreen(pixel) : (qGreen(pixel) * alpha + 255 * (255 - alpha)) / 255;
+            const int blue = dither ? qBlue(pixel) : (qBlue(pixel) * alpha + 255 * (255 - alpha)) / 255;
             const int r = (red * 5 + 127) / 255;
             const int g = (green * 5 + 127) / 255;
             const int b = (blue * 5 + 127) / 255;
@@ -266,7 +276,7 @@ bool ImageExporter::saveGif(const QVector<QImage> &frames, const QString &path, 
 
 bool ImageExporter::saveGifFrames(int count, const QSize &size, const QString &path,
                                   const std::function<QImage(int)> &frameAt, int delayMs,
-                                  bool transparent, bool loop, QString *error) {
+                                  bool transparent, bool loop, QString *error, bool ditherTransparency) {
     if (count<=0) {
         if (error) *error = QStringLiteral("내보낼 애니메이션 프레임이 없습니다.");
         return false;
@@ -334,7 +344,7 @@ bool ImageExporter::saveGifFrames(int count, const QSize &size, const QString &p
             if (error) *error = file.errorString();
             return false;
         }
-        const QVector<quint8> pixels = quantizeGifFrame(frame, size, transparent);
+        const QVector<quint8> pixels = quantizeGifFrame(frame, size, transparent, ditherTransparency);
         const QByteArray compressed = gifLzw(pixels);
         if (!file.putChar(char(8))) { // minimum LZW code size
             if (error) *error = file.errorString();

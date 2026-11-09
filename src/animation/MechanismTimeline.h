@@ -23,6 +23,9 @@ struct MechanismOptions {
     bool preserveBonds = true;
     bool keepDeparted = true;
     float lift = 6.0f;
+    float departedOpacity = 0.18f;
+    float parkedOpacity = 0.35f;
+    float dimmedOpacity = 0.20f;
 };
 
 // Presentation interpolation of supplied structures, never a molecular dynamics calculation.
@@ -45,11 +48,12 @@ public:
     static QByteArray saveProject(const QVector<MechanismStep> &steps, const MechanismOptions &options);
     static bool loadProject(const QByteArray &json, QVector<MechanismStep> &steps, MechanismOptions &options, QString *error = nullptr);
 private:
+    enum class Presence : quint8 { Absent, Present, Departed };
     struct Node {
         double time = 0;
         int step = 0;
         QVector<QVector3D> positions;
-        QVector<float> presence;
+        QVector<Presence> presence;
         QVector<Bond> bonds;
     };
     QMap<quint64,QVector<int>> cleavageNodes(int stage) const;
