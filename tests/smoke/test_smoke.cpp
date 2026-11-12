@@ -324,9 +324,7 @@ void SmokeTest::scanDisplayDefaults() {
     QVERIFY(window.m_view->style().showHydrogen);
     QVERIFY(!window.m_view->molecule().atoms[1].visible);
     QVERIFY(window.m_view->molecule().atoms[3].visible);
-    QAction *reset = nullptr;
-    for (auto *action : window.findChildren<QAction *>())
-        if (action->text() == QStringLiteral("수소 숨기기 초기화")) reset = action;
+    QAction *reset = window.findChild<QAction *>(QStringLiteral("RestoreCarbonHydrogens"));
     QVERIFY(reset);
     reset->trigger();
     QVERIFY(window.m_view->molecule().atoms[1].visible);
@@ -1147,6 +1145,7 @@ void SmokeTest::nativeTabDragBetweenWindows_data() {
 void SmokeTest::nativeTabDragBetweenWindows() {
 #ifdef Q_OS_WIN
     if (QGuiApplication::platformName() != "windows") QSKIP("Requires the Windows drag backend");
+    if (!qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) QSKIP("Native drag needs unmodified Windows desktop scaling");
     QFETCH(bool, ontoTabBar);
     QFETCH(bool, reorderFirst);
     MainWindow source, target;
