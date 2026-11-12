@@ -1,3 +1,4 @@
+#include <QScreen>
 #include "compute/GaussianConnection.h"
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
@@ -105,6 +106,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void orbitalCacheAndDetachedWindow();
     void reactionCoordinatePresentationWorkflow();
     void hydrogenRemovalActions();
     void wholeMechanismAnimationWorkflow();
@@ -3667,6 +3669,33 @@ void SmokeTest::pastedXYZWorkflow() {
     if(!capture.isEmpty()){auto *tabs=window.m_analysis->findChild<QTabWidget *>();tabs->setCurrentIndex(tabs->count()-1);QTest::qWait(200);QVERIFY(window.grab().save(capture+".xyz.png"));}
 }
 #include "reaction_capture_workflow.inc"
+void SmokeTest::orbitalCacheAndDetachedWindow() {
+    MainWindow owner; owner.resize(1200,800); owner.show();
+    auto *open=owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow"); QVERIFY(open);
+    auto *dialog=owner.m_analysis->findChild<QDialog*>("OrbitalManagerWindow"); QVERIFY(dialog); QVERIFY(!dialog->isVisible());
+    open->click(); QVERIFY(dialog->isVisible()); QVERIFY(!dialog->isModal());
+    QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    dialog->close(); QVERIFY(!dialog->isVisible()); open->click(); QVERIFY(dialog->isVisible());
+    MoleculeView view;
+    auto grid=std::make_shared<CubeGrid>(); grid->valid=true;grid->nx=grid->ny=grid->nz=2;
+    grid->axisX={1,0,0};grid->axisY={0,1,0};grid->axisZ={0,0,1};grid->values={-1,1,-1,1,-1,1,-1,1};
+    view.setCubeGrid(grid,.02f);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000); QVERIFY(view.m_positiveSurface);
+    const auto positive=view.m_positiveSurface,negative=view.m_negativeSurface;
+    auto other=std::make_shared<CubeGrid>(*grid); view.setCubeGrid(other,.02f);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    view.setCubeGrid(grid,.02f); QVERIFY(!view.m_surfaceBuilding);
+    QCOMPARE(view.m_positiveSurface,positive); QCOMPARE(view.m_negativeSurface,negative);
+    auto style=view.style();style.isoValue=.04f;view.setStyle(style);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    style.isoValue=.02f;view.setStyle(style);QVERIFY(!view.m_surfaceBuilding);QCOMPARE(view.m_positiveSurface,positive);
+    // Coalesce a burst; the final visible mesh must belong to the final grid/isovalue.
+    for(int i=0;i<30;++i){style.isoValue=.03f+i*.001f;view.setStyle(style);}
+    view.setCubeGrid(grid,.02f); QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    QCOMPARE(view.m_positiveSurface,positive);
+    view.clearCubeGrid();QVERIFY(!view.m_positiveSurface);
+}
+
 void SmokeTest::automaticRemoteConnectionAndHomo() {
     const auto source=qEnvironmentVariable("YOUNGCRAFT_AUTOMATIC_CHK");if(source.isEmpty())QSKIP("Automatic real-server test not requested");
     const auto org=QCoreApplication::organizationName(), app=QCoreApplication::applicationName();
@@ -3792,6 +3821,7 @@ void SmokeTest::orbitalResponsiveSidebar(){
     owner.m_data.orbitals={{1,-13.6,2,{},"Alpha"},{2,1.2,0,{},"Alpha"},{1,-12.1,1,{},"Beta"},{2,2.3,0,{},"Beta"}};
     owner.m_analysis->setData(owner.m_data);owner.m_analysis->setCurrentTab(6);
     auto *panel=owner.m_analysis->findChild<OrbitalStudyWidget*>();QVERIFY(panel);
+    owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow")->click();
     auto *scroll=owner.m_currentSidebar->findChild<QScrollArea*>("SidebarAnalysisScroll");QVERIFY(scroll);
     const QString capture=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_RESPONSIVE_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
     for(int theme=0;theme<6;++theme){
@@ -3799,7 +3829,7 @@ void SmokeTest::orbitalResponsiveSidebar(){
         for(int width:{230,280,360,230}){
             owner.resizeDocks({owner.m_explorerDock},{width},Qt::Horizontal);QTest::qWait(60);
             QCOMPARE(scroll->horizontalScrollBar()->maximum(),0);
-            QVERIFY(panel->width()<=scroll->viewport()->width());
+            QVERIFY(panel->width()<=panel->parentWidget()->width());
             for(auto *button:panel->findChildren<QPushButton*>()){
                 if(!button->property("orbitalResponsiveButton").toBool())continue;
                 QCOMPARE(button->height(),32);QVERIFY(!button->icon().isNull());QVERIFY(!button->toolTip().isEmpty());QVERIFY(!button->accessibleName().isEmpty());

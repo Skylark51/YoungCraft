@@ -50,6 +50,7 @@ private:
     QColor m_plusColor{60,110,235}, m_minusColor{220,65,65}, m_lowColor{220,35,35}, m_highColor{40,65,220};
     std::shared_ptr<const CubeGrid> m_surface, m_potential;
     bool m_mep = false;
+    int m_requestedRow = -1;
     double m_moIsovalue = 0.02, m_mepIsovalue = 0.001;
 };
 }

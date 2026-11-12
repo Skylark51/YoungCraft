@@ -63,10 +63,33 @@ private slots:
         connect(&runner,&GaussianTools::ready,this,[&](auto s,auto p){++received;surface=s;potential=p;});
         runner.generate(source,"MEP",40,"SCF");QTRY_COMPARE_WITH_TIMEOUT(received,1,15000);QCOMPARE(failed.size(),0);QVERIFY(surface&&potential);QVERIFY(!runner.busy());
         runner.generate(converted,"AMO=1",40,"SCF");QTRY_COMPARE_WITH_TIMEOUT(received,2,15000);QVERIFY(surface&&!potential);
-        qputenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE","fail");runner.generate(source,"MEP",40,"SCF");QTRY_COMPARE_WITH_TIMEOUT(failed.size(),1,15000);QVERIFY(!runner.busy());
-        qputenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE","hang");runner.generate(source,"MEP",40,"SCF");QTest::qWait(100);runner.cancel();QCOMPARE(failed.size(),2);QVERIFY(!runner.busy());
+        qputenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE","fail");runner.generate(source,"AMO=2",40,"SCF");QTRY_COMPARE_WITH_TIMEOUT(failed.size(),1,15000);QVERIFY(!runner.busy());
+        qputenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE","hang");runner.generate(source,"AMO=3",40,"SCF");QTest::qWait(100);runner.cancel();QTRY_COMPARE_WITH_TIMEOUT(failed.size(),2,10000);QVERIFY(!runner.busy());
         qunsetenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE");
         QSettings().setValue("orbitals/cubegen",dir.filePath("missing.exe"));runner.generate(converted,"AMO=1",40,"SCF");QTRY_COMPARE(failed.size(),3);QVERIFY(!runner.busy());
+    }
+    void cachedOrbitalsSurviveRunnerAndSourceChanges() {
+        QTemporaryDir dir; const auto source=dir.filePath("cache.fchk");
+        // Distinct contents isolate the persistent cache between test runs.
+        QVERIFY(write(source, fchk()+"\n"+dir.path().toUtf8()+"\n"));
+        QSettings().setValue("orbitals/remoteEnabled",false);
+        QSettings().setValue("orbitals/cubegen",QCoreApplication::applicationFilePath());
+        auto cleanup=qScopeGuard([]{qunsetenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE");});
+        GaussianTools runner; int received=0; std::shared_ptr<const CubeGrid> first;
+        connect(&runner,&GaussianTools::ready,this,[&](auto grid,auto){++received;if(!first)first=grid;else QCOMPARE(grid,first);});
+        runner.generate(source,"AMO=1",40,"SCF"); QTRY_COMPARE_WITH_TIMEOUT(received,1,15000);
+        QVERIFY(QFileInfo::exists(first->filePath));
+        qputenv("YOUNGCRAFT_FAKE_GAUSSIAN_MODE","fail");
+        runner.generate(source,"AMO=1",40,"SCF"); QCOMPARE(received,2); QVERIFY(!runner.busy());
+        GaussianTools reopened; QSignalSpy failed(&reopened,&GaussianTools::failed); int disk=0;
+        connect(&reopened,&GaussianTools::ready,this,[&](auto grid,auto){QVERIFY(grid->valid);++disk;});
+        reopened.generate(source,"AMO=1",40,"SCF"); QTRY_COMPARE_WITH_TIMEOUT(disk,1,15000); QCOMPARE(failed.size(),0);
+        // Different resolution, spin and density cannot reuse the first result.
+        reopened.generate(source,"AMO=1",80,"SCF"); QTRY_COMPARE_WITH_TIMEOUT(failed.size(),1,15000);
+        reopened.generate(source,"BMO=1",40,"SCF"); QTRY_COMPARE_WITH_TIMEOUT(failed.size(),2,15000);
+        reopened.generate(source,"AMO=1",40,"MP2"); QTRY_COMPARE_WITH_TIMEOUT(failed.size(),3,15000);
+        QVERIFY(write(source,fchk()+"\nchanged source\n"));
+        reopened.generate(source,"AMO=1",40,"SCF"); QTRY_COMPARE_WITH_TIMEOUT(failed.size(),4,15000); QCOMPARE(disk,1);
     }
     void missingToolsFailBeforeCopy() {
         QTemporaryDir dir;
@@ -78,7 +101,7 @@ private slots:
         QVERIFY(error.contains("formchk"));
         GaussianTools runner; QSignalSpy failed(&runner,&GaussianTools::failed);
         runner.generate(dir.filePath("not-copied.fchk"),"AMO=1",40,"SCF");
-        QCOMPARE(failed.size(),1); QVERIFY(failed.first().first().toString().contains("cubegen"));
+        QTRY_COMPARE_WITH_TIMEOUT(failed.size(),1,10000); QVERIFY(failed.first().first().toString().contains("cubegen"));
         QVERIFY(!runner.busy());
         const auto real=qEnvironmentVariable("YOUNGCRAFT_TEST_CHK");
         if(!real.isEmpty()) {

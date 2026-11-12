@@ -4,7 +4,9 @@ param(
     [string]$BuildDir = '',
     [string]$DistDir = '',
     [string]$ZipPath = '',
-    [string]$Python = 'python'
+    [string]$Python = 'python',
+    [string]$ApplicationPath = '',
+    [switch]$ReuseMmRuntime
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,12 +32,14 @@ if (-not (Test-Path -LiteralPath $windeployqt)) { throw "windeployqt가 없습�
 
 & cmake --build $BuildDir --config Release --target Youngcraft
 if ($LASTEXITCODE -ne 0) { throw "Release 빌드 실패: $LASTEXITCODE" }
-$application = Join-Path $ProjectRoot 'Youngcraft.exe'
+$application = if ($ApplicationPath) { [IO.Path]::GetFullPath($ApplicationPath) } else { Join-Path $ProjectRoot 'Youngcraft.exe' }
 if (-not (Test-Path -LiteralPath $application)) { throw "실행 파일이 없습니다: $application" }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
-    -ProjectRoot $ProjectRoot -Python $Python
-if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
+if (-not $ReuseMmRuntime) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
+        -ProjectRoot $ProjectRoot -Python $Python
+    if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
+}
 $mmSource = Join-Path $ProjectRoot 'build-mm-runtime/YoungcraftMM'
 if (-not (Test-Path -LiteralPath (Join-Path $mmSource 'YoungcraftMM.exe'))) {
     throw "MM worker가 없습니다: $mmSource"

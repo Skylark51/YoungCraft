@@ -168,6 +168,8 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     m_tables=new QTabWidget; m_tables->setObjectName("OrbitalAnalysisTables");m_tables->setMinimumWidth(0);m_tables->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);m_tables->setUsesScrollButtons(true);m_tables->tabBar()->setExpanding(false);m_tables->setElideMode(Qt::ElideNone);m_tables->tabBar()->setStyleSheet("QTabBar::tab { padding:4px 5px; }");
     m_orbitals=table({"MO","Spin","Energy (eV)","Occupation","Frontier"});m_orbitals->setObjectName("OrbitalTable");
     const int widths[]={38,48,86,72,68};for(int col=0;col<5;++col)m_orbitals->setColumnWidth(col,widths[col]);
+    connect(m_orbitals,&QTableWidget::cellDoubleClicked,this,[this](int, int){generate(false);});
+    m_orbitals->setToolTip(QStringLiteral("MO를 선택한 뒤 생성 버튼을 누르거나 두 번 클릭하세요. 저장된 결과는 재계산 없이 표시합니다."));
     m_tables->addTab(m_orbitals,"FMO"); layout->addWidget(m_tables);
     auto *tableActions=new QWidget(this);tableActions->setObjectName("OrbitalTableActions");auto *frontier=new SidebarFlowLayout(tableActions);
     auto *exportButton=new QPushButton(QStringLiteral("표 저장…"));exportButton->setObjectName("ExportOrbitalTable");adaptiveButton(exportButton,style()->standardIcon(QStyle::SP_DialogSaveButton));frontier->addWidget(exportButton);connect(exportButton,&QPushButton::clicked,this,&OrbitalStudyWidget::exportTable);
@@ -306,6 +308,7 @@ void OrbitalStudyWidget::setView(MoleculeView *view) {
 }
 void OrbitalStudyWidget::setData(const CalculationData &data) {
     if(m_runner->busy())m_runner->cancel();
+    m_requestedRow=-1;
     m_data=data;m_surface.reset();m_potential.reset();m_mep=false;
     {QSignalBlocker block(m_iso);m_iso->setValue(m_moIsovalue);}
     m_source->setText(data.filePath.isEmpty()?QStringLiteral("Orbitals · CHK 변환 / FMO / MEP / NBO / Wiberg"):QFileInfo(data.filePath).fileName());m_source->setToolTip(data.filePath);
@@ -364,14 +367,20 @@ void OrbitalStudyWidget::generate(bool mep) {
     QString kind="MEP";
     if(!mep){int r=m_orbitals->currentRow();if(r<0){m_status->setText(QStringLiteral("궤도를 선택하세요."));return;}kind=(m_orbitals->item(r,1)->text()=="Beta"?"BMO=":"AMO=")+m_orbitals->item(r,0)->text();}
     m_homo->setEnabled(false);m_lumo->setEnabled(false);m_generateMo->setEnabled(false);m_generateMep->setEnabled(false);m_cancel->setEnabled(true);
+    m_requestedRow=mep?-1:m_orbitals->currentRow();
     m_runner->generate(m_data.filePath,kind,QList<int>{40,80,120}[m_resolution->currentIndex()],m_density->currentText());
     updateGenerationButtons();
 }
 void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std::shared_ptr<const CubeGrid> potential) {
     m_surface=surface;m_potential=potential;m_mep=bool(potential);
+    if (!m_mep && m_requestedRow>=0 && m_requestedRow<m_orbitals->rowCount()) {
+        auto *item=m_orbitals->item(m_requestedRow,0);
+        item->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+        item->setToolTip(QStringLiteral("생성 결과 저장됨 · 같은 해상도로 다시 선택하면 재사용합니다."));
+    }
     updateGenerationButtons();
     {QSignalBlocker block(m_iso);m_iso->setValue(m_mep?m_mepIsovalue:m_moIsovalue);}
-    if(m_view)m_view->setCubeGrid(m_surface);
+    if(m_view)m_view->setCubeGrid(m_surface,float(m_iso->value()));
     applyStyle();
     m_status->setToolTip(QStringLiteral("생성된 cube: %1\n%2").arg(m_surface->filePath,m_potential?m_potential->filePath:QString()));
     m_status->setText(m_mep?QStringLiteral("MEP: 전자밀도 등가면에 정전기 퍼텐셜 매핑. 이미지 복사/저장으로 내보낼 수 있습니다."):QStringLiteral("MO 등가면 생성 완료. Isovalue와 위상 색상을 조절하고 이미지 복사/저장으로 내보내세요."));
