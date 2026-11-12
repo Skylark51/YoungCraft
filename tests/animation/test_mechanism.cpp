@@ -99,7 +99,7 @@ private slots:
     void segmentHoldSpeedAndRepeatedCleavage() {
         auto a=step(0),b=step(0);
         a.presentation["hold"]=.5;
-        a.presentation["photoCleavages"]=QJsonArray{QJsonArray{0,1,1}};
+        a.presentation["photoCleavages"]=QJsonArray{QJsonValue(QJsonArray{0,1,1})};
         b.presentation["speed"]=2;
         b.presentation["hold"]=.25;
         b.frames={{{0,0,0},{4,0,0},{0,1.4f,0}},

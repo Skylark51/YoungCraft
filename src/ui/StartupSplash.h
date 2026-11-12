@@ -1,5 +1,5 @@
 #pragma once
-#include "ui/AppPattern.h"
+#include "settings/AppPattern.h"
 #include <QApplication>
 #include <QElapsedTimer>
 #include <QFontMetricsF>

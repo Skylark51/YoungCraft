@@ -2,7 +2,7 @@
 #include "compute/GaussianConnection.h"
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
-#include "ui/AppPattern.h"
+#include "settings/AppPattern.h"
 #include "ui/SidebarFlowLayout.h"
 #include "ui/CenteredIconTabs.h"
 #include "ui/StartupSplash.h"

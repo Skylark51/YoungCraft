@@ -5,7 +5,8 @@
 #include "export/ReactionCapture.h"
 #include "render/MoleculeView.h"
 #include "ui/AnalysisPanel.h"
-#include "ui/AppPattern.h"
+#include "ui/StyleEditorDialog.h"
+#include "settings/AppPattern.h"
 #include "ui/DialogThemeSync.h"
 
 #include <QActionGroup>

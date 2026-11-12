@@ -62,6 +62,8 @@ Windows에서 `tools/package_portable.ps1`을 실행하면 xTB의 실행 데이�
 
 ## 빌드
 
+병렬 개발 시 [모듈별 작업 범위와 검증 기준](docs/MODULES.md)을 참고하세요.
+
 Qt 6.4 이상, CMake 3.24 이상, Ninja, C++20 컴파일러가 필요합니다.
 
 ```powershell
