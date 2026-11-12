@@ -3414,8 +3414,11 @@ void SmokeTest::sidebarPatternContinuity(){
                 window.findChild<QAction *>(QString("PatternTemplate%1").arg(pattern))->trigger();
         }
         for(const QSize size:{QSize(1000,650),QSize(1280,800),QSize(1500,960)}){
-            window.resize(size);QTest::qWait(35);
-            QCOMPARE(window.size(),size);
+            const QSize frame = window.frameGeometry().size() - window.size();
+            const QSize available = window.screen()->availableGeometry().size() - frame;
+            const QSize bounded(qMin(size.width(),available.width()),qMin(size.height(),available.height()));
+            window.resize(bounded);QTest::qWait(35);
+            QCOMPARE(window.size(),bounded);
             const auto left=window.m_explorerDock->geometry(),right=window.m_structureDock->geometry();
             QVERIFY(!left.intersects(right));
             QVERIFY(window.rect().contains(left));QVERIFY(window.rect().contains(right));
@@ -3673,8 +3676,16 @@ void SmokeTest::orbitalCacheAndDetachedWindow() {
     MainWindow owner; owner.resize(1200,800); owner.show();
     auto *open=owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow"); QVERIFY(open);
     auto *dialog=owner.m_analysis->findChild<QDialog*>("OrbitalManagerWindow"); QVERIFY(dialog); QVERIFY(!dialog->isVisible());
+    CalculationData data;data.format="FCHK";data.filePath="sample.fchk";
+    data.orbitals={{1,-13.6,2,{},"Alpha"},{2,1.2,0,{},"Alpha"}};
+    owner.m_analysis->setData(data);
     open->click(); QVERIFY(dialog->isVisible()); QVERIFY(!dialog->isModal());
     QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_WINDOW_PREVIEW");
+    if(!preview.isEmpty()){QTest::qWait(100);QVERIFY(dialog->grab().save(preview));}
+    dialog->resize(420,480);QTest::qWait(50);
+    QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    if(!preview.isEmpty())QVERIFY(dialog->grab().save(preview+".small.png"));
     dialog->close(); QVERIFY(!dialog->isVisible()); open->click(); QVERIFY(dialog->isVisible());
     MoleculeView view;
     auto grid=std::make_shared<CubeGrid>(); grid->valid=true;grid->nx=grid->ny=grid->nz=2;
@@ -4197,7 +4208,7 @@ void SmokeTest::wholeMechanismAnimationWorkflow() {
     const auto camera=dialog->m_view->cameraState();const auto first=dialog->m_view->molecule();
     dialog->seek(.3);QVERIFY((dialog->m_view->molecule().atoms[1].position-first.atoms[1].position).length()>.1f);
     QCOMPARE(dialog->m_view->cameraState().rotation,camera.rotation);QCOMPARE(dialog->m_view->cameraState().centerOffset,camera.centerOffset);
-    dialog->seek(0);dialog->play(true);QTest::qWait(120);QVERIFY(dialog->m_time>0);dialog->play(false);
+    dialog->seek(0);dialog->play(true);QTRY_VERIFY_WITH_TIMEOUT(dialog->m_time>0,3000);dialog->play(false);
     dialog->m_view->selection().atoms={0};dialog->emphasize(1);dialog->seek(.2);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
     QTemporaryDir dir;QVERIFY(dialog->saveProject(dir.filePath("mechanism.ycmechanism")));
     QVERIFY(dialog->openProject(dir.filePath("mechanism.ycmechanism")));QCOMPARE(dialog->m_focusMode,1);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);

@@ -85,6 +85,12 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
     const auto settings = GaussianRemoteSettings::load();
     const QString cubegen = executable("cubegen"), formchk = executable("formchk");
     const QFileInfo info(source);
+    if (!info.isFile()) {
+        emit failed(!remote && !isAvailable("cubegen")
+            ? QStringLiteral("cubegen 실행 파일을 찾을 수 없습니다: ") + cubegen
+            : QStringLiteral("입력 파일을 찾을 수 없습니다: ") + source);
+        return;
+    }
     const QByteArray options = QJsonDocument(QJsonArray{kind, points, densityType, remote,
         remote ? settings.host : cubegen, remote ? settings.gaussianDirectory : formchk,
         settings.port, settings.checkpointDirectory}).toJson(QJsonDocument::Compact);

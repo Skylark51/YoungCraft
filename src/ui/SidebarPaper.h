@@ -5,6 +5,7 @@
 #include <QEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QPointer>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabWidget>
@@ -44,9 +45,11 @@ inline void watchSidebar(QWidget *dock) {
         watch(area->viewport());
         if(!area->property("sidebarPaperScrollWatched").toBool()) {
             area->setProperty("sidebarPaperScrollWatched",true);
-            auto refresh=[dock]{for(auto *child:dock->findChildren<QWidget*>())if(child->property("sidebarPaperWatched").toBool())child->update();};
-            QObject::connect(area->verticalScrollBar(),&QScrollBar::valueChanged,area,refresh);
-            QObject::connect(area->horizontalScrollBar(),&QScrollBar::valueChanged,area,refresh);
+            // Dialog scrollbars can emit while their owning dock is being destroyed.
+            const QPointer<QWidget> owner(dock);
+            auto refresh=[owner]{if(!owner)return;for(auto *child:owner->findChildren<QWidget*>())if(child->property("sidebarPaperWatched").toBool())child->update();};
+            QObject::connect(area->verticalScrollBar(),&QScrollBar::valueChanged,dock,refresh,Qt::QueuedConnection);
+            QObject::connect(area->horizontalScrollBar(),&QScrollBar::valueChanged,dock,refresh,Qt::QueuedConnection);
         }
     }
 }

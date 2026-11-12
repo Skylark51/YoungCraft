@@ -28,6 +28,7 @@ $ninja = Join-Path $vs 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja
 $script = Join-Path $env:TEMP ('YoungcraftRelease-' + [Guid]::NewGuid().ToString('N') + '.cmd')
 $commands = @"
 @echo off
+set VSLANG=1033
 chcp 65001 >nul
 call "$vcvars" >nul
 cmake -S . -B "$BuildDir" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="$ninja" -DQt6_DIR:PATH="$QtRoot/lib/cmake/Qt6"

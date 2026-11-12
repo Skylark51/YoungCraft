@@ -133,7 +133,8 @@ void MoleculeView::rebuildIsosurfaces() {
             if (!receiver) return;
             receiver->m_surfaceBuilding = false;
             const qsizetype bytes = (positive->positions.size() + positive->normals.size()
-                + negative->positions.size() + negative->normals.size()) * sizeof(QVector3D);
+                + negative->positions.size() + negative->normals.size()) * sizeof(QVector3D)
+                + grid->values.size() * sizeof(float);
             receiver->m_surfaceCache.insert(key, new CachedSurface{grid, positive, negative},
                 int(qMin<qsizetype>(INT_MAX, qMax<qsizetype>(1, bytes / 1024))));
             if (receiver->m_cubeGrid == grid && receiver->m_style.isoValue == iso) {
