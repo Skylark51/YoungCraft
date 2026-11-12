@@ -1,4 +1,10 @@
 #include "compute/GaussianConnection.h"
+#include "compute/SshPasswordBroker.h"
+#include "compute/OrbitalDiagnostics.h"
+#include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QDateTime>
 #include "ui/SidebarButton.h"
 #include "ui/SidebarFlowLayout.h"
 #include <QTabBar>
@@ -87,6 +93,12 @@ QString num(double x) { return std::isfinite(x)?QString::number(x,'f',5):QString
 }
 OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_runner(new GaussianTools(this)) {
     setObjectName("OrbitalStudyWidget");
+    if(!qEnvironmentVariableIsEmpty("YOUNGCRAFT_ORBITAL_DIAGNOSTICS")) {
+        auto *heartbeat=new QTimer(this);heartbeat->setInterval(16);
+        auto clock=std::make_shared<QElapsedTimer>();clock->start();
+        connect(heartbeat,&QTimer::timeout,this,[clock]{const auto gap=clock->restart();if(gap>100)recordOrbitalDiagnostic({{"event","gui-gap"},{"gap_ms",double(gap)}});});
+        heartbeat->start();
+    }
     auto *layout=new QVBoxLayout(this); layout->setContentsMargins(2,2,2,2);
     setMinimumWidth(0);
     m_source=new QLabel; m_source->setWordWrap(true); layout->addWidget(m_source);
@@ -124,13 +136,13 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     auto *remoteSummary=new QLabel(connection->text());remoteSummary->setObjectName("GaussianConnectionStatus");remoteSummary->setProperty("connected",connection->connected());remoteSummary->setWordWrap(true);remoteSummary->setToolTip(connection->text());remoteLayout->addWidget(remoteSummary);
     connect(connection,&GaussianConnection::changed,remoteSummary,[remoteSummary](const QString &text,bool connected){remoteSummary->setText(text);remoteSummary->setToolTip(text);remoteSummary->setProperty("connected",connected);});
     auto *remoteActions=new QWidget(remote);remoteActions->setObjectName("OrbitalRemoteActions");auto *remoteFlow=new SidebarFlowLayout(remoteActions);remoteLayout->addWidget(remoteActions);
-    auto *reconnect=new QPushButton(QStringLiteral("자동 재연결"));reconnect->setObjectName("ReconnectGaussianServer");adaptiveButton(reconnect,style()->standardIcon(QStyle::SP_BrowserReload));remoteFlow->addWidget(reconnect);
-    connect(reconnect,&QPushButton::clicked,connection,[connection]{connection->connectNow(true);});
+    auto *reconnect=new QPushButton(QStringLiteral("비밀번호 로그인"));reconnect->setObjectName("ReconnectGaussianServer");adaptiveButton(reconnect,style()->standardIcon(QStyle::SP_BrowserReload));remoteFlow->addWidget(reconnect);
+    connect(reconnect,&QPushButton::clicked,connection,[connection]{SshPasswordBroker::forgetPasswords();QTimer::singleShot(0,connection,[connection]{connection->connectNow(true);});});
     auto *remoteOptions=new QPushButton(QStringLiteral("서버 설정…"));remoteOptions->setObjectName("RemoteGaussianSettingsButton");adaptiveButton(remoteOptions,style()->standardIcon(QStyle::SP_ComputerIcon));remoteFlow->addWidget(remoteOptions);
     auto *remoteDialog=new QDialog(this);remoteDialog->setObjectName("RemoteGaussianSettings");remoteDialog->setWindowTitle(QStringLiteral("계산 서버 · Gaussian 설정"));
     auto *remoteForm=new QFormLayout(remoteDialog);
     connect(remoteOptions,&QPushButton::clicked,this,[remoteDialog,connection]{remoteDialog->exec();connection->connectNow(true);});
-    auto *remoteHelp=new QLabel(QStringLiteral("기존 SSH 키 인증으로 CHK 변환과 MO / MEP 생성을 서버에서 실행하고 결과를 가져옵니다."));
+    auto *remoteHelp=new QLabel(QStringLiteral("라이온 서버 비밀번호는 별도 로그인 창에서 입력합니다. 비밀번호는 현재 앱의 메모리에서만 사용하며 파일이나 설정에 저장하지 않습니다."));
     remoteHelp->setWordWrap(true);remoteForm->addRow(remoteHelp);
     auto remoteText=[this,remoteForm](const QString &label,const QString &key,const QString &fallback,bool browse) {
         auto *row=new QWidget;auto *h=new QHBoxLayout(row);h->setContentsMargins(0,0,0,0);
@@ -144,7 +156,11 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     auto *port=new QSpinBox;port->setObjectName("remotePort");port->setRange(1,65535);port->setValue(QSettings().value("orbitals/remotePort",22).toInt());
     remoteForm->addRow(QStringLiteral("SSH 포트"),port);connect(port,qOverload<int>(&QSpinBox::valueChanged),this,[](int value){QSettings().setValue("orbitals/remotePort",value);});
     remoteText(QStringLiteral("SSH 설정 파일 (선택)"),"remoteConfig",{},true);
-    remoteText(QStringLiteral("SSH 키 파일 (선택)"),"remoteIdentity",{},true);
+    auto *authMode=new QComboBox;authMode->setObjectName("RemoteAuthenticationMode");
+    authMode->addItems({QStringLiteral("비밀번호 로그인"),QStringLiteral("SSH 키 (기존 고급 설정)")});
+    authMode->setCurrentIndex(QSettings().value("orbitals/remotePasswordAuthentication",true).toBool()?0:1);
+    remoteForm->addRow(QStringLiteral("인증 방식"),authMode);
+    connect(authMode,qOverload<int>(&QComboBox::currentIndexChanged),this,[](int index){QSettings().setValue("orbitals/remotePasswordAuthentication",index==0);SshPasswordBroker::forgetPasswords();});
     remoteText(QStringLiteral("서버 Gaussian 폴더"),"remoteGaussianDirectory","/opt/gaussian/g16",false);
     remoteText(QStringLiteral("서버 CHK 폴더 (동일 파일 재사용)"),"remoteCheckpointDirectory",{},false);
     auto *remoteClose=new QDialogButtonBox(QDialogButtonBox::Close);remoteForm->addRow(remoteClose);
@@ -168,8 +184,9 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     m_tables=new QTabWidget; m_tables->setObjectName("OrbitalAnalysisTables");m_tables->setMinimumWidth(0);m_tables->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);m_tables->setUsesScrollButtons(true);m_tables->tabBar()->setExpanding(false);m_tables->setElideMode(Qt::ElideNone);m_tables->tabBar()->setStyleSheet("QTabBar::tab { padding:4px 5px; }");
     m_orbitals=table({"MO","Spin","Energy (eV)","Occupation","Frontier"});m_orbitals->setObjectName("OrbitalTable");
     const int widths[]={38,48,86,72,68};for(int col=0;col<5;++col)m_orbitals->setColumnWidth(col,widths[col]);
-    connect(m_orbitals,&QTableWidget::cellDoubleClicked,this,[this](int, int){generate(false);});
-    m_orbitals->setToolTip(QStringLiteral("MO를 선택한 뒤 생성 버튼을 누르거나 두 번 클릭하세요. 저장된 결과는 재계산 없이 표시합니다."));
+    connect(m_orbitals,&QTableWidget::cellClicked,this,[this](int row,int){if(m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
+    connect(m_orbitals,&QTableWidget::cellDoubleClicked,this,[this](int row,int){if(!m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
+    m_orbitals->setToolTip(QStringLiteral("처음에는 MO를 두 번 클릭하거나 생성 버튼을 누르세요. 이미 생성한 MO는 한 번 클릭하면 바로 표시합니다."));
     m_tables->addTab(m_orbitals,"FMO"); layout->addWidget(m_tables);
     auto *tableActions=new QWidget(this);tableActions->setObjectName("OrbitalTableActions");auto *frontier=new SidebarFlowLayout(tableActions);
     auto *exportButton=new QPushButton(QStringLiteral("표 저장…"));exportButton->setObjectName("ExportOrbitalTable");adaptiveButton(exportButton,style()->standardIcon(QStyle::SP_DialogSaveButton));frontier->addWidget(exportButton);connect(exportButton,&QPushButton::clicked,this,&OrbitalStudyWidget::exportTable);
@@ -180,7 +197,7 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     m_resolution=new QComboBox; m_resolution->setObjectName("OrbitalGridResolution");m_resolution->addItems({"40 (빠르게)","80 (표준)","120 (정밀)"});m_resolution->setCurrentIndex(1);form->addRow(QStringLiteral("격자 해상도"),m_resolution);
     m_density=new QComboBox;m_density->addItems({"SCF","MP2","CI","QCI"});m_density->setToolTip(QStringLiteral("FCHK에 저장된 밀도 유형을 선택하세요. 없는 밀도는 cubegen이 오류를 보고합니다."));form->addRow(QStringLiteral("MEP 밀도"),m_density);
     layout->addLayout(form);
-    auto *generationActions=new QWidget(this);generationActions->setObjectName("OrbitalGenerationActions");auto *actions=new SidebarFlowLayout(generationActions); m_generateMo=new QPushButton(QStringLiteral("선택 MO 생성"));m_generateMo->setObjectName("GenerateMo");
+    auto *generationActions=new QWidget(this);generationActions->setObjectName("OrbitalGenerationActions");auto *actions=new SidebarFlowLayout(generationActions); m_generateMo=new QPushButton(QStringLiteral("선택 MO 표시 / 생성"));m_generateMo->setObjectName("GenerateMo");
     adaptiveButton(m_generateMo,style()->standardIcon(QStyle::SP_MediaPlay));actions->addWidget(m_generateMo);layout->addWidget(generationActions);
     connect(m_generateMo,&QPushButton::clicked,this,[this]{generate(false);});
     auto *map=new QPushButton(QStringLiteral("현재 density cube에 potential cube 매핑…"));map->setObjectName("MapOrbitalPotential");adaptiveButton(map,style()->standardIcon(QStyle::SP_BrowserReload));actions->addWidget(map);
@@ -234,7 +251,11 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     m_cancel=new QPushButton(QStringLiteral("계산 취소"));m_cancel->setObjectName("CancelOrbitalCalculation");m_cancel->setEnabled(false);adaptiveButton(m_cancel,style()->standardIcon(QStyle::SP_MediaStop));sourceFlow->addWidget(m_cancel);connect(m_cancel,&QPushButton::clicked,m_runner,&GaussianTools::cancel);
     connect(m_runner,&GaussianTools::status,m_status,&QLabel::setText);
     connect(m_runner,&GaussianTools::failed,this,[this](const QString &message){m_status->setText(message);updateGenerationButtons();});
-    connect(m_runner,&GaussianTools::ready,this,&OrbitalStudyWidget::showSurface);
+    connect(m_runner,&GaussianTools::ready,this,[this](auto surface,auto potential){
+        showSurface(surface,potential);
+        if(m_runner->lastResultSource()=="generated" && QSettings().value("orbitals/remoteEnabled",false).toBool())
+            GaussianConnection::instance()->connectNow();
+    });
     for(auto *label:findChildren<QLabel*>())if(sidebarControl(label,this)&&label->wordWrap()){
         label->setMinimumWidth(0);label->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);label->setWordWrap(true);
     }
@@ -308,7 +329,7 @@ void OrbitalStudyWidget::setView(MoleculeView *view) {
 }
 void OrbitalStudyWidget::setData(const CalculationData &data) {
     if(m_runner->busy())m_runner->cancel();
-    m_requestedRow=-1;
+    m_requestedRow=-1;m_requestedSelection.clear();
     m_data=data;m_surface.reset();m_potential.reset();m_mep=false;
     {QSignalBlocker block(m_iso);m_iso->setValue(m_moIsovalue);}
     m_source->setText(data.filePath.isEmpty()?QStringLiteral("Orbitals · CHK 변환 / FMO / MEP / NBO / Wiberg"):QFileInfo(data.filePath).fileName());m_source->setToolTip(data.filePath);
@@ -362,17 +383,27 @@ void OrbitalStudyWidget::startDefaultOrbital() {
     if(chooseFrontier(false))generate(false);
     else m_status->setText(QStringLiteral("FCHK를 읽었지만 HOMO를 판별할 수 없습니다. MO 표에서 궤도를 선택하세요."));
 }
+QString OrbitalStudyWidget::orbitalSelectionKey(int row) const {
+    if(row<0 || row>=m_orbitals->rowCount())return {};
+    const QFileInfo file(m_data.filePath);
+    return QString::fromUtf8(QJsonDocument(QJsonArray{file.absoluteFilePath(),QString::number(file.size()),
+        QString::number(file.lastModified().toMSecsSinceEpoch()),m_orbitals->item(row,0)->text(),
+        m_orbitals->item(row,1)->text(),m_resolution->currentIndex(),m_density->currentText()}).toJson(QJsonDocument::Compact));
+}
 void OrbitalStudyWidget::generate(bool mep) {
     if(m_runner->busy())return;
     QString kind="MEP";
     if(!mep){int r=m_orbitals->currentRow();if(r<0){m_status->setText(QStringLiteral("궤도를 선택하세요."));return;}kind=(m_orbitals->item(r,1)->text()=="Beta"?"BMO=":"AMO=")+m_orbitals->item(r,0)->text();}
     m_homo->setEnabled(false);m_lumo->setEnabled(false);m_generateMo->setEnabled(false);m_generateMep->setEnabled(false);m_cancel->setEnabled(true);
     m_requestedRow=mep?-1:m_orbitals->currentRow();
+    m_requestedSelection=mep?QString():orbitalSelectionKey(m_requestedRow);
     m_runner->generate(m_data.filePath,kind,QList<int>{40,80,120}[m_resolution->currentIndex()],m_density->currentText());
     updateGenerationButtons();
 }
 void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std::shared_ptr<const CubeGrid> potential) {
+    QElapsedTimer displayTimer;displayTimer.start();
     m_surface=surface;m_potential=potential;m_mep=bool(potential);
+    if(!m_requestedSelection.isEmpty())m_renderedSelections.insert(m_requestedSelection);
     if (!m_mep && m_requestedRow>=0 && m_requestedRow<m_orbitals->rowCount()) {
         auto *item=m_orbitals->item(m_requestedRow,0);
         item->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
@@ -382,8 +413,13 @@ void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std
     {QSignalBlocker block(m_iso);m_iso->setValue(m_mep?m_mepIsovalue:m_moIsovalue);}
     if(m_view)m_view->setCubeGrid(m_surface,float(m_iso->value()));
     applyStyle();
+    recordOrbitalDiagnostic({{"event","surface-displayed"},{"source",m_runner->lastResultSource()},
+        {"display_ms",double(displayTimer.nsecsElapsed())/1e6},{"mep",m_mep}});
     m_status->setToolTip(QStringLiteral("생성된 cube: %1\n%2").arg(m_surface->filePath,m_potential?m_potential->filePath:QString()));
     m_status->setText(m_mep?QStringLiteral("MEP: 전자밀도 등가면에 정전기 퍼텐셜 매핑. 이미지 복사/저장으로 내보낼 수 있습니다."):QStringLiteral("MO 등가면 생성 완료. Isovalue와 위상 색상을 조절하고 이미지 복사/저장으로 내보내세요."));
+    if(m_runner->lastResultSource()=="memory")m_status->setText(QStringLiteral("저장된 오비탈 즉시 표시 · 재계산 없음"));
+    else if(m_runner->lastResultSource()=="disk")m_status->setText(QStringLiteral("디스크에 저장된 오비탈 불러오기 완료 · Gaussian 재계산 없음"));
+
 }
 void OrbitalStudyWidget::applyStyle() {
     if(!m_view)return;

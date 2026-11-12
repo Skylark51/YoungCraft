@@ -8,6 +8,7 @@ namespace youngcraft {
 struct GaussianRemoteSettings {
     QString host, configFile, identityFile, gaussianDirectory, checkpointDirectory;
     int port = 22;
+    bool passwordAuthentication = true;
     static void initializeDefaults(const QString &profilePath = {});
     static GaussianRemoteSettings load();
     QString error() const;

@@ -3,7 +3,7 @@
   "autoGenerateHomo": true,
   "remoteHost": "skylark@lion.jbnu.ac.kr",
   "remotePort": 10022,
-  "remoteConfig": "~/.ssh/lion.conf",
+  "remotePasswordAuthentication": true,
   "remoteGaussianDirectory": "/opt/gaussian/g16",
   "remoteCheckpointDirectory": "/home/skylark/chk"
 }

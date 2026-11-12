@@ -51,6 +51,9 @@ $stage = Join-Path $env:TEMP ('YoungcraftPortable-' + [Guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 try {
     Copy-Item -LiteralPath $application -Destination (Join-Path $stage 'Youngcraft.exe') -Force
+    $askpass = Join-Path (Split-Path -Parent $application) 'YoungcraftSshAskpass.exe'
+    if (-not (Test-Path -LiteralPath $askpass)) { throw 'SSH password helper is missing.' }
+    Copy-Item -LiteralPath $askpass -Destination (Join-Path $stage 'YoungcraftSshAskpass.exe') -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'resources/gaussian-remote.json') -Destination (Join-Path $stage 'youngcraft-server.json') -Force
     & $windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage 'Youngcraft.exe')
     if ($LASTEXITCODE -ne 0) { throw "windeployqt 실패: $LASTEXITCODE" }

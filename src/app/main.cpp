@@ -1,5 +1,6 @@
 #include "compute/GaussianConnection.h"
 #include "compute/GaussianRemote.h"
+#include "compute/SshPasswordBroker.h"
 #include "app/MainWindow.h"
 #include "app/SingleInstance.h"
 #include "ui/StartupSplash.h"
@@ -33,6 +34,7 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("Youngcraft"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     qRegisterMetaType<youngcraft::LoadedFile>();
+    youngcraft::SshPasswordBroker::instance();
     QStringList paths;
     bool newWindow = false;
     bool literalPaths = false;

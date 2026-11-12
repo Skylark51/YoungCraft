@@ -1,4 +1,5 @@
 #include "render/MoleculeView.h"
+#include "compute/OrbitalDiagnostics.h"
 
 #include "render/IsosurfaceBuilder.h"
 
@@ -120,10 +121,11 @@ void MoleculeView::rebuildIsosurfaces() {
         if (m_glReady) { makeCurrent(); uploadSurfaceMeshes(); doneCurrent(); }
         update();
     };
-    if (auto *cached = m_surfaceCache.object(key)) { display(cached->positive, cached->negative); return; }
+    if (auto *cached = m_surfaceCache.object(key)) { display(cached->positive, cached->negative); recordOrbitalDiagnostic({{"event","mesh-cache-hit"},{"grid",QString::number(quintptr(grid.get()),16)},{"iso",double(iso)}}); return; }
     // One background mesh job per view; rapid changes coalesce to the latest request.
     if (m_surfaceBuilding) return;
     m_surfaceBuilding = true;
+    recordOrbitalDiagnostic({{"event","mesh-build-start"},{"grid",QString::number(quintptr(grid.get()),16)},{"iso",double(iso)}});
     QPointer<MoleculeView> receiver(this);
     QThread *thread = QThread::create([receiver, grid, iso, key] {
         const auto positive = std::make_shared<SurfaceMesh>(IsosurfaceBuilder::build(*grid, iso, true));

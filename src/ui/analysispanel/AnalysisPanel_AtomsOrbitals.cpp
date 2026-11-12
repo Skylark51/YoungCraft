@@ -1,5 +1,6 @@
 #include "ui/OrbitalStudyWidget.h"
 #include "ui/AnalysisPanel.h"
+#include "compute/OrbitalDiagnostics.h"
 
 #include "analysis/AnalysisEngine.h"
 #include "ui/PlotWidget.h"
@@ -22,6 +23,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QDialog>
+#include <QJsonArray>
 #include <QScrollArea>
 #include <QScreen>
 #include <QGuiApplication>
@@ -72,18 +74,37 @@ QWidget *AnalysisPanel::makeOrbitalsTab() {
     m_orbitalStudy = new OrbitalStudyWidget;
     scroll->setWidget(m_orbitalStudy); dialogLayout->addWidget(scroll);
     connect(open, &QPushButton::clicked, this, [page, dialog] {
-        auto *screen = page->window()->screen();
+        const bool first=!dialog->property("orbitalWindowPlaced").toBool();
+        auto *screen = first ? page->window()->screen() : dialog->screen();
         if (!screen) screen = QGuiApplication::primaryScreen();
-        if (screen) {
-            const QRect area = screen->availableGeometry();
-            const QSize size(qMin(680, area.width() * 9 / 10), qMin(1000, area.height() * 9 / 10));
-            // Re-clamp on every open, including after a monitor is disconnected.
-            const QPoint point = dialog->isVisible() ? dialog->pos()
-                : QPoint(area.right() - size.width() - 16, area.center().y() - size.height() / 2);
-            dialog->setGeometry(QRect(QPoint(qBound(area.left(), point.x(), area.right() - size.width() + 1),
-                qBound(area.top(), point.y(), area.bottom() - size.height() + 1)), size));
+        if (screen && first) {
+            const QRect area=screen->availableGeometry();
+            const QSize size(qMin(680,area.width()*9/10),qMin(1000,area.height()*9/10));
+            dialog->resize(size);
+            dialog->move(area.right()-size.width()-16,area.center().y()-size.height()/2);
+            dialog->setProperty("orbitalWindowPlaced",true);
         }
         dialog->show(); dialog->raise(); dialog->activateWindow();
+        QTimer::singleShot(0,dialog,[dialog] {
+            auto *screen=dialog->screen();if(!screen)return;
+            const auto area=screen->availableGeometry();
+            if(!dialog->isMaximized()) {
+                auto frame=dialog->frameGeometry();
+                const QSize decoration=frame.size()-dialog->size();
+                dialog->resize(qMin(dialog->width(),qMax(1,area.width()-decoration.width()-16)),
+                    qMin(dialog->height(),qMax(1,area.height()-decoration.height()-16)));
+                frame=dialog->frameGeometry();
+                // move() uses the outer frame position; setGeometry() uses the client
+                // position and would shift the title bar upward on each repeated open.
+                dialog->move(qBound(area.left()+8,frame.left(),qMax(area.left()+8,area.right()-frame.width()-7)),
+                    qBound(area.top()+8,frame.top(),qMax(area.top()+8,area.bottom()-frame.height()-7)));
+            }
+            const auto frame=dialog->frameGeometry();
+            recordOrbitalDiagnostic({{"event","manager-window"},{"screen",screen->name()},
+                {"frame",QJsonArray{frame.x(),frame.y(),frame.width(),frame.height()}},
+                {"available",QJsonArray{area.x(),area.y(),area.width(),area.height()}},
+                {"fits",area.contains(frame)}});
+        });
     });
     connect(m_orbitalStudy, &OrbitalStudyWidget::openRequested, this, &AnalysisPanel::orbitalFileRequested);
     connect(m_orbitalStudy, &OrbitalStudyWidget::surfaceStyleChanged, this, &AnalysisPanel::orbitalStyleChanged);

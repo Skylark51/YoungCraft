@@ -19,6 +19,7 @@ public:
     static QString convertCheckpoint(const QString &source, QString *error);
     void generate(const QString &source, const QString &kind, int points, const QString &densityType);
     void cancel();
+    QString lastResultSource() const { return m_lastResultSource; }
     bool busy() const { return m_worker != nullptr; }
 signals:
     void status(const QString &text);
@@ -29,6 +30,7 @@ private:
         std::shared_ptr<const CubeGrid> surface, potential;
     };
     QCache<QString, CachedOrbital> m_cache{256 * 1024}; // KiB, bounded LRU
+    QString m_lastResultSource;
     QThread *m_worker = nullptr;
     std::shared_ptr<std::atomic_bool> m_cancelToken;
 };
