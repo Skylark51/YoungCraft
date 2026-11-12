@@ -49,6 +49,9 @@ private:
     void editPhotoSelection(MoleculeView *view);
     void setPhotoMark(int stage, int first, int second, int occurrence);
     void refreshTimelineEvents();
+    void editReactionCaptions(QWidget *parent);
+    QString reactionCaptionAt(double time) const;
+    QJsonObject reactionCaptionSettings() const;
     void editPresentationStops(QWidget *anchor);
     QVector<double> presentationBoundaries() const;
     bool exportPowerPoint(const QString &path,int width,int fps,bool bundle=false);
@@ -70,6 +73,7 @@ private:
     MoleculeView *m_view=nullptr,*m_playerView=nullptr;
     ReactionCoordinateWidget *m_coordinate=nullptr;
     QPushButton *m_coordinateMode=nullptr,*m_coordinateEdit=nullptr;
+    QPushButton *m_reactionCaptionEdit=nullptr;
     QDialog *m_player=nullptr;
     QPushButton *m_playerOpen=nullptr,*m_playerPlay=nullptr;
     QSlider *m_playerSlider=nullptr;
@@ -94,6 +98,9 @@ private:
     QElapsedTimer m_clock;
     double m_time=0,m_startedAt=0,m_previewEnd=-1,m_previewStart=0;
     bool m_loading=false,m_exporting=false,m_valid=false;
+    struct ReactionCaption { QString name; double start; double end; };
+    QVector<ReactionCaption> m_reactionCaptions;
+    bool m_useReactionCaptions=false;
     QVector<double> m_presentationStops;
     QSet<int> m_focus,m_keptHydrogens,m_shotAtoms;
     int m_shotArrangement=0,m_shotAspect=0;

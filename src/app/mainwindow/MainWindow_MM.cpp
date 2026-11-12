@@ -1,3 +1,4 @@
+#include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
 
 #include "animation/AnimationController.h"
@@ -8,6 +9,7 @@
 #include "ui/ConstraintEditor.h"
 
 #include <QComboBox>
+#include <QDockWidget>
 #include <QCheckBox>
 #include <QCoreApplication>
 #include <QDialog>
@@ -82,8 +84,12 @@ void MainWindow::setDrawingMode(bool enabled) {
     if (enabled) { m_animation->stop(); stopMMOptimization(); setAtomDragMode(false); }
     m_drawingMode = enabled;
     m_view->setDrawingMode(enabled);
-    m_drawBar->setVisible(enabled);
-    if (enabled) m_workspace->setCurrentWidget(m_moleculeWorkspace);
+    if (enabled) {
+        m_workspace->setCurrentWidget(m_moleculeWorkspace);
+        m_structureDock->show();
+        m_structureTabs->setCurrentIndex(1);
+    }
+    updatePanelActions();
     setStatus(enabled ? QStringLiteral("원소 또는 ‘원자 / 결합 그리기’를 먼저 선택하세요 · 클릭으로 사슬 연장 · 드래그로 결합 · Esc/우클릭: 사슬 끝내기 · Alt: 자유 배치 · Lab Ligands: 금속 배위 구조")
                       : QStringLiteral("구조 그리기 종료"), enabled ? 0 : 4000);
 }
@@ -265,8 +271,8 @@ void MainWindow::startMMOptimization() {
     m_mmProgress->setRange(0, m_mmMaximum);
     m_mmProgress->setValue(0);
     m_mmPauseButton->setEnabled(true);
-    m_mmPauseButton->setText(QStringLiteral("일시정지"));
-    m_mmStopButton->setText(QStringLiteral("중단"));
+    setSidebarButtonIcon(m_mmPauseButton, QStyle::SP_MediaPause, QStringLiteral("일시정지"));
+    setSidebarButtonIcon(m_mmStopButton, QStyle::SP_MediaStop, QStringLiteral("중단"));
     m_mmRestoreButton->setEnabled(true);
     m_mmLabel->setText(QStringLiteral("%1 초기화 중...").arg(field.currentText()));
     m_mmBar->show();
@@ -478,7 +484,7 @@ void MainWindow::stopMMOptimization(const QString &message) {
     else process->kill();
     if (process->state() == QProcess::NotRunning && m_mmState == MMState::Stopping) m_mmState = MMState::Finished;
     m_mmPauseButton->setEnabled(false);
-    m_mmStopButton->setText(QStringLiteral("닫기"));
+    setSidebarButtonIcon(m_mmStopButton, QStyle::SP_DialogCloseButton, QStringLiteral("닫기"));
     if (m_mmDisplayedIteration > 0) {
         Frame frame;
         frame.metrics.step = m_mmDisplayedIteration;

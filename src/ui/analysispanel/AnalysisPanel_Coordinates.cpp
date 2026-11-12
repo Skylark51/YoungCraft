@@ -1,3 +1,4 @@
+#include "ui/SidebarButton.h"
 #include "ui/AnalysisPanel.h"
 #include "io/XYZParser.h"
 
@@ -63,6 +64,7 @@ QWidget *AnalysisPanel::makeCoordinateTab() {
     m_coordinateCopy = new QPushButton(QStringLiteral("XYZ 복사"));
     m_coordinateCopy->setObjectName(QStringLiteral("CopyCoordinateButton"));
     m_coordinateCopy->setToolTip(QStringLiteral("현재 구조의 원소와 X, Y, Z 좌표를 복사합니다 (번호·제목 제외)."));
+    makeSidebarIconButton(m_coordinateCopy, sidebarCopyIcon());
     m_coordinateCopy->setEnabled(false);
     connect(m_coordinateCopy, &QPushButton::clicked, this, [this] {
         emit coordinateViewRequested();
@@ -80,7 +82,8 @@ QWidget *AnalysisPanel::makeCoordinateTab() {
     auto *input=new QPlainTextEdit;input->setObjectName("CoordinatePasteInput");
     input->setPlaceholderText(QStringLiteral("새 XYZ 붙여넣기\n원자 수·제목이 있는 XYZ 또는 원소 X Y Z 좌표를 넣으세요."));
     input->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));input->setMinimumHeight(100);input->setMaximumHeight(140);layout->insertWidget(1,input);
-    auto *render=new QPushButton(QStringLiteral("붙여넣은 XYZ 렌더링 (새 탭)"));render->setObjectName("RenderPastedXYZ");layout->insertWidget(2,render);
+    auto *render=new QPushButton(QStringLiteral("붙여넣은 XYZ 렌더링 (새 탭)"));
+    makeSidebarIconButton(render, QStyle::SP_ArrowForward);render->setObjectName("RenderPastedXYZ");layout->insertWidget(2,render);
     auto *message=new QLabel;message->setObjectName("CoordinatePasteStatus");message->setWordWrap(true);layout->insertWidget(3,message);
     connect(render,&QPushButton::clicked,this,[this,input,message]{
         const auto parsed=XYZParser::parseText(input->toPlainText());

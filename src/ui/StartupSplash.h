@@ -21,11 +21,11 @@ public:
     }
     void finishWhenReady(QWidget *mainWindow, std::function<void()> onReady = {}) {
         const QPointer<QWidget> ready(mainWindow);
-        // Keep the workspace hidden until the full splash interval has elapsed.
-        QTimer::singleShot(2000,Qt::PreciseTimer,this,[this,ready,onReady]{
+        // Include the fade in the one-second splash interval.
+        QTimer::singleShot(splashDurationMs-fadeDurationMs,Qt::PreciseTimer,this,[this,ready,onReady]{
             if(!ready || !isVisible()){hide();return;}
             auto *fade=new QPropertyAnimation(this,"windowOpacity",this);
-            fade->setDuration(180);fade->setStartValue(1.0);fade->setEndValue(0.0);
+            fade->setDuration(fadeDurationMs);fade->setStartValue(1.0);fade->setEndValue(0.0);
             connect(fade,&QPropertyAnimation::finished,this,[this,ready,onReady]{
                 if(ready){ready->show();finish(ready);if(onReady)onReady();}
                 else hide();
@@ -36,6 +36,8 @@ public:
 protected:
     void mousePressEvent(QMouseEvent *) override {} // Preserve the startup interval on click.
 private:
+    static constexpr int splashDurationMs=1000;
+    static constexpr int fadeDurationMs=180;
     static QPixmap artwork() {
         const char *papers[]={"#edf4fa","#eef4ee","#f2eef8","#f6f1e7","#f8eef0","#faf0e8"};
         const char *inks[]={"#446781","#4d6c5b","#6d5b85","#79634c","#865e6d","#865f49"};

@@ -14,15 +14,26 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QTimer>
+#include <QScrollArea>
+#include <QSplitter>
 #include <cmath>
 #include <algorithm>
 namespace youngcraft {
 XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int initialMethod,bool autoRun,const QVector<int> &selection)
     :QDialog(parent),original(m),runtime(path),runner(this),automatic(autoRun) {
-    setWindowTitle(QStringLiteral("xTB 빠른 양자화학 계산"));setObjectName("XtbDialog");setAttribute(Qt::WA_DeleteOnClose);resize(660,760);
-    auto *layout=new QVBoxLayout(this);
+    setWindowTitle(QStringLiteral("xTB 빠른 양자화학 계산"));setObjectName("XtbDialog");setAttribute(Qt::WA_DeleteOnClose);resize(960,720);setMinimumSize(860,620);
+    auto *layout=new QVBoxLayout(this);layout->setContentsMargins(12,12,12,12);layout->setSpacing(10);
     auto *notice=new QLabel(QStringLiteral("빠른 구조 relaxation / DFT 시작 구조 / single-point inspection용 반경험적 방법입니다.\n고정밀 DFT를 대체하지 않으며, open-shell spin-state 상대 에너지에는 제한이 있습니다."),this);notice->setWordWrap(true);layout->addWidget(notice);
-    settings=new QWidget(this);auto *form=new QFormLayout(settings);layout->addWidget(settings);
+    auto *columns=new QSplitter(Qt::Horizontal,this);columns->setObjectName("XtbColumns");columns->setChildrenCollapsible(false);
+    layout->addWidget(columns,1);
+    auto *settingsScroll=new QScrollArea(columns);settingsScroll->setObjectName("XtbSettingsScroll");settingsScroll->setWidgetResizable(true);settingsScroll->setFrameShape(QFrame::NoFrame);settingsScroll->setMinimumWidth(360);
+    settings=new QWidget(settingsScroll);settings->setObjectName("XtbSettingsPanel");auto *form=new QFormLayout(settings);
+    form->setContentsMargins(0,0,8,0);form->setRowWrapPolicy(QFormLayout::WrapLongRows);form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    settingsScroll->setWidget(settings);settings->setAutoFillBackground(false);settingsScroll->viewport()->setAutoFillBackground(false);
+    auto *resultsScroll=new QScrollArea(columns);resultsScroll->setObjectName("XtbResultsScroll");resultsScroll->setWidgetResizable(true);resultsScroll->setFrameShape(QFrame::NoFrame);resultsScroll->setMinimumWidth(380);
+    auto *resultsPanel=new QWidget(resultsScroll);resultsPanel->setObjectName("XtbResultsPanel");
+    auto *resultsLayout=new QVBoxLayout(resultsPanel);resultsLayout->setContentsMargins(8,0,0,0);resultsLayout->setSpacing(8);resultsScroll->setWidget(resultsPanel);resultsPanel->setAutoFillBackground(false);resultsScroll->viewport()->setAutoFillBackground(false);
+    columns->setSizes({400,540});columns->setStretchFactor(0,4);columns->setStretchFactor(1,5);
     kind=new QComboBox(settings);kind->addItems({"Single Point","Geometry Optimization"});kind->setCurrentIndex(1);kind->setObjectName("XtbKind");
     method=new QComboBox(settings);method->setObjectName("XtbMethod");
     method->addItem("GFN2-xTB",2);method->addItem("GFN1-xTB",1);method->addItem("GFN-FF (MM)",0);
@@ -42,7 +53,7 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     preserveBonds->setObjectName("XtbPreserveBonds");preserveBonds->setChecked(hasMetal);
     preserveBonds->setToolTip(QStringLiteral("현재 결합의 초기 거리를 유지하며 구조를 정리합니다. 사용자 거리 constraint가 우선합니다. 자유 최적화에서는 해제하세요."));
     form->addRow(preserveBonds);
-    constraints=new ConstraintEditor(m,selection,settings); form->addRow(constraints);
+    constraints=new ConstraintEditor(m,selection,resultsPanel,true);resultsLayout->addWidget(constraints);
     connect(solvation,&QComboBox::currentIndexChanged,this,[this](int i){solvent->setEnabled(i==1);});
     auto updateMethod=[this,notice]{const bool ff=method->currentData().toInt()==0;
         multiplicity->setEnabled(!ff);solvation->setEnabled(!ff);
@@ -52,15 +63,15 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     connect(method,&QComboBox::currentIndexChanged,this,updateMethod);
     method->setCurrentIndex(method->findData(initialMethod));updateMethod();
     connect(kind,&QComboBox::currentIndexChanged,this,[this](int i){level->setEnabled(i==1);cycles->setEnabled(i==1);});
-    status=new QLabel(QStringLiteral("계산 준비"),this);status->setObjectName("XtbStatus");status->setWordWrap(true);status->setTextInteractionFlags(Qt::TextSelectableByMouse);layout->addWidget(status);
-    energyMode=new QComboBox(this);energyMode->addItems({"Absolute energy (Eh)","Relative energy (kcal/mol, 첫 frame 기준)"});layout->addWidget(energyMode);
-    plot=new PlotWidget(this);plot->setObjectName("XtbEnergyPlot");plot->setMinimumHeight(160);layout->addWidget(plot);
+    status=new QLabel(QStringLiteral("계산 준비"),this);status->setObjectName("XtbStatus");status->setWordWrap(true);status->setTextInteractionFlags(Qt::TextSelectableByMouse);status->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);resultsLayout->addWidget(status);
+    energyMode=new QComboBox(this);energyMode->addItems({"Absolute energy (Eh)","Relative energy (kcal/mol, 첫 frame 기준)"});energyMode->setObjectName("XtbEnergyMode");resultsLayout->addWidget(energyMode);
+    plot=new PlotWidget(this);plot->setObjectName("XtbEnergyPlot");plot->setMinimumHeight(180);resultsLayout->addWidget(plot,1);
     connect(energyMode,&QComboBox::currentIndexChanged,this,[this]{refreshPlot();});
     auto *buttons=new QHBoxLayout;layout->addLayout(buttons);
     start=new QPushButton(QStringLiteral("계산 시작"),this);start->setObjectName("XtbStart");cancel=new QPushButton(QStringLiteral("중단"),this);cancel->setObjectName("XtbCancel");cancel->setEnabled(false);
-    auto *outputButton=new QPushButton(QStringLiteral("출력 보기"),this);buttons->addWidget(start);buttons->addWidget(cancel);buttons->addWidget(outputButton);
-    auto *results=new QHBoxLayout;layout->addLayout(results);
-    apply=new QPushButton(QStringLiteral("현재 구조에 적용"),this);apply->setObjectName("XtbApply");open=new QPushButton(QStringLiteral("새 구조로 열기"),this);open->setObjectName("XtbOpen");save=new QPushButton(QStringLiteral("XYZ 저장"),this);
+    auto *outputButton=new QPushButton(QStringLiteral("출력 보기"),this);outputButton->setObjectName("XtbOutput");buttons->addWidget(start);buttons->addWidget(cancel);buttons->addWidget(outputButton);buttons->addSpacing(12);
+    auto *results=buttons;
+    apply=new QPushButton(QStringLiteral("현재 구조에 적용"),this);apply->setObjectName("XtbApply");open=new QPushButton(QStringLiteral("새 구조로 열기"),this);open->setObjectName("XtbOpen");save=new QPushButton(QStringLiteral("XYZ 저장"),this);save->setObjectName("XtbSave");
     for(auto *button:{apply,open,save}){results->addWidget(button);button->setEnabled(false);}
     connect(start,&QPushButton::clicked,this,&XtbDialog::startCalculation);
     connect(cancel,&QPushButton::clicked,&runner,&XtbRunner::cancel);
@@ -92,7 +103,7 @@ void XtbDialog::startCalculation() {
     o.constraints=entries;
     o.preserveCoordination=preserveFramework->isChecked();
     o.preserveBondLengths=preserveBonds->isChecked();
-    settings->setEnabled(false);start->setEnabled(false);cancel->setEnabled(true);for(auto *b:{apply,open,save})b->setEnabled(false);
+    settings->setEnabled(false);constraints->setEnabled(false);start->setEnabled(false);cancel->setEnabled(true);for(auto *b:{apply,open,save})b->setEnabled(false);
     status->setText(QStringLiteral("시작 중..."));runner.start(original,o,runtime);
 }
 void XtbDialog::refreshPlot() {
@@ -100,7 +111,7 @@ void XtbDialog::refreshPlot() {
     plot->setSeries(values,"Optimization step",energyMode->currentIndex()?QStringLiteral("ΔE (kcal mol⁻¹)"):QStringLiteral("Energy (Eh)"));
 }
 void XtbDialog::finishCalculation() {
-    settings->setEnabled(true);start->setEnabled(true);cancel->setEnabled(false);
+    settings->setEnabled(true);constraints->setEnabled(true);start->setEnabled(true);cancel->setEnabled(false);
     QString label;
     switch(runner.state){case XtbRunner::State::Finished:label=kind->currentIndex()?QStringLiteral("최적화 수렴"):QStringLiteral("Single Point 완료");break;case XtbRunner::State::NotConverged:label=QStringLiteral("최적화 미수렴 — 마지막 geometry 확인 가능");break;case XtbRunner::State::Cancelled:label=QStringLiteral("중단 — 마지막 geometry 확인 가능");break;default:label=runner.error;break;}
     auto value=[](double v){return std::isfinite(v)?QString::number(v,'g',12):QStringLiteral("제공되지 않음");};

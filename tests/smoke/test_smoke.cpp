@@ -1,7 +1,10 @@
+#include <QScreen>
 #include "compute/GaussianConnection.h"
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
 #include "settings/AppPattern.h"
+#include "ui/SidebarFlowLayout.h"
+#include "ui/CenteredIconTabs.h"
 #include "ui/StartupSplash.h"
 #include "ui/OrbitalStudyWidget.h"
 #include "compute/GaussianTools.h"
@@ -76,8 +79,14 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QMimeData>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QUrl>
 #include <QScopeGuard>
 #include <QFileInfo>
+#include <QFileDialog>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <QProcess>
 #include <QProgressBar>
 #include <QStandardPaths>
@@ -88,9 +97,16 @@
 
 using namespace youngcraft;
 
+static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
+    for (auto *button : parent->findChildren<QToolButton *>())
+        if (button->defaultAction() == action) return button;
+    return nullptr;
+}
+
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void orbitalCacheAndDetachedWindow();
     void reactionCoordinatePresentationWorkflow();
     void hydrogenRemovalActions();
     void wholeMechanismAnimationWorkflow();
@@ -105,10 +121,15 @@ private slots:
     void optimizationGraphWindow();
     void patternTemplatesWorkflow();
     void patternViewportContinuity();
+    void professorPhotoTheme();
     void measurementBarPatternContinuity();
     void sidebarPatternContinuity();
+    void sidebarIconFlowLayout();
+    void frequencyPagingAndDetails();
+    void saveChoicesAndFormats();
     void dialogThemeSynchronization();
     void orbitalStudyControlsAndRendering();
+    void orbitalResponsiveSidebar();
     void orbitalThemesAndPatterns();
     void realRemoteOrbitalResults();
     void automaticRemoteConnectionAndHomo();
@@ -152,6 +173,7 @@ private slots:
     void mainWindowStartsWithKoreanUi();
     void startupSplashShowsAndCloses();
     void loadsGaussianFixtureWithoutBlocking();
+    void opensDroppedFilesFromViewportAndAnalysis();
     void moleculeViewKeepsManualBond();
     void rendersShadowAndTransparentCapture();
     void supersamplingSmoothsDiagonalEdges();
@@ -182,6 +204,7 @@ private slots:
     void mmChunkRegression();
     void mmPauseResumeStopConverge();
     void xtbGeometryActions();
+    void xtbCompactColumns();
     void crystalModesSwitchStructures();
     void styleEditorPreviewsImmediately();
     void editorInputTransactionsAndSelection();
@@ -208,7 +231,12 @@ void SmokeTest::additionalInteractionRequests(){
     auto *toggle=w.m_workspace->findChild<QPushButton *>("ViewportFrequencyToggle");QVERIFY(toggle);QVERIFY(toggle->isVisible());QVERIFY(w.m_animation->isPlaying());toggle->click();QVERIFY(!w.m_animation->isPlaying());
     const auto paused=view->molecule().atoms[0].position;QTest::qWait(70);QCOMPARE(view->molecule().atoms[0].position,paused);toggle->click();QVERIFY(w.m_animation->isPlaying());QTest::qWait(70);QVERIFY(view->molecule().atoms[0].position!=paused);
     w.m_workspace->findChild<QPushButton *>("ViewportFrequencyRestore")->click();QVERIFY(!w.m_animation->isPlaying());QCOMPARE(view->molecule().atoms[0].position,w.m_data.molecule.atoms[0].position);
-    auto *main=w.findChild<QToolBar *>("MainToolBar");auto *qm=w.findChild<QAction *>("QMOptimizationAction");QVERIFY(qm);const auto actions=main->actions();int index=actions.indexOf(qm);QVERIFY(index>0);QCOMPARE(actions[index-1]->text(),QStringLiteral("MM opt"));
+    auto *toolbar = w.findChild<QToolBar *>("MainToolBar");
+    QVERIFY(toolbar);
+    for (const auto *name : {"MMOptimizationAction", "QMOptimizationAction"}) {
+        auto *action = w.findChild<QAction *>(name);
+        QVERIFY(action && action->isEnabled() && toolbar->widgetForAction(action));
+    }
     if(!qEnvironmentVariableIsEmpty("YOUNGCRAFT_EDIT_PREVIEW")){QTest::qWait(100);w.grab().save(qEnvironmentVariable("YOUNGCRAFT_EDIT_PREVIEW"));}
 }
 
@@ -296,9 +324,7 @@ void SmokeTest::scanDisplayDefaults() {
     QVERIFY(window.m_view->style().showHydrogen);
     QVERIFY(!window.m_view->molecule().atoms[1].visible);
     QVERIFY(window.m_view->molecule().atoms[3].visible);
-    QAction *reset = nullptr;
-    for (auto *action : window.findChildren<QAction *>())
-        if (action->text() == QStringLiteral("수소 숨기기 초기화")) reset = action;
+    QAction *reset = window.findChild<QAction *>(QStringLiteral("RestoreCarbonHydrogens"));
     QVERIFY(reset);
     reset->trigger();
     QVERIFY(window.m_view->molecule().atoms[1].visible);
@@ -700,7 +726,7 @@ void SmokeTest::calculationDefaultPanels() {
     data.frequencies.clear(); data.excitedStates.clear();
     data.route="# opt b3lyp/6-31g(d)";
     window.m_explorerDock->hide(); window.onFileLoaded(loaded);
-    QCOMPARE(window.m_analysis->currentTab(),0); QVERIFY(window.m_explorerDock->isVisible());
+    QCOMPARE(window.m_analysis->currentTab(),0); QVERIFY(!window.m_explorerDock->isVisible());
     data.route="# opt freq b3lyp/6-31g(d)";
     window.onFileLoaded(loaded); QCOMPARE(window.m_analysis->currentTab(),1);
     data.route="# opt IRC=(calcfc,forward) freq";
@@ -721,15 +747,14 @@ void SmokeTest::calculationDefaultPanels() {
     data.route="# hf/sto-3g title=frequency";
     window.onFileLoaded(loaded); QCOMPARE(window.m_analysis->currentTab(),0);
     auto *toolbar = window.findChild<QToolBar *>("MainToolBar"); QVERIFY(toolbar);
-    const QStringList expected = {QStringLiteral("새 구조"),QStringLiteral("열기"),QStringLiteral("구조 그리기"),
-        "MM opt",QStringLiteral("이미지 복사"),QStringLiteral("맞춤 캡처"),QStringLiteral("수소 숨기기"),QStringLiteral("수소 숨기기 초기화"),
-        QStringLiteral("가운데 배치"),QStringLiteral("베스트 뷰"),QStringLiteral("뷰 동기화")};
-    const auto actions=toolbar->actions();
-    for (int i=0;i<expected.size();++i) QCOMPARE(actions[i]->text(),expected[i]);
-    auto *xyz=window.findChild<QAction *>("AnalysisPanelTab7"); QVERIFY(xyz);
-    QVERIFY(!toolbar->actions().contains(xyz));
-    QVERIFY(window.findChild<QToolBar *>("AnalysisToolBar")->actions().contains(xyz));
-    for (auto *action:actions) QVERIFY(action->text()!=QStringLiteral("TS 애니메이션 복사"));
+    QStringList buttons;
+    for (auto *action : toolbar->actions()) if (!action->isSeparator()) buttons << action->iconText();
+    QCOMPARE(buttons, QStringList({QStringLiteral("새 구조"), QStringLiteral("열기"),
+        QStringLiteral("MM 최적화"), QStringLiteral("xTB"), QStringLiteral("이미지 복사"),
+        QStringLiteral("맞춤 캡처"), QStringLiteral("내보내기"), QStringLiteral("결과 패널"),
+        QStringLiteral("구조 패널"), QStringLiteral("원문 보기")}));
+    auto *xyz = window.findChild<QAction *>("AnalysisPanelTab7");
+    QVERIFY(xyz && toolButtonForAction(window.m_explorerDock, xyz));
 }
 
 void SmokeTest::contextualTsCopyButton() {
@@ -739,11 +764,13 @@ void SmokeTest::contextualTsCopyButton() {
     CalculationData data; FrequencyMode mode; mode.wavenumber=100;
     data.frequencies={mode}; panel.setData(data); QVERIFY(!copy->isVisible());
     mode.imaginary=true; mode.wavenumber=-200;
-    data.frequencies={mode}; panel.setData(data); QVERIFY(copy->isVisible());
+    data.frequencies={mode}; panel.setData(data);
+    auto *details=panel.findChild<QPushButton*>("OpenFrequencyDetails");QVERIFY(details);details->click();QVERIFY(copy->isVisible());
     QSignalSpy requested(&panel,&AnalysisPanel::animationCopyRequested);
     copy->click(); QCOMPARE(requested.count(),1);
+    panel.findChild<QDialog*>("FrequencyDetailsDialog")->hide();
     panel.setCurrentTab(0); QVERIFY(!copy->isVisible());
-    panel.setCurrentTab(1); QVERIFY(copy->isVisible());
+    panel.setCurrentTab(1); details->click();QVERIFY(copy->isVisible());
     panel.setData(CalculationData{}); QVERIFY(!copy->isVisible());
 }
 
@@ -1118,6 +1145,7 @@ void SmokeTest::nativeTabDragBetweenWindows_data() {
 void SmokeTest::nativeTabDragBetweenWindows() {
 #ifdef Q_OS_WIN
     if (QGuiApplication::platformName() != "windows") QSKIP("Requires the Windows drag backend");
+    if (!qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR")) QSKIP("Native drag needs unmodified Windows desktop scaling");
     QFETCH(bool, ontoTabBar);
     QFETCH(bool, reorderFirst);
     MainWindow source, target;
@@ -1200,6 +1228,7 @@ void SmokeTest::movesDocumentsBetweenWindows() {
     QCOMPARE(target.m_view, view);
     QCOMPARE(target.m_currentSidebar, sidebar);
     QCOMPARE(target.m_workspace, workspace);
+    QVERIFY(target.m_structureDock->isAncestorOf(target.m_drawBar));
     QCOMPARE(target.m_view->molecule().atoms[1].position.y(), 0.5f);
     QVERIFY(!target.m_view->molecule().atoms[2].visible);
     QCOMPARE(target.m_geometrySelection, QVector<int>({0,1}));
@@ -1320,15 +1349,12 @@ void SmokeTest::atomVisibilityPreservesViewAndScroll() {
     for (int i=0; i<toolbarActions.size(); ++i)
         if (toolbarActions[i]->text() == QStringLiteral("이미지 복사")) copyIndex = i;
     QVERIFY(copyIndex >= 0);
-    QAction *removeHydrogen = nullptr, *resetHydrogen = nullptr;
-    for (auto *action : toolbarActions) {
-        if (action->text() == QStringLiteral("수소 숨기기")) removeHydrogen = action;
-        if (action->text() == QStringLiteral("수소 숨기기 초기화")) resetHydrogen = action;
-    }
+    auto *removeHydrogen = w.findChild<QAction *>("HideCarbonHydrogens");
+    auto *resetHydrogen = w.findChild<QAction *>("RestoreCarbonHydrogens");
     QVERIFY(removeHydrogen);
     QVERIFY(resetHydrogen);
-    QCOMPARE(removeHydrogen->text(), QStringLiteral("수소 숨기기"));
-    QCOMPARE(resetHydrogen->text(), QStringLiteral("수소 숨기기 초기화"));
+    QVERIFY(toolButtonForAction(w.m_structureDock, removeHydrogen));
+    QVERIFY(toolButtonForAction(w.m_structureDock, resetHydrogen));
     w.applyAtomSelection({0,2});
     // A reset must affect only C-bound H, leaving unrelated hidden atoms alone.
     w.m_data.molecule.atoms[4].visible = false;
@@ -1377,33 +1403,111 @@ void SmokeTest::atomVisibilityPreservesViewAndScroll() {
 
 void SmokeTest::topPanelToolbarFollowsDocuments() {
     MainWindow w; w.resize(1400,900); w.show();
-    auto *toolbar = w.findChild<QToolBar *>("AnalysisToolBar"); QVERIFY(toolbar);
+    auto *toolbar = w.findChild<QToolBar *>("MainToolBar"); QVERIFY(toolbar);
     QCOMPARE(w.toolBarArea(toolbar), Qt::TopToolBarArea);
+    QCOMPARE(w.findChildren<QToolBar *>().size(), 1);
+    QCOMPARE(toolbar->toolButtonStyle(), Qt::ToolButtonIconOnly);
+    const auto commonActions = {"NewStructure", "OpenStructureFile", "MMOptimizationAction",
+                                "QMOptimizationAction", "CopyStructureImage", "CustomStructureCapture",
+                                "ToolbarExport", "ToggleResultsSidebar", "ToggleStructureSidebar", "ToggleOutputSource"};
+    for (const auto *name : commonActions) {
+        auto *action = w.findChild<QAction *>(name);
+        QVERIFY(action);
+        auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
+        QVERIFY(button && !button->icon().isNull());
+        QCOMPARE(button->size(), QSize(32, 32));
+        QVERIFY(!button->accessibleName().isEmpty());
+    }
+    QVERIFY(!w.findChild<QAction *>("MMOptimizationAction")->isEnabled());
+    QVERIFY(!w.findChild<QAction *>("CopyStructureImage")->isEnabled());
     QCOMPARE(w.dockWidgetArea(w.m_explorerDock), Qt::LeftDockWidgetArea);
-    QVERIFY(toolbar->geometry().top() > w.findChild<QToolBar *>("MainToolBar")->geometry().top());
+    QCOMPARE(w.dockWidgetArea(w.m_structureDock), Qt::RightDockWidgetArea);
+    auto *leftToggle = toolbar->widgetForAction(w.m_explorerDock->toggleViewAction());
+    auto *rightToggle = toolbar->widgetForAction(w.m_structureDock->toggleViewAction());
+    QVERIFY(leftToggle && rightToggle && leftToggle->isVisible() && rightToggle->isVisible());
+    w.m_explorerDock->show();
+    w.m_structureDock->show();
+    QTest::mouseClick(leftToggle, Qt::LeftButton);
+    QVERIFY(!w.m_explorerDock->isVisible());
+    QVERIFY(w.m_structureDock->isVisible());
+    QTest::mouseClick(rightToggle, Qt::LeftButton);
+    QVERIFY(!w.m_explorerDock->isVisible());
+    QVERIFY(!w.m_structureDock->isVisible());
+    QTest::mouseClick(leftToggle, Qt::LeftButton);
+    QVERIFY(w.m_explorerDock->isVisible());
+    QVERIFY(!w.m_structureDock->isVisible());
+    QTest::mouseClick(rightToggle, Qt::LeftButton);
+    QVERIFY(w.m_structureDock->isVisible());
+
     Molecule m; m.atoms = {{1,6,"C",{}}}; w.newDrawingDocument(m); w.setDrawingMode(false);
+    QVERIFY(w.findChild<QAction *>("MMOptimizationAction")->isEnabled());
+    QVERIFY(w.findChild<QAction *>("CopyStructureImage")->isEnabled());
     const int first = w.m_documentTabs->currentIndex();
-    auto *frequency = w.findChild<QAction *>("AnalysisPanelTab1"); QVERIFY(frequency);
-    frequency->trigger(); QCOMPARE(w.m_analysis->currentTab(),1); QVERIFY(frequency->isChecked());
+    auto *frequency = w.findChild<QToolButton *>("AnalysisShortcut1");
+    auto *opt = w.findChild<QToolButton *>("AnalysisShortcut0");
+    QVERIFY(frequency && opt && opt->isVisible() && !frequency->isVisible());
+    auto *source = w.findChild<QToolButton *>("ResultSourceButton");
+    QVERIFY(source && !source->isVisible());
+    w.m_data.route = QStringLiteral("# opt freq");
+    w.m_analysis->setData(w.m_data);
+    QVERIFY(frequency->isVisible());
+    QTest::mouseClick(frequency, Qt::LeftButton);
+    QCOMPARE(w.m_analysis->currentTab(), 1);
+    QVERIFY(frequency->isChecked());
     auto *splitter = w.m_currentSidebar->findChild<QSplitter *>("SidebarPanelSplitter");
     // The sidebar itself is the splitter.
     if (!splitter) splitter = qobject_cast<QSplitter *>(w.m_currentSidebar);
     QVERIFY(splitter); QCOMPARE(splitter->orientation(), Qt::Vertical);
     auto *firstPanel = w.m_analysis;
     w.newDrawingDocument(m); w.setDrawingMode(false);
-    auto *atoms = w.findChild<QAction *>("AnalysisPanelTab5"); QVERIFY(atoms);
-    atoms->trigger(); QCOMPARE(w.m_analysis->currentTab(),5); QVERIFY(atoms->isChecked());
+    auto *atoms = w.findChild<QToolButton *>("AnalysisShortcut5");
+    QVERIFY(atoms && atoms->isVisible() && !frequency->isVisible());
+    QTest::mouseClick(atoms, Qt::LeftButton);
+    QCOMPARE(w.m_analysis->currentTab(), 5);
+    QVERIFY(atoms->isChecked());
     w.m_documentTabs->setCurrentIndex(first);
-    QCOMPARE(w.m_analysis, firstPanel); QCOMPARE(w.m_analysis->currentTab(),1);
-    QVERIFY(frequency->isChecked()); QVERIFY(!atoms->isChecked());
-    frequency->trigger(); QVERIFY(!w.m_explorerDock->isVisible()); QVERIFY(!frequency->isChecked());
-    frequency->trigger(); QVERIFY(w.m_explorerDock->isVisible()); QVERIFY(frequency->isChecked());
+    QCOMPARE(w.m_analysis, firstPanel);
+    QCOMPARE(w.m_analysis->currentTab(), 1);
+    QVERIFY(frequency->isVisible() && frequency->isChecked() && !atoms->isChecked());
+    QTest::mouseClick(leftToggle, Qt::LeftButton);
+    QVERIFY(!w.m_explorerDock->isVisible());
+    const QString path = QFINDTESTDATA("tests/data/mvp.out");
+    QVERIFY(!path.isEmpty());
+    w.openFile(path);
+    QTRY_VERIFY_WITH_TIMEOUT(w.m_workspace->property("loadFinished").toBool(), 10000);
+    QVERIFY(!w.m_explorerDock->isVisible());
+    QTest::mouseClick(leftToggle, Qt::LeftButton);
+    QVERIFY(source->isVisible());
     QVERIFY(w.m_view->height() > 200);
+
+    w.resize(820, 640);
+    QTRY_COMPARE(w.size(), QSize(820, 640));
+    auto *bottomToggle = toolbar->widgetForAction(w.m_outputDock->toggleViewAction());
+    QVERIFY(bottomToggle && bottomToggle->isVisible());
+    QTest::mouseClick(bottomToggle, Qt::LeftButton);
+    QTRY_VERIFY(w.m_outputDock->isVisible());
+    QTRY_COMPARE(w.size(), QSize(820, 640));
+    QCOMPARE(frequency->size(), QSize(32, 32));
+    QVERIFY(!frequency->icon().isNull());
+    const auto outputButtons = w.m_outputDock->findChildren<QPushButton *>();
+    QCOMPARE(outputButtons.size(), 4);
+    for (auto *button : outputButtons) {
+        QCOMPARE(button->size(), QSize(32, 32));
+        QVERIFY(!button->icon().isNull() && !button->accessibleName().isEmpty());
+        QVERIFY(w.m_outputDock->rect().contains(button->mapTo(w.m_outputDock, button->rect().bottomRight())));
+    }
+    QCOMPARE(w.m_view->geometry(), w.m_view->parentWidget()->rect());
+    const auto compactCapture = qEnvironmentVariable("YOUNGCRAFT_COMPACT_CAPTURE");
+    if (!compactCapture.isEmpty()) {
+        QTest::qWait(120);
+        QVERIFY(w.grab().save(compactCapture));
+    }
+    QTest::mouseClick(bottomToggle, Qt::LeftButton);
+    QVERIFY(!w.m_outputDock->isVisible());
     const auto capture = qEnvironmentVariable("YOUNGCRAFT_TOP_PANEL_CAPTURE");
     if (!capture.isEmpty()) {
-        w.openFile("tests/data/mvp.out");
-        QTRY_VERIFY_WITH_TIMEOUT(w.m_workspace->property("loadFinished").toBool(), 10000);
-        w.m_analysis->setCurrentTab(1); w.m_explorerDock->show();
+        w.m_analysis->setCurrentTab(1);
+        w.m_structureTabs->setCurrentIndex(0);
         QTest::qWait(150); QVERIFY(w.grab().save(capture));
     }
 }
@@ -1442,11 +1546,12 @@ void SmokeTest::scanVisibilityAndFlexibleViewport() {
     MainWindow w; w.resize(1400,900); w.show(); QTest::qWait(60);
     QVERIFY(!w.findChild<QWidget *>("ScanWorkspace"));
     QCOMPARE(w.m_view->geometry(),w.m_view->parentWidget()->rect());
-    auto *toolbar = w.findChild<QToolBar *>("AnalysisToolBar"); QVERIFY(toolbar);
-    const QStringList labels = {"Opt","Freq","Scan","IRC","TD-DFT","Atom Properties","Orbitals","XYZ"};
+    const QStringList labels = w.m_analysis->tabTitles();
     for (int i=0; i<labels.size(); ++i) {
         auto *a=w.findChild<QAction *>(QString("AnalysisPanelTab%1").arg(i));
-        QVERIFY(a); QCOMPARE(a->text(), labels[i]);
+        QVERIFY(a); QCOMPARE(a->toolTip(), labels[i]);
+        auto *button = w.m_analysisShortcuts->findChild<QToolButton *>(QString("AnalysisShortcut%1").arg(i));
+        QVERIFY(button && button->defaultAction() == a);
     }
     // A real Gaussian optimization/frequency output with its Scan sections removed.
     QFile input("tests/data/mvp.out"); QVERIFY(input.open(QIODevice::ReadOnly));
@@ -1535,19 +1640,17 @@ void SmokeTest::atomNumbersToolbarLabelsEveryAtom() {
     style.showHydrogen = true;
     window.applyStyle(style);
     auto *action = window.findChild<QAction *>(QStringLiteral("ShowAtomNumbers"));
-    auto *toolbar = window.findChild<QToolBar *>(QStringLiteral("AnalysisToolBar"));
-    QVERIFY(action); QVERIFY(toolbar);
-    auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
-    QVERIFY(button);
-    QCOMPARE(button->text(), QStringLiteral("Atomic number"));
-    QVERIFY(!button->isChecked());
+    window.m_structureTabs->setCurrentIndex(0);
+    auto *display = toolButtonForAction(window.m_structureDock, action);
+    QVERIFY(action && display && display->isVisible());
+    QVERIFY(!action->isChecked());
     auto *view = window.m_view;
     view->bestView();
     QTest::qWait(150);
     const bool visual = QGuiApplication::platformName() != "offscreen";
     QImage before;
     if (visual) { QVERIFY(view->isValid()); before = view->image(); }
-    QTest::mouseClick(button, Qt::LeftButton);
+    QTest::mouseClick(display, Qt::LeftButton);
     QVERIFY(action->isChecked());
     QVERIFY(view->style().showLabels);
     if (visual) {
@@ -1567,12 +1670,12 @@ void SmokeTest::atomNumbersToolbarLabelsEveryAtom() {
     window.newDrawingDocument(molecule);
     style.showLabels = false;
     window.applyStyle(style);
-    QVERIFY(!button->isChecked());
+    QVERIFY(!action->isChecked());
     window.m_documentTabs->setCurrentIndex(numberedTab);
-    QVERIFY(button->isChecked());
+    QVERIFY(action->isChecked());
     QVERIFY(window.m_view->style().showLabels);
-    action->trigger(); // The menu and toolbar share the same action.
-    QVERIFY(!button->isChecked());
+    action->trigger();
+    QVERIFY(!action->isChecked());
     QVERIFY(!window.m_view->style().showLabels);
     window.applyStyle(originalStyle);
 }
@@ -1700,11 +1803,46 @@ void SmokeTest::mmPauseResumeStopConverge() {
     qputenv("YOUNGCRAFT_FAKE_CONVERGE","1");begin();QTRY_VERIFY_WITH_TIMEOUT(!window.m_mmProcess,3000);QCOMPARE(window.m_mmStep,64);QCOMPARE(window.m_mmState,MainWindow::MMState::Finished);QVERIFY(window.m_mmLabel->text().contains(QStringLiteral("수렴")));
     qunsetenv("YOUNGCRAFT_FAKE_CONVERGE");qunsetenv("YOUNGCRAFT_MM_TEST_WORKER");
 }
+void SmokeTest::xtbCompactColumns(){
+    const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("XtbCompactColumns");QSettings().clear();
+    auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
+    MainWindow owner;owner.resize(1400,900);owner.show();
+    Molecule molecule;molecule.atoms={{1,28,"Ni",{0,0,0}},{2,7,"N",{1.8f,0,0}},{3,8,"O",{0,1.8f,0}}};molecule.rebuildBonds();
+    auto *dialog=new XtbDialog(molecule,QString(),&owner,2,false,{0,1});dialog->show();QTest::qWait(50);
+    auto *left=dialog->findChild<QScrollArea*>("XtbSettingsScroll");auto *right=dialog->findChild<QScrollArea*>("XtbResultsScroll");
+    auto *editor=static_cast<ConstraintEditor*>(dialog->findChild<QWidget*>("ConstraintEditor"));auto *plot=dialog->findChild<PlotWidget*>("XtbEnergyPlot");QVERIFY(left&&right&&editor&&plot);
+    auto *add=editor->findChild<QPushButton*>("AddConstraint");auto *remove=editor->findChild<QPushButton*>("RemoveConstraint");
+    auto *freeze=editor->findChild<QPushButton*>("FreezeSelectedAtoms");auto *all=editor->findChild<QPushButton*>("FreezeAllAtoms");
+    add->click();QVector<GeometryConstraint> constraints;QString error;QVERIFY2(editor->read(constraints,&error),qPrintable(error));QCOMPARE(constraints.size(),1);QCOMPARE(constraints[0].atoms,QVector<int>({0,1}));
+    const QString capture=qEnvironmentVariable("YOUNGCRAFT_XTB_LAYOUT_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
+    for(int theme=0;theme<6;++theme){
+        owner.findChild<QAction*>(QString("PastelTheme%1").arg(theme))->trigger();
+        for(const QSize size:{QSize(960,720),QSize(860,620)}){
+            dialog->resize(size);QTest::qWait(35);QCOMPARE(dialog->size(),size);
+            QVERIFY(left->mapTo(dialog,QPoint(left->width(),0)).x()<=right->mapTo(dialog,QPoint()).x());
+            QCOMPARE(left->horizontalScrollBar()->maximum(),0);QCOMPARE(right->horizontalScrollBar()->maximum(),0);
+            QCOMPARE(add->y(),remove->y());QCOMPARE(freeze->y(),all->y());QCOMPARE(add->x(),freeze->x());QVERIFY(freeze->y()>add->y());
+            int y=-1;
+            for(const char *name:{"XtbStart","XtbCancel","XtbOutput","XtbApply","XtbOpen","XtbSave"}){
+                auto *button=dialog->findChild<QPushButton*>(name);QVERIFY(button);const auto position=button->mapTo(dialog,QPoint());
+                QVERIFY(dialog->rect().contains(QRect(position,button->size())));if(y<0)y=position.y();QCOMPARE(position.y(),y);
+            }
+            auto *table=editor->findChild<QTableWidget*>("ConstraintTable");QVERIFY(plot->mapTo(dialog,QPoint()).x()>=right->mapTo(dialog,QPoint()).x());
+            QVERIFY(plot->mapTo(dialog,QPoint()).y()>table->mapTo(dialog,table->rect().bottomLeft()).y());
+            if(size.height()>=700)QVERIFY(right->viewport()->rect().contains(plot->mapTo(right->viewport(),plot->rect().bottomRight())));
+            if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+QString("/theme-%1-%2x%3.png").arg(theme).arg(size.width()).arg(size.height())));
+        }
+    }
+    dialog->close();
+}
+
 void SmokeTest::xtbGeometryActions() {
     qputenv("YOUNGCRAFT_XTB_TEST_RUNTIME",QDir::current().filePath("xtb_runtime").toUtf8());
     MainWindow window;window.show();Molecule m;m.atoms={{1,8,"O",{0,0,0}},{2,1,"H",{1.2f,0,0}},{3,1,"H",{-0.3f,1.1f,0}}};m.rebuildBonds();window.newDrawingDocument(m);
     window.startXtbCalculation();auto *dialog=window.findChild<XtbDialog *>();QVERIFY(dialog);dialog->findChild<QPushButton *>("XtbStart")->click();
-    auto *apply=dialog->findChild<QPushButton *>("XtbApply");QTRY_VERIFY_WITH_TIMEOUT(apply->isEnabled(),15000);QVERIFY(dialog->findChild<QLabel *>("XtbStatus")->text().contains(QStringLiteral("최적화 수렴")));
+    QVERIFY(!dialog->findChild<QWidget*>("ConstraintEditor")->isEnabled());QVERIFY(dialog->findChild<QPushButton*>("XtbOutput")->isEnabled());
+    auto *apply=dialog->findChild<QPushButton *>("XtbApply");QTRY_VERIFY_WITH_TIMEOUT(apply->isEnabled(),15000);QVERIFY(dialog->findChild<QLabel *>("XtbStatus")->text().contains(QStringLiteral("최적화 수렴")));QVERIFY(dialog->findChild<QWidget*>("ConstraintEditor")->isEnabled());
     auto *plot=dialog->findChild<PlotWidget *>("XtbEnergyPlot");QVERIFY(plot->series().size()>1);
     QVERIFY(dialog->grab().save(QDir::current().filePath("docs/xtb-dialog.png")));
     auto optimized=window.m_view->molecule();QVERIFY((optimized.atoms[1].position-m.atoms[1].position).length()>0.01f);
@@ -1769,12 +1907,9 @@ void SmokeTest::mmStopTerminatesWorker() {
     MainWindow window;
     window.show();
     QAction *draw = nullptr, *optimize = nullptr;
-    for (QAction *menuAction : window.menuBar()->actions()) {
-        if (!menuAction->menu()) continue;
-        for (QAction *action : menuAction->menu()->actions()) {
-            if (action->text() == QStringLiteral("새 구조 그리기")) draw = action;
-            if (action->text() == QStringLiteral("구조 최적화...")) optimize = action;
-        }
+    for (QAction *action : window.findChildren<QAction *>()) {
+        if (action->text() == QStringLiteral("새 구조 그리기")) draw = action;
+        if (action->objectName() == QStringLiteral("MMOptimizationAction")) optimize = action;
     }
     QVERIFY(draw); QVERIFY(optimize);
     draw->trigger();
@@ -1810,21 +1945,27 @@ void SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() {
     window.resize(1100, 750);
     window.show();
     QAction *newDrawing = nullptr, *undo = nullptr, *redo = nullptr;
-    for (QAction *menuAction : window.menuBar()->actions()) {
-        if (!menuAction->menu()) continue;
-        for (QAction *action : menuAction->menu()->actions()) {
-            if (action->text() == QStringLiteral("새 구조 그리기")) newDrawing = action;
-            if (action->text() == QStringLiteral("실행 취소")) undo = action;
-            if (action->text() == QStringLiteral("다시 실행")) redo = action;
-        }
+    for (QAction *action : window.findChildren<QAction *>()) {
+        if (action->text() == QStringLiteral("새 구조 그리기")) newDrawing = action;
+        if (action->text() == QStringLiteral("실행 취소")) undo = action;
+        if (action->text() == QStringLiteral("다시 실행")) redo = action;
     }
     QVERIFY(newDrawing); QVERIFY(undo); QVERIFY(redo);
+    const auto menuReview=qEnvironmentVariable("YOUNGCRAFT_EDIT_MENU_REVIEW");
+    if(!menuReview.isEmpty()) {
+        QDir().mkpath(menuReview);
+        auto *edit=window.findChild<QMenu *>("EditMenu");QVERIFY(edit);
+        edit->popup(window.mapToGlobal(QPoint(30,40)));QTest::qWait(60);
+        QVERIFY(edit->height()<600);
+        QVERIFY(edit->grab().save(menuReview+"/edit-menu.png"));
+        edit->hide();
+    }
     newDrawing->trigger();
     auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("DocumentTabs"));
     QVERIFY(tabs);
     auto *view = tabs->currentWidget()->findChild<MoleculeView *>();
-    auto *autoH = tabs->currentWidget()->findChild<QPushButton *>(QStringLiteral("AutoHydrogenButton"));
-    auto *order = tabs->currentWidget()->findChild<QComboBox *>(QStringLiteral("DrawBondOrder"));
+    auto *autoH = window.m_drawBar->findChild<QPushButton *>(QStringLiteral("AutoHydrogenButton"));
+    auto *order = window.m_drawBar->findChild<QComboBox *>(QStringLiteral("DrawBondOrder"));
     QVERIFY(view); QVERIFY(autoH); QVERIFY(order);
     QVERIFY(!autoH->isChecked());
     autoH->click();
@@ -1843,9 +1984,7 @@ void SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() {
     QCOMPARE(view->molecule().atoms.size(), 6);
     redo->trigger();
     QCOMPARE(view->molecule().atoms.size(), 4);
-    QPushButton *deleteAtom = nullptr;
-    for (QPushButton *button : tabs->currentWidget()->findChildren<QPushButton *>())
-        if (button->text() == QStringLiteral("선택 원자 삭제")) deleteAtom = button;
+    auto *deleteAtom = window.m_drawBar->findChild<QPushButton *>("Document_deleteAtom");
     QVERIFY(deleteAtom);
     view->setSelectedAtom(1);
     deleteAtom->click();
@@ -1853,11 +1992,8 @@ void SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() {
     undo->trigger();
     QCOMPARE(view->molecule().atoms.size(), 4);
     QAction *clearBonds = nullptr;
-    for (QAction *menuAction : window.menuBar()->actions()) {
-        if (!menuAction->menu()) continue;
-        for (QAction *action : menuAction->menu()->actions())
-            if (action->text() == QStringLiteral("모든 결합 지우기")) clearBonds = action;
-    }
+    for (QAction *action : window.findChildren<QAction *>())
+        if (action->text() == QStringLiteral("모든 결합 지우기")) clearBonds = action;
     QVERIFY(clearBonds);
     clearBonds->trigger();
     QCOMPARE(view->molecule().atoms.size(), 10); // Two isolated CH4 fragments.
@@ -1879,14 +2015,19 @@ void SmokeTest::toolbarDrawKeepsWindowOpen() {
     window.show();
     auto *toolbar = window.findChild<QToolBar *>(QStringLiteral("MainToolBar"));
     QVERIFY(toolbar);
-    QAction *draw = nullptr;
-    for (QAction *action : toolbar->actions())
-        if (action->text() == QStringLiteral("구조 그리기")) draw = action;
+    auto *draw = window.findChild<QAction *>("DrawCurrentStructure");
     QVERIFY(draw);
-    QWidget *button = toolbar->widgetForAction(draw);
-    QVERIFY(button);
+    window.m_structureDock->show();
+    window.m_structureTabs->setCurrentIndex(1);
+    auto *button = toolButtonForAction(window.m_structureDock, draw);
+    QVERIFY(button && button->isVisible());
+    const auto chooseDraw = [&] {
+        QTest::mouseClick(button, Qt::LeftButton);
+        QVERIFY(window.m_structureDock->isAncestorOf(window.m_drawBar));
+        QVERIFY(window.m_drawBar->isVisible());
+    };
 
-    QTest::mouseClick(button, Qt::LeftButton);
+    chooseDraw();
     QVERIFY(window.isVisible());
     auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("DocumentTabs"));
     QVERIFY(tabs);
@@ -1903,13 +2044,17 @@ void SmokeTest::toolbarDrawKeepsWindowOpen() {
     QVERIFY(!path.isEmpty());
     window.openFile(path);
     QTRY_VERIFY_WITH_TIMEOUT(tabs->currentWidget()->property("loadFinished").toBool(), 15000);
-    QTest::mouseClick(button, Qt::LeftButton);
+    chooseDraw();
     QVERIFY(window.isVisible());
     QCOMPARE(tabs->count(), 2);
     view = tabs->currentWidget()->findChild<MoleculeView *>();
     QVERIFY(view);
     QVERIFY(view->isVisible());
     QVERIFY(!view->molecule().atoms.isEmpty());
+    auto *finish = window.m_drawBar->findChild<QPushButton *>("Document_finishDrawing");
+    QVERIFY(finish);
+    finish->click();
+    QVERIFY(!window.m_drawingMode && !window.m_drawBar->isVisible());
 }
 
 void SmokeTest::drawingModeCreatesAtomsAndBonds() {
@@ -1918,12 +2063,9 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
     window.show();
     QAction *drawAction = nullptr;
     QAction *optimizeAction = nullptr;
-    for (QAction *menuAction : window.menuBar()->actions()) {
-        if (!menuAction->menu()) continue;
-        for (QAction *action : menuAction->menu()->actions()) {
-            if (action->text() == QStringLiteral("새 구조 그리기")) drawAction = action;
-            if (action->text() == QStringLiteral("구조 최적화...")) optimizeAction = action;
-        }
+    for (QAction *action : window.findChildren<QAction *>()) {
+        if (action->text() == QStringLiteral("새 구조 그리기")) drawAction = action;
+        if (action->objectName() == QStringLiteral("MMOptimizationAction")) optimizeAction = action;
     }
     QVERIFY(drawAction);
     QVERIFY(optimizeAction);
@@ -1978,7 +2120,7 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
     element->setCurrentText(QStringLiteral("N"));
     QPushButton *replace = nullptr;
     for (QPushButton *candidate : window.findChildren<QPushButton *>())
-        if (candidate->isVisible() && candidate->text() == QStringLiteral("선택 원자 → 현재 원소")) replace = candidate;
+        if (candidate->isVisible() && (candidate->text() == QStringLiteral("선택 원자 → 현재 원소") || candidate->accessibleName() == QStringLiteral("선택 원자 → 현재 원소"))) replace = candidate;
     QVERIFY(replace);
     replace->click();
     QCOMPARE(view->molecule().atoms[1].atomicNumber, 7);
@@ -1986,7 +2128,7 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
     QVERIFY(!view->molecule().atoms[1].colorOverride.isValid());
     QPushButton *finish = nullptr;
     for (QPushButton *candidate : window.findChildren<QPushButton *>())
-        if (candidate->isVisible() && candidate->text() == QStringLiteral("그리기 종료")) finish = candidate;
+        if (candidate->isVisible() && (candidate->text() == QStringLiteral("그리기 종료") || candidate->accessibleName() == QStringLiteral("그리기 종료"))) finish = candidate;
     QVERIFY(finish);
     finish->click();
     QTest::keyClick(&window, Qt::Key_D, Qt::ControlModifier);
@@ -2186,8 +2328,9 @@ void SmokeTest::startupSplashShowsAndCloses() {
     QWidget ready;QElapsedTimer elapsed;elapsed.start();bool completed=false;
     splash.finishWhenReady(&ready,[&]{completed=true;});
     QTest::mouseClick(&splash,Qt::LeftButton);
-    QTest::qWait(1700);QVERIFY(splash.isVisible());QVERIFY(!ready.isVisible());QVERIFY(!completed);
-    QTRY_VERIFY_WITH_TIMEOUT(!splash.isVisible(),1800);QVERIFY(ready.isVisible());QVERIFY(completed);QVERIFY(elapsed.elapsed()>=2000);QVERIFY(elapsed.elapsed()<3000);
+    QTest::qWait(650);QVERIFY(splash.isVisible());QVERIFY(!ready.isVisible());QVERIFY(!completed);
+    QTRY_VERIFY_WITH_TIMEOUT(!splash.isVisible(),1200);QVERIFY(ready.isVisible());QVERIFY(completed);QVERIFY(elapsed.elapsed()>=950);QVERIFY(elapsed.elapsed()<1700);
+    qInfo()<<"Splash-to-workspace elapsed milliseconds:"<<elapsed.elapsed();
     StartupSplash closedEarly;closedEarly.show();auto *temporary=new QWidget;temporary->show();closedEarly.finishWhenReady(temporary);delete temporary;
     QTRY_VERIFY_WITH_TIMEOUT(!closedEarly.isVisible(),4500);
 }
@@ -2314,6 +2457,7 @@ void SmokeTest::copiesMoleculeWithTransparentBackground() {
 
     MainWindow window;
     window.resize(900, 700);
+    window.setProperty("appPattern", -1);
     Molecule molecule;
     molecule.atoms = {{1, 6, "C", {0, 0, 0}}};
     window.newDrawingDocument(molecule);
@@ -2530,7 +2674,7 @@ void SmokeTest::exposesAnalysisPanelRestoreAction() {
     for (QAction *menuAction : window.menuBar()->actions()) {
         if (!menuAction->menu()) continue;
         for (QAction *action : menuAction->menu()->actions()) {
-            if (action->text() == QStringLiteral("분석 패널 표시")) restore = action;
+            if (action->objectName() == QStringLiteral("ToggleResultsSidebar")) restore = action;
             if (action->text() == QStringLiteral("기본 패널 배치 복원")) resetLayout = action;
         }
     }
@@ -2547,7 +2691,7 @@ void SmokeTest::exposesKoreanFrequencyControls() {
     QVERIFY(checkTexts.contains(QStringLiteral("변위 벡터 표시")));
     QVERIFY(checkTexts.contains(QStringLiteral("스케일 벡터")));
     QStringList buttonTexts;
-    for (QPushButton *button : panel.findChildren<QPushButton *>()) buttonTexts.push_back(button->text());
+    for (QPushButton *button : panel.findChildren<QPushButton *>()) buttonTexts.push_back(button->accessibleName());
     QVERIFY(buttonTexts.contains(QStringLiteral("원래 구조")));
     QVERIFY(buttonTexts.contains(QStringLiteral("애니메이션 저장")));
     QCOMPARE(panel.frequencyAmplitude(), 0.5);
@@ -2693,6 +2837,51 @@ void SmokeTest::loadsGaussianFixtureWithoutBlocking() {
     }
 }
 
+void SmokeTest::opensDroppedFilesFromViewportAndAnalysis() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QStringList names = {QStringLiteral("시작 구조.xyz"), QStringLiteral("다음 구조.xyz"),
+                               QStringLiteral("마지막 구조.xyz")};
+    QList<QUrl> files;
+    for (const auto &name : names) {
+        QFile file(directory.filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write("1\nDrop fixture\nC 0 0 0\n") > 0);
+        files.push_back(QUrl::fromLocalFile(file.fileName()));
+    }
+
+    MainWindow window;
+    window.show();
+    QSignalSpy loaded(&window, &MainWindow::documentLoaded);
+    auto dropOn = [](QWidget *target, const QList<QUrl> &urls) {
+        QMimeData mime;
+        mime.setUrls(urls);
+        const auto actions = Qt::CopyAction | Qt::MoveAction;
+        const QPoint position(5, 5);
+        QDragEnterEvent enter(position, actions, &mime, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(target, &enter);
+        QVERIFY(enter.isAccepted());
+        QCOMPARE(enter.dropAction(), Qt::CopyAction);
+        QDropEvent drop(position, actions, &mime, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(target, &drop);
+        QVERIFY(drop.isAccepted());
+        QCOMPARE(drop.dropAction(), Qt::CopyAction);
+    };
+    dropOn(window.m_view, {files[0]});
+    QTRY_COMPARE(loaded.size(), 1);
+    window.m_analysis->setCurrentTab(7);
+    auto *input = window.m_analysis->findChild<QPlainTextEdit *>("CoordinatePasteInput");
+    QVERIFY(input && input->viewport()->acceptDrops());
+    dropOn(input->viewport(), {files[0], files[1], QUrl::fromLocalFile(directory.path()), files[2]});
+    QTRY_COMPARE(loaded.size(), 3);
+    QCOMPARE(window.m_documentTabs->count(), 3);
+    for (int i = 0; i < names.size(); ++i) {
+        QCOMPARE(window.m_documentTabs->tabText(i), names[i]);
+        QVERIFY(window.m_documentTabs->widget(i)->property("loadSuccess").toBool());
+        QVERIFY(QFileInfo::exists(files[i].toLocalFile()));
+    }
+}
+
 void SmokeTest::matchingAtomViewsSynchronize_data() {
     QTest::addColumn<bool>("perspective");
     QTest::newRow("orthographic") << false;
@@ -2704,8 +2893,7 @@ void SmokeTest::matchingAtomViewsSynchronize() {
     MainWindow w; w.resize(1200,850); w.show();
     auto *sync = w.findChild<QAction *>(QStringLiteral("SyncMatchingAtomViews"));
     QVERIFY(sync); QVERIFY(sync->isCheckable()); QVERIFY(!sync->isChecked());
-    auto *toolbar = w.findChild<QToolBar *>(QStringLiteral("MainToolBar"));
-    QVERIFY(toolbar->actions().contains(sync));
+    QVERIFY(toolButtonForAction(w.m_structureDock, sync));
     Molecule a; a.atoms = {{1,6,"C",{0,0,0}}, {2,8,"O",{2,0,0}}}; a.setBond(0,1,1);
     w.newDrawingDocument(a); w.setDrawingMode(false);
     auto *first = w.m_view; const int firstTab = w.m_documentTabs->currentIndex();
@@ -3005,7 +3193,7 @@ void SmokeTest::dialogThemeSynchronization(){
     QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("DialogThemeSync");QSettings().clear();
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1450,960);window.show();
-    window.findChild<QToolButton*>("PatternTemplate0")->click();
+    window.findChild<QAction *>("PatternTemplate0")->trigger();
     Molecule molecule;molecule.atoms={{1,6,"C",{0,0,0}},{2,8,"O",{1.3f,0,0}}};molecule.setBond(0,1,1);
     auto *xtb=new XtbDialog(molecule,QString(),&window,2,false,{});xtb->show();
     StyleEditorDialog style(window.m_style,&molecule,-1,&window);style.show();
@@ -3029,7 +3217,7 @@ void SmokeTest::dialogThemeSynchronization(){
         QVERIFY(qAbs(multi->m_views[0]->width()-multi->m_views[1]->width())<=1);
     };aligned();
     for(int i=0;i<6;++i){
-        window.findChild<QToolButton*>(QString("PastelTheme%1").arg(i))->click();
+        window.findChild<QAction *>(QString("PastelTheme%1").arg(i))->trigger();
         for(QDialog *dialog:{static_cast<QDialog*>(xtb),static_cast<QDialog*>(&style),&nested,static_cast<QDialog*>(capture),static_cast<QDialog*>(multi)}){
             QCOMPARE(dialog->property("appPattern").toInt(),0);
             QCOMPARE(dialog->property("appPatternPaper"),window.property("appPatternPaper"));
@@ -3038,43 +3226,214 @@ void SmokeTest::dialogThemeSynchronization(){
         }
         aligned();
     }
-    window.findChild<QToolButton*>("PastelTheme2")->click();
+    window.findChild<QAction *>("PastelTheme2")->trigger();
     capture->resize(1000,820);multi->resize(1000,820);QTest::qWait(50);aligned();
     capture->m_includeTs->setChecked(false);QTest::qWait(30);
     QCOMPARE(capture->m_views[0]->y(),capture->m_views[2]->y());QVERIFY(capture->m_views[0]->width()>capture->width()*.4);
     capture->m_includeTs->setChecked(true);capture->resize(1160,800);multi->resize(1200,800);QTest::qWait(50);aligned();
     const auto path=qEnvironmentVariable("YOUNGCRAFT_DIALOG_THEME_REVIEW");
     if(!path.isEmpty()){QTest::qWait(70);QVERIFY(xtb->grab().save(path));QVERIFY(style.grab().save(path+".style.png"));QVERIFY(capture->grab().save(path+".capture.png"));QVERIFY(multi->grab().save(path+".multi.png"));}
-    window.findChild<QToolButton*>("PatternTemplate0")->click();QVERIFY(!uiPattern::active(xtb));QVERIFY(!uiPattern::active(&nested));
+    window.findChild<QAction *>("PatternTemplate0")->trigger();QVERIFY(!uiPattern::active(xtb));QVERIFY(!uiPattern::active(&nested));
     nested.hide();style.hide();xtb->hide();
+}
+
+void SmokeTest::saveChoicesAndFormats(){
+    QTemporaryDir temporary;QVERIFY(temporary.isValid());
+    const auto review=qEnvironmentVariable("YOUNGCRAFT_SAVE_REVIEW");if(!review.isEmpty())QDir().mkpath(review);
+    QImage source(32,24,QImage::Format_ARGB32);source.fill(QColor(10,20,30));source.setPixelColor(0,0,Qt::transparent);source.setPixelColor(5,6,QColor(40,100,220,128));
+    source.setDotsPerMeterX(23622);source.setDotsPerMeterY(23622);
+    for(const QString &format:{QString("png"),QString("gif"),QString("jpg"),QString("jpeg"),QString("tif"),QString("tiff"),QString("bmp")}){
+        const auto path=temporary.filePath("sample."+format);QString error;
+        QVERIFY2(ImageExporter::saveImage(source,path,1,true,&error),qPrintable(error));QVERIFY(QFileInfo(path).size()>0);
+        if(format=="tif"||format=="tiff"){
+            QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));QVERIFY(file.read(4)==QByteArray("II*\0",4));
+        }else{
+            const QImage restored(path);QCOMPARE(restored.size(),source.size());
+            if(format=="png"||format=="gif")QCOMPARE(restored.pixelColor(0,0).alpha(),0);
+            if(format=="bmp")QCOMPARE(restored.pixelColor(0,0),QColor(Qt::white));
+        }
+        if(!review.isEmpty()){
+            QFile from(path);QVERIFY(from.open(QIODevice::ReadOnly));QFile to(review+"/sample."+format);QVERIFY(to.open(QIODevice::WriteOnly));to.write(from.readAll());
+        }
+    }
+    QString error;QVERIFY(!ImageExporter::saveImage(source,temporary.filePath("missing/sample.png"),1,true,&error));QVERIFY(!error.isEmpty());
+
+    const bool nativeDisabled=QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+    QApplication::setAttribute(Qt::AA_DontUseNativeDialogs,true);
+    auto restore=qScopeGuard([&]{QApplication::setAttribute(Qt::AA_DontUseNativeDialogs,nativeDisabled);});
+    MainWindow window;window.resize(1000,700);window.show();
+    Molecule molecule;molecule.title=QStringLiteral("저장 좌표 확인");molecule.atoms={{1,6,"C",{0,0,0}},{2,8,"O",{1.3f,0,0}}};molecule.setBond(0,1,1);
+    window.newDrawingDocument(molecule);window.setDrawingMode(false);
+    auto current=molecule;current.atoms[0].position={2.25f,-1.5f,.75f};window.m_view->setMolecule(current);
+    auto *save=window.findChild<QAction*>("SaveStructureImage");QVERIFY(save);QCOMPARE(save->shortcut(),QKeySequence("Ctrl+S"));
+    const auto exercise=[&](bool xyz,const QString &path){
+        bool failed=false,visitedChoice=false,visitedFile=false;int ticks=0;QTimer driver;driver.setInterval(20);
+        connect(&driver,&QTimer::timeout,&window,[&]{
+            auto *dialog=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!dialog)return;
+            if(++ticks>300){failed=true;dialog->reject();return;}
+            if(dialog->objectName()=="SaveStructureChoice"){
+                visitedChoice=true;
+                if(!review.isEmpty())dialog->grab().save(review+"/save-choice.png");
+                auto *choice=dialog->findChild<QPushButton*>(xyz?"SaveXYZChoice":"SavePictureChoice");if(!choice){failed=true;dialog->reject();return;}choice->click();
+            }else if(auto *file=qobject_cast<QFileDialog*>(dialog)){
+                visitedFile=true;
+                if(!xyz){const auto filters=file->nameFilters().join(';');for(const char *extension:{"*.png","*.gif","*.jpg","*.tif","*.bmp"})if(!filters.contains(extension))failed=true;file->selectNameFilter("PNG 그림 (*.png)");}
+                file->selectFile(path);QMetaObject::invokeMethod(file,"accept",Qt::DirectConnection);
+            }else if(auto *resolution=qobject_cast<QInputDialog*>(dialog)){resolution->setIntValue(512);resolution->accept();}
+            else if(auto *question=qobject_cast<QMessageBox*>(dialog)){
+                if(question->windowTitle()==QStringLiteral("투명 배경"))question->button(QMessageBox::Yes)->click();
+                else{failed=true;question->reject();}
+            }else{failed=true;dialog->reject();}
+        });
+        driver.start();save->trigger();driver.stop();QVERIFY(!failed);QVERIFY(visitedChoice&&visitedFile);
+    };
+    const auto xyzPath=temporary.filePath("현재 구조.xyz");exercise(true,xyzPath);QVERIFY(QFileInfo::exists(xyzPath));
+    const auto parsed=XYZParser::parse(xyzPath);QVERIFY(parsed.success);QCOMPARE(parsed.data.molecule.atoms.size(),2);
+    QCOMPARE(parsed.data.molecule.atoms[0].position,current.atoms[0].position);QCOMPARE(parsed.data.molecule.atoms[1].position,current.atoms[1].position);
+    const auto imageBase=temporary.filePath("rendered");exercise(false,imageBase);const QImage rendered(imageBase+".png");QVERIFY(!rendered.isNull());QCOMPARE(qMax(rendered.width(),rendered.height()),512);
+    bool cancelled=false;QTimer::singleShot(30,[&]{auto *dialog=window.findChild<QDialog*>("SaveStructureChoice");if(dialog){cancelled=true;dialog->reject();}});save->trigger();QVERIFY(cancelled);
+}
+
+void SmokeTest::frequencyPagingAndDetails(){
+    const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("FrequencyPages");QSettings().clear();
+    auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
+    MainWindow window;window.resize(1000,650);window.show();
+    Molecule molecule;molecule.atoms={{1,6,"C",{0,0,0}},{2,8,"O",{1.3f,0,0}}};molecule.setBond(0,1,1);
+    window.newDrawingDocument(molecule);window.setDrawingMode(false);
+    for(int i=0;i<12;++i){FrequencyMode mode;mode.number=i+1;mode.wavenumber=10.0*(i+1);mode.irIntensity=i+.25;mode.ramanActivity=i+.5;mode.displacement={{.1f,0,0},{-.1f,0,0}};window.m_data.frequencies.append(mode);}
+    window.m_analysis->setData(window.m_data);
+    auto *navigator=window.findChild<QAction*>("ToggleResultNavigator");navigator->setChecked(true);
+    window.m_analysis->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());
+    window.m_analysis->setCurrentTab(1);QTest::qWait(80);QVERIFY(window.m_explorer->isHidden());QVERIFY(navigator->isChecked());
+    auto *panel=window.m_analysis;auto *list=panel->findChild<QListWidget*>("FrequencyList");auto *next=panel->findChild<QPushButton*>("NextFrequencyPage");
+    auto *details=panel->findChild<QPushButton*>("OpenFrequencyDetails");QVERIFY(list&&next&&details);
+    QCOMPARE(panel->findChild<QWidget*>("FrequencyToolbar")->findChildren<QPushButton*>().size(),5);
+    const auto verifyPage=[&](int first,int size){int visible=0;for(int i=0;i<list->count();++i){QCOMPARE(!list->item(i)->isHidden(),i>=first&&i<first+size);if(!list->item(i)->isHidden())++visible;}QCOMPARE(visible,size);};
+    verifyPage(0,5);QCOMPARE(list->verticalScrollBarPolicy(),Qt::ScrollBarAlwaysOff);
+    QSignalSpy requests(panel,&AnalysisPanel::frequencyRequested);
+    next->click();verifyPage(5,5);QCOMPARE(panel->currentFrequency(),5);QCOMPARE(window.m_currentFrequency,5);QCOMPARE(requests.size(),1);
+    next->click();verifyPage(10,2);next->click();verifyPage(0,5);
+    panel->setCurrentFrequency(4);panel->selectNext();verifyPage(5,5);QCOMPARE(panel->currentFrequency(),5);
+    auto *scroll=window.m_currentSidebar->findChild<QScrollArea*>("SidebarAnalysisScroll");QVERIFY(scroll);
+    for(const char *name:{"FrequencyAmplitude","FrequencyCycleTime","FrequencyScaledVectors"}){
+        auto *control=panel->findChild<QWidget*>(name);QVERIFY(control&&control->isVisible());
+        QVERIFY(scroll->viewport()->rect().contains(control->mapTo(scroll->viewport(),control->rect().bottomRight())));
+    }
+    const QString capture=qEnvironmentVariable("YOUNGCRAFT_FREQUENCY_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
+    if(!capture.isEmpty())QVERIFY(window.grab().save(capture+"/frequency-page.png"));
+    details->click();auto *dialog=panel->findChild<QDialog*>("FrequencyDetailsDialog");QVERIFY(dialog->isVisible());
+    auto *table=dialog->findChild<QTableWidget*>("FrequencyDetailsTable");QCOMPARE(table->rowCount(),12);QCOMPARE(table->columnCount(),5);
+    QCOMPARE(table->item(10,2)->text(),QString("10.2500"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
+    if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+"/frequency-details.png"));
+    dialog->hide();window.m_analysis->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());
+    for(int tab:{6,7}){
+        panel->setCurrentTab(tab);QVERIFY(window.m_explorer->isHidden());
+        navigator->setChecked(false);navigator->setChecked(true);QVERIFY(window.m_explorer->isHidden());
+        if(!capture.isEmpty()){QTest::qWait(30);QVERIFY(window.grab().save(capture+QString("/navigator-hidden-tab-%1.png").arg(tab)));}
+        panel->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());
+    }
+    navigator->setChecked(false);panel->setCurrentTab(7);panel->setCurrentTab(0);QVERIFY(window.m_explorer->isHidden());
+    navigator->setChecked(true);QVERIFY(window.m_explorer->isVisible());
+    window.m_data.frequencies.resize(3);panel->setData(window.m_data);panel->setCurrentTab(1);verifyPage(0,3);QVERIFY(!next->isEnabled());
+    window.m_data.frequencies.clear();panel->setData(window.m_data);verifyPage(0,0);QVERIFY(!next->isEnabled());
+}
+
+void SmokeTest::sidebarIconFlowLayout(){
+    QWidget host;host.resize(400,400);
+    QWidget strip(&host);
+    auto *flow=new SidebarFlowLayout(&strip);
+    QList<QToolButton*> controls;
+    for(int i=0;i<9;++i){auto *button=new QToolButton(&strip);button->setFixedSize(32,32);flow->addWidget(button);controls.append(button);}
+    host.show();strip.show();
+    const auto verify=[&](int width){
+        strip.resize(width,flow->heightForWidth(width));QTest::qWait(20);
+        int position=0;const int columns=qMax(1,(width+4)/36);
+        for(auto *button:controls)if(!button->isHidden()){
+            QCOMPARE(button->geometry(),QRect((position%columns)*36,(position/columns)*36,32,32));
+            QVERIFY(strip.rect().contains(button->geometry()));++position;
+        }
+    };
+    for(int width:{32,68,104,176,320})verify(width);
+    controls[2]->hide();verify(104);controls[2]->show();verify(320);host.hide();
+
+    const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("SidebarIconFlow");QSettings().clear();
+    auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
+    MainWindow window;window.resize(1400,900);window.show();window.openFile(QFINDTESTDATA("tests/data/mvp.out"));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.m_data.molecule.isEmpty(),10000);
+    const QString capture=qEnvironmentVariable("YOUNGCRAFT_FLOW_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
+    for(int width:{188,208,360,188}){
+        window.resizeDocks({window.m_structureDock},{width},Qt::Horizontal);QTest::qWait(60);
+        auto *displayFlow=window.findChild<QLayout*>("StructureDisplayFlow");QVERIFY(displayFlow);QCOMPARE(displayFlow->count(),7);
+        const auto checkFlow=[&](QLayout *layout){
+            int position=0;const int columns=qMax(1,(layout->geometry().width()+4)/36);
+            const auto origin=layout->geometry().topLeft();
+            for(int i=0;i<layout->count();++i){auto *item=layout->itemAt(i);if(item->isEmpty())continue;
+                QCOMPARE(item->geometry().topLeft(),origin+QPoint((position%columns)*36,(position/columns)*36));
+                QCOMPARE(item->geometry().size(),QSize(32,32));++position;
+            }
+        };
+        checkFlow(displayFlow);
+        auto *first=displayFlow->itemAt(0)->widget();auto *tabs=window.m_structureTabs->tabBar();
+        QCOMPARE(first->mapTo(window.m_structureDock,QPoint()).x(),tabs->mapTo(window.m_structureDock,tabs->tabRect(0).topLeft()).x());
+        auto *centered=dynamic_cast<CenteredIconTabBar*>(tabs);QVERIFY(centered);
+        for(int tab=0;tab<2;++tab){
+            QVERIFY(qAbs(centered->iconRect(tab).center().x()-centered->buttonRect(tab).center().x())<=1);
+            QVERIFY(qAbs(centered->iconRect(tab).center().y()-centered->buttonRect(tab).center().y())<=1);
+            const auto pixels=window.m_structureTabs->tabIcon(tab).pixmap(QSize(18,18)).toImage();QRect bounds;
+            for(int y=0;y<pixels.height();++y)for(int x=0;x<pixels.width();++x)if(qAlpha(pixels.pixel(x,y)))bounds=bounds.united(QRect(x,y,1,1));
+            QVERIFY(!bounds.isEmpty());QVERIFY(qAbs(bounds.center().x()-pixels.rect().center().x())<=1);QVERIFY(qAbs(bounds.center().y()-pixels.rect().center().y())<=1);
+        }
+        checkFlow(window.m_analysisShortcuts->layout());
+        window.m_structureTabs->setCurrentIndex(1);QTest::qWait(30);checkFlow(window.findChild<QLayout*>("StructureEditFlow"));
+        window.m_structureTabs->setCurrentIndex(0);QTest::qWait(30);
+        if(!capture.isEmpty())QVERIFY(window.grab().save(capture+QString("/sidebar-width-%1.png").arg(width)));
+    }
 }
 
 void SmokeTest::sidebarPatternContinuity(){
     const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
-    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("SidebarContinuity");QSettings().clear();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("SidebarSolidWorkspace");QSettings().clear();
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1500,960);window.show();window.m_explorer->show();QTest::qWait(100);
-    auto verify=[&](QWidget *widget){
-        QVERIFY(widget);const QImage actual=widget->grab().toImage();
-        QImage expected(widget->size(),QImage::Format_ARGB32);expected.fill(Qt::transparent);
-        {QPainter painter(&expected);uiPattern::paintBackdrop(painter,widget);}
-        const auto ratio=widget->devicePixelRatioF();
-        // Bottom half avoids list items and native header labels.
-        for(int y=widget->height()/2;y<widget->height()-8;y+=23)for(int x=12;x<widget->width()-12;x+=29){
-            const auto a=actual.pixelColor(qRound(x*ratio),qRound(y*ratio)),b=expected.pixelColor(x,y);
-            QVERIFY2(qAbs(a.red()-b.red())<8 && qAbs(a.green()-b.green())<8,"Sidebar motif must use the same window-space origin as the molecular view");
+    QVERIFY(window.m_explorer->isHeaderHidden());
+    const QString capture=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_REVIEW");
+    if(!capture.isEmpty())QDir().mkpath(capture);
+    for(int theme=0;theme<6;++theme){
+        window.findChild<QAction *>(QString("PastelTheme%1").arg(theme))->trigger();
+        for(int pattern=0;pattern<6;++pattern){
+            window.findChild<QAction *>(QString("PatternTemplate%1").arg(pattern))->trigger();
+            QVERIFY(!uiPattern::active(window.m_view));
+            QTest::qWait(10);
+            const QImage image=window.m_explorer->viewport()->grab().toImage();
+            const auto base=window.m_explorer->palette().color(QPalette::Base);
+            QCOMPARE(image.pixelColor(image.width()-10,image.height()-10),base);
+            if(window.findChild<QAction *>(QString("PatternTemplate%1").arg(pattern))->isChecked())
+                window.findChild<QAction *>(QString("PatternTemplate%1").arg(pattern))->trigger();
         }
-    };
-    for(int i=0;i<6;++i){
-        QTest::mouseClick(window.findChild<QToolButton*>(QString("PatternTemplate%1").arg(i)),Qt::LeftButton);QTest::qWait(30);
-        verify(window.m_explorer->viewport());
-        auto *list=window.m_analysis->findChild<QListWidget*>("FrameList");QVERIFY(list);verify(list->viewport());
+        for(const QSize size:{QSize(1000,650),QSize(1280,800),QSize(1500,960)}){
+            const QSize frame = window.frameGeometry().size() - window.size();
+            const QSize available = window.screen()->availableGeometry().size() - frame;
+            const QSize bounded(qMin(size.width(),available.width()),qMin(size.height(),available.height()));
+            window.resize(bounded);QTest::qWait(35);
+            QCOMPARE(window.size(),bounded);
+            const auto left=window.m_explorerDock->geometry(),right=window.m_structureDock->geometry();
+            QVERIFY(!left.intersects(right));
+            QVERIFY(window.rect().contains(left));QVERIFY(window.rect().contains(right));
+            QVERIFY(window.centralWidget()->width()>=120);
+            for(auto *dock:{window.m_explorerDock,window.m_structureDock}){
+                for(auto *button:dock->findChildren<QToolButton*>()){
+                    if(!button->isVisible()||!button->property("sidebarButton").toBool())continue;
+                    QCOMPARE(button->size(),QSize(32,32));
+                    QVERIFY(dock->rect().contains(QRect(button->mapTo(dock,QPoint()),button->size())));
+                }
+                dock->toggleViewAction()->trigger();QTest::qWait(10);QVERIFY(dock->isHidden());
+                dock->toggleViewAction()->trigger();QTest::qWait(10);QVERIFY(dock->isVisible());
+            }
+            if(!capture.isEmpty())QVERIFY(window.grab().save(capture+QString("/theme-%1-%2x%3.png").arg(theme).arg(size.width()).arg(size.height())));
+        }
     }
-    window.resize(1350,860);QTest::qWait(60);verify(window.m_explorer->viewport());
-    QTest::mouseClick(window.findChild<QToolButton*>("PatternTemplate0"),Qt::LeftButton);
-    const auto path=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_CONTINUITY_REVIEW");
-    if(!path.isEmpty())QVERIFY(window.grab().save(path));
-    QTest::mouseClick(window.findChild<QToolButton*>("PatternTemplate0"),Qt::LeftButton);QVERIFY(!uiPattern::active(window.m_explorer));
 }
 
 void SmokeTest::measurementBarPatternContinuity(){
@@ -3082,7 +3441,7 @@ void SmokeTest::measurementBarPatternContinuity(){
     QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("MeasurementPaper");QSettings().clear();
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1500,950);window.show();
-    window.findChild<QToolButton*>("PatternTemplate0")->click();QTest::qWait(70);
+    window.findChild<QAction *>("PatternTemplate0")->trigger();QTest::qWait(70);
     auto *row=window.findChild<QWidget*>("WorkspaceMeasurementRow");QVERIFY(row);QVERIFY(row->height()<60);
     const auto actual=row->grab().toImage();QImage expected(row->size(),QImage::Format_ARGB32);
     expected.fill(Qt::transparent);{QPainter painter(&expected);uiPattern::paintBackdrop(painter,row);}
@@ -3091,17 +3450,53 @@ void SmokeTest::measurementBarPatternContinuity(){
     const auto path=qEnvironmentVariable("YOUNGCRAFT_MEASUREMENT_PAPER_PREVIEW");if(!path.isEmpty())QVERIFY(window.grab().save(path));
 }
 
+void SmokeTest::professorPhotoTheme() {
+    const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("ProfessorTheme");QSettings().clear();
+    auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
+    MainWindow window;window.resize(1280,800);window.show();QTest::qWait(150);
+    auto *action=window.findChild<QAction*>("PastelTheme6");QVERIFY(action);
+    QCOMPARE(action->text(),QStringLiteral("교수님이 보고있어"));
+    const auto plain=window.m_view->grabFramebuffer();QVERIFY(!plain.isNull());
+    const auto exported=window.m_view->image(false,true);
+    action->trigger();QTest::qWait(100);QVERIFY(action->isChecked());
+    QCOMPARE(QSettings().value("ui/theme").toInt(),6);
+    const auto photo=window.m_view->grabFramebuffer();QVERIFY(!photo.isNull());QVERIFY(photo!=plain);
+    const auto center=photo.pixelColor(photo.width()/2,photo.height()/4);
+    const auto paper=window.property("appPatternPaper").value<QColor>();
+    QVERIFY(qAbs(center.red()-paper.red())+qAbs(center.green()-paper.green())+qAbs(center.blue()-paper.blue())>30);
+    QCOMPARE(window.m_view->image(false,true),exported);
+    QTest::qWait(400);const auto animated=window.m_view->grabFramebuffer();QVERIFY(animated!=photo);
+    // Capture the bright phase so the eye effect is easy to review.
+    QImage brightest;int highest=-1;
+    for(int i=0;i<65;++i){QTest::qWait(40);const auto frame=window.m_view->grabFramebuffer();
+        const int side=qMax(window.m_view->width(),window.m_view->height());
+        const int x=qRound((0.410*side-(side-window.m_view->width())/2.0)*frame.devicePixelRatio());
+        const int y=qRound((0.299*side-(side-window.m_view->height())/2.0)*frame.devicePixelRatio());
+        const auto c=frame.pixelColor(x,y);const int light=c.red()+c.green()+c.blue();
+        if(light>highest){highest=light;brightest=window.grab().toImage();}
+    }
+    QVERIFY(highest>650);
+    const auto path=qEnvironmentVariable("YOUNGCRAFT_PROFESSOR_PREVIEW");if(!path.isEmpty())QVERIFY(brightest.save(path));
+    {MainWindow restored;QVERIFY(restored.property("professorBackdrop").toBool());QVERIFY(restored.findChild<QAction*>("PastelTheme6")->isChecked());}
+    window.resize(1000,650);QTest::qWait(100);QVERIFY(!window.m_view->grabFramebuffer().isNull());
+    window.findChild<QAction*>("PastelTheme0")->trigger();QTest::qWait(100);
+    QVERIFY(!window.property("professorBackdrop").toBool());
+    const auto clean=window.m_view->grabFramebuffer();QCOMPARE(clean.pixelColor(2,2),window.m_view->style().background);
+}
+
 void SmokeTest::patternViewportContinuity(){
     const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
     QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("PatternViewport");QSettings().clear();
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1500,960);window.show();QTest::qWait(150);
-    auto *button=window.findChild<QToolButton*>("PatternTemplate0");QVERIFY(button);
-    QTest::mouseClick(button,Qt::LeftButton);QTest::qWait(100);
+    auto *pattern=window.findChild<QAction *>("PatternTemplate0");QVERIFY(pattern);
+    pattern->trigger();QTest::qWait(100);
     auto *view=window.m_view;QVERIFY(view->isValid());
     const auto paper=window.property("appPatternPaper").value<QColor>();
     const auto frame=view->grabFramebuffer();QVERIFY(!frame.isNull());
-    QVERIFY(qAbs(frame.pixelColor(2,2).red()-paper.red())<10);
+    QCOMPARE(frame.pixelColor(2,2),view->style().background);
+    QVERIFY(!uiPattern::active(view));
     auto *surface=window.findChild<QWidget*>("MoleculeViewport");QVERIFY(surface);
     // Compare the GL background to the same window-space motif rendered as a widget.
     QImage expected(surface->size(),QImage::Format_ARGB32);expected.fill(paper);
@@ -3111,7 +3506,7 @@ void SmokeTest::patternViewportContinuity(){
     if(!debugPath.isEmpty()){shot.save(debugPath+".surface.png");expected.save(debugPath+".expected.png");}
     for(int y=10;y<surface->height();y+=37)for(int x=10;x<surface->width();x+=41){
         const auto inView=view->geometry().adjusted(0,0,-1,-1);
-        if(inView.contains(x,y) && qAbs(y-surface->height()/2)<30)continue;
+        if(inView.contains(x,y))continue;
         const auto a=shot.pixelColor(qRound(x*dpr),qRound(y*dpr)),b=expected.pixelColor(x,y);
         QVERIFY2(qAbs(a.red()-b.red())<9 && qAbs(a.green()-b.green())<9,qPrintable(QString("Pattern continuity at %1,%2: actual %3 expected %4").arg(x).arg(y).arg(a.name(),b.name())));
     }
@@ -3121,7 +3516,7 @@ void SmokeTest::patternViewportContinuity(){
     const auto transparent=view->image(true,true);QVERIFY(!transparent.isNull());QVERIFY(transparent.pixelColor(0,0).alpha()<8);
     const QString path=qEnvironmentVariable("YOUNGCRAFT_VIEWPORT_PATTERN_REVIEW");
     if(!path.isEmpty())QVERIFY(window.grab().save(path));
-    QTest::mouseClick(button,Qt::LeftButton);QVERIFY(!uiPattern::active(view));
+    pattern->trigger();QVERIFY(!uiPattern::active(view));
     QVERIFY(view->image(true,true)==transparent);
 }
 
@@ -3130,29 +3525,27 @@ void SmokeTest::patternTemplatesWorkflow(){
     QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("PatternTemplates");QSettings().clear();
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1500,960);window.show();QTest::qWait(120);
-    auto *top=window.findChild<QToolBar*>("MainToolBar");auto *bottom=window.findChild<QToolBar*>("AnalysisToolBar");
-    auto *selector=window.findChild<QWidget*>("AppPatternSelector");QVERIFY(selector);QVERIFY(top);QVERIFY(bottom);
-    QCOMPARE(selector->findChildren<QToolButton*>().size(),6);
+    auto *top=window.findChild<QToolBar *>("MainToolBar");QVERIFY(top);
+    auto *selector=window.findChild<QMenu *>("AppPatternSelector");QVERIFY(selector);
+    QCOMPARE(selector->actions().size(),7);
     const auto style=window.m_view->style();
     QString capture=qEnvironmentVariable("YOUNGCRAFT_PATTERN_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
-    const QImage plain=top->grab().toImage();
-    const QImage sidebarPlain=window.m_analysis->grab().toImage();
+
     for(int i=0;i<6;++i){
-        auto *button=window.findChild<QToolButton*>(QString("PatternTemplate%1").arg(i));QVERIFY(button);QVERIFY(button->isVisible());
-        auto *color=window.findChild<QToolButton*>(QString("PastelTheme%1").arg(i));QVERIFY(color);
-        QCOMPARE(button->mapTo(&window,QPoint()).x(),color->mapTo(&window,QPoint()).x());
-        QVERIFY(button->mapTo(&window,QPoint()).y()>color->mapTo(&window,QPoint()).y());
-        QTest::mouseClick(button,Qt::LeftButton);QCOMPARE(top->property("patternTemplate").toInt(),i);QCOMPARE(bottom->property("patternTemplate").toInt(),i);
-        QCOMPARE(QSettings().value("ui/patternTemplate").toInt(),i);QVERIFY(top->grab().toImage()!=plain);
-        QVERIFY(window.m_analysis->grab().toImage()!=sidebarPlain);
-        for(int j=0;j<6;++j)QCOMPARE(window.findChild<QToolButton*>(QString("PatternTemplate%1").arg(j))->isChecked(),j==i);
-        QTest::mouseClick(color,Qt::LeftButton);QCOMPARE(top->property("patternTemplate").toInt(),i);
+        auto *pattern=window.findChild<QAction *>(QString("PatternTemplate%1").arg(i));QVERIFY(pattern);
+        QVERIFY(selector->actions().contains(pattern));
+        auto *color=window.findChild<QAction *>(QString("PastelTheme%1").arg(i));QVERIFY(color);
+        pattern->trigger();QCOMPARE(top->property("patternTemplate").toInt(),i);
+        QCOMPARE(QSettings().value("ui/patternTemplate").toInt(),i);QVERIFY(!uiPattern::active(top));
+        QVERIFY(!uiPattern::active(window.m_analysis));
+        for(int j=0;j<6;++j)QCOMPARE(window.findChild<QAction *>(QString("PatternTemplate%1").arg(j))->isChecked(),j==i);
+        color->trigger();QCOMPARE(top->property("patternTemplate").toInt(),i);
         QCOMPARE(window.m_view->style().background,style.background);
         QTest::qWait(40);if(!capture.isEmpty())QVERIFY(window.grab().save(capture+QString("/pattern-%1.png").arg(i+1)));
     }
     {MainWindow restored;QCOMPARE(restored.findChild<QToolBar*>("MainToolBar")->property("patternTemplate").toInt(),5);}
-    QTest::mouseClick(window.findChild<QToolButton*>("PatternTemplate5"),Qt::LeftButton);
-    QCOMPARE(top->property("patternTemplate").toInt(),-1);QCOMPARE(bottom->property("patternTemplate").toInt(),-1);
+    window.findChild<QAction *>("PatternTemplate5")->trigger();
+    QCOMPARE(top->property("patternTemplate").toInt(),-1);
 }
 
 void SmokeTest::themesEmptySidebarAndScanApproach(){
@@ -3161,14 +3554,14 @@ void SmokeTest::themesEmptySidebarAndScanApproach(){
     auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
     MainWindow window;window.resize(1500,960);window.show();QTest::qWait(80);
     auto *plot=window.findChild<PlotWidget *>("OptimizationEnergyPlot");QVERIFY(plot);QVERIFY(plot->isHidden());
-    auto *themes=window.findChild<QWidget *>("AppThemeSelector");QVERIFY(themes);
-    const auto swatches=themes->findChildren<QToolButton *>();QCOMPARE(swatches.size(),6);
+    auto *themes=window.findChild<QMenu *>("AppThemeSelector");QVERIFY(themes);
+    const auto swatches=themes->actions();QCOMPARE(swatches.size(),7);
     QString errors;const auto library=FragmentLibrary::load(&errors);Fragment ligand,adduct;
     for(auto f:library){if(f.name=="12-MTP (Me3-TPADP)")ligand=f;if(f.name.startsWith("peroxo")&&f.name.contains("eta2"))adduct=f;}
     Molecule complex;QVERIFY2(LabComplexBuilder::assemble(ligand,adduct,26,3,1,6,complex,&errors),qPrintable(errors));
     window.newDrawingDocument(complex);window.setDrawingMode(false);window.m_view->bestView();
     const QString capture=qEnvironmentVariable("YOUNGCRAFT_REVIEW_DIR");if(!capture.isEmpty())QDir().mkpath(capture);
-    for(int i=0;i<swatches.size();++i){QTest::mouseClick(swatches[i],Qt::LeftButton);QVERIFY(swatches[i]->isChecked());
+    for(int i=0;i<swatches.size();++i){swatches[i]->trigger();QVERIFY(swatches[i]->isChecked());
         QCOMPARE(QSettings().value("ui/theme").toInt(),i);QTest::qWait(70);
         QCOMPARE(window.m_view->style().background,window.m_style.background);
         const auto shot=window.grab();
@@ -3278,6 +3671,41 @@ void SmokeTest::pastedXYZWorkflow() {
     if(!capture.isEmpty()){auto *tabs=window.m_analysis->findChild<QTabWidget *>();tabs->setCurrentIndex(tabs->count()-1);QTest::qWait(200);QVERIFY(window.grab().save(capture+".xyz.png"));}
 }
 #include "reaction_capture_workflow.inc"
+void SmokeTest::orbitalCacheAndDetachedWindow() {
+    MainWindow owner; owner.resize(1200,800); owner.show();
+    auto *open=owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow"); QVERIFY(open);
+    auto *dialog=owner.m_analysis->findChild<QDialog*>("OrbitalManagerWindow"); QVERIFY(dialog); QVERIFY(!dialog->isVisible());
+    CalculationData data;data.format="FCHK";data.filePath="sample.fchk";
+    data.orbitals={{1,-13.6,2,{},"Alpha"},{2,1.2,0,{},"Alpha"}};
+    owner.m_analysis->setData(data);
+    open->click(); QVERIFY(dialog->isVisible()); QVERIFY(!dialog->isModal());
+    QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_WINDOW_PREVIEW");
+    if(!preview.isEmpty()){QTest::qWait(100);QVERIFY(dialog->grab().save(preview));}
+    dialog->resize(420,480);QTest::qWait(50);
+    QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    if(!preview.isEmpty())QVERIFY(dialog->grab().save(preview+".small.png"));
+    dialog->close(); QVERIFY(!dialog->isVisible()); open->click(); QVERIFY(dialog->isVisible());
+    MoleculeView view;
+    auto grid=std::make_shared<CubeGrid>(); grid->valid=true;grid->nx=grid->ny=grid->nz=2;
+    grid->axisX={1,0,0};grid->axisY={0,1,0};grid->axisZ={0,0,1};grid->values={-1,1,-1,1,-1,1,-1,1};
+    view.setCubeGrid(grid,.02f);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000); QVERIFY(view.m_positiveSurface);
+    const auto positive=view.m_positiveSurface,negative=view.m_negativeSurface;
+    auto other=std::make_shared<CubeGrid>(*grid); view.setCubeGrid(other,.02f);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    view.setCubeGrid(grid,.02f); QVERIFY(!view.m_surfaceBuilding);
+    QCOMPARE(view.m_positiveSurface,positive); QCOMPARE(view.m_negativeSurface,negative);
+    auto style=view.style();style.isoValue=.04f;view.setStyle(style);
+    QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    style.isoValue=.02f;view.setStyle(style);QVERIFY(!view.m_surfaceBuilding);QCOMPARE(view.m_positiveSurface,positive);
+    // Coalesce a burst; the final visible mesh must belong to the final grid/isovalue.
+    for(int i=0;i<30;++i){style.isoValue=.03f+i*.001f;view.setStyle(style);}
+    view.setCubeGrid(grid,.02f); QTRY_VERIFY_WITH_TIMEOUT(!view.m_surfaceBuilding,10000);
+    QCOMPARE(view.m_positiveSurface,positive);
+    view.clearCubeGrid();QVERIFY(!view.m_positiveSurface);
+}
+
 void SmokeTest::automaticRemoteConnectionAndHomo() {
     const auto source=qEnvironmentVariable("YOUNGCRAFT_AUTOMATIC_CHK");if(source.isEmpty())QSKIP("Automatic real-server test not requested");
     const auto org=QCoreApplication::organizationName(), app=QCoreApplication::applicationName();
@@ -3393,6 +3821,44 @@ void SmokeTest::orbitalThemesAndPatterns() {
     view.makeCurrent();QCOMPARE(view.glGetError(),GLenum(GL_NO_ERROR));view.doneCurrent();
 }
 
+void SmokeTest::orbitalResponsiveSidebar(){
+    const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("OrbitalResponsiveSidebar");QSettings().clear();
+    auto cleanup=qScopeGuard([&]{QSettings().clear();QCoreApplication::setOrganizationName(oldOrg);QCoreApplication::setApplicationName(oldApp);});
+    MainWindow owner;owner.resize(1200,900);owner.show();Molecule molecule;molecule.atoms={{1,6,"C",{0,0,0}},{2,8,"O",{1.3f,0,0}}};molecule.setBond(0,1,1);
+    owner.newDrawingDocument(molecule);owner.setDrawingMode(false);
+    owner.m_data.filePath="a_very_long_checkpoint_filename_for_sidebar_width_validation.fchk";owner.m_data.format="FCHK";
+    owner.m_data.orbitals={{1,-13.6,2,{},"Alpha"},{2,1.2,0,{},"Alpha"},{1,-12.1,1,{},"Beta"},{2,2.3,0,{},"Beta"}};
+    owner.m_analysis->setData(owner.m_data);owner.m_analysis->setCurrentTab(6);
+    auto *panel=owner.m_analysis->findChild<OrbitalStudyWidget*>();QVERIFY(panel);
+    owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow")->click();
+    auto *scroll=owner.m_currentSidebar->findChild<QScrollArea*>("SidebarAnalysisScroll");QVERIFY(scroll);
+    const QString capture=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_RESPONSIVE_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
+    for(int theme=0;theme<6;++theme){
+        owner.findChild<QAction*>(QString("PastelTheme%1").arg(theme))->trigger();
+        for(int width:{230,280,360,230}){
+            owner.resizeDocks({owner.m_explorerDock},{width},Qt::Horizontal);QTest::qWait(60);
+            QCOMPARE(scroll->horizontalScrollBar()->maximum(),0);
+            QVERIFY(panel->width()<=panel->parentWidget()->width());
+            for(auto *button:panel->findChildren<QPushButton*>()){
+                if(!button->property("orbitalResponsiveButton").toBool())continue;
+                QCOMPARE(button->height(),32);QVERIFY(!button->icon().isNull());QVERIFY(!button->toolTip().isEmpty());QVERIFY(!button->accessibleName().isEmpty());
+                if(panel->width()<300){QCOMPARE(button->width(),32);QVERIFY(button->text().isEmpty());}
+                const auto bounds=QRect(button->mapTo(panel,QPoint()),button->size());QVERIFY(bounds.left()>=0);QVERIFY(bounds.right()<panel->width());
+            }
+            auto *tabs=panel->findChild<QTabWidget*>("OrbitalAnalysisTables");QVERIFY(tabs->usesScrollButtons());QVERIFY(tabs->width()<=panel->width());
+            if(!capture.isEmpty())QVERIFY(owner.grab().save(capture+QString("/theme-%1-width-%2.png").arg(theme).arg(width)));
+        }
+    }
+    auto *original=panel->findChild<QTableWidget*>("OrbitalTable");QCOMPARE(original->columnCount(),5);QCOMPARE(original->rowCount(),4);
+    panel->findChild<QPushButton*>("ExpandOrbitalTable")->click();
+    auto *dialog=panel->findChild<QDialog*>("ExpandedOrbitalTableDialog");QVERIFY(dialog&&dialog->isVisible());
+    auto *expanded=dialog->findChild<QTableWidget*>("ExpandedOrbitalTable");QCOMPARE(expanded->columnCount(),5);QCOMPARE(expanded->rowCount(),4);
+    for(int row=0;row<4;++row)for(int col=0;col<5;++col)QCOMPARE(expanded->item(row,col)->text(),original->item(row,col)->text());
+    expanded->setCurrentCell(2,0);QCOMPARE(original->currentRow(),2);
+    if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+"/expanded-table.png"));dialog->close();
+}
+
 void SmokeTest::orbitalStudyControlsAndRendering() {
     MainWindow w;w.resize(1450,1000);w.show();
     auto loaded=FileDispatcher::load("tests/data/mvp.out",{});QVERIFY(loaded.parseResult.success);
@@ -3404,7 +3870,11 @@ void SmokeTest::orbitalStudyControlsAndRendering() {
     auto *panel=w.m_analysis->findChild<OrbitalStudyWidget*>();QVERIFY(panel);
     auto *orbitals=panel->findChild<QTableWidget*>("OrbitalTable");QVERIFY(orbitals);QCOMPARE(orbitals->rowCount(),4);QCOMPARE(orbitals->currentRow(),0);
     auto *toolbar=w.findChild<QToolBar*>("MainToolBar");QVERIFY(toolbar);QCOMPARE(toolbar->toolButtonStyle(),Qt::ToolButtonIconOnly);
-    for(int i=0;i<11;++i){QVERIFY(!toolbar->actions()[i]->icon().isNull());QVERIFY(!toolbar->actions()[i]->toolTip().isEmpty());}
+    for (auto *action : toolbar->actions()) {
+        if (action->isSeparator()) continue;
+        QVERIFY(!action->icon().isNull());
+        QVERIFY(!action->toolTip().isEmpty());
+    }
     auto grid=std::make_shared<CubeGrid>();grid->valid=true;grid->nx=grid->ny=grid->nz=33;grid->origin={-4,-4,-4};grid->axisX={.25f,0,0};grid->axisY={0,.25f,0};grid->axisZ={0,0,.25f};grid->molecule=w.m_view->molecule();
     auto potential=std::make_shared<CubeGrid>(*grid);
     for(int z=0;z<33;++z)for(int y=0;y<33;++y)for(int x=0;x<33;++x){const auto p=grid->origin+x*grid->axisX+y*grid->axisY+z*grid->axisZ;grid->values.push_back(std::exp(-2*p.lengthSquared()));potential->values.push_back(p.x()*.03f);}
@@ -3713,14 +4183,44 @@ void SmokeTest::wholeMechanismAnimationWorkflow() {
     QVERIFY(!dialog->m_view->molecule().atoms[4].visible);
     dialog->m_player->close();
     QVERIFY(dialog->setSteps({a,b,c}));QTest::qWait(100);
+    QVERIFY(dialog->m_caption->text().startsWith("Reactant"));
+    QTimer::singleShot(0, dialog, [&] {
+        auto *editor = dialog->findChild<QDialog *>("ReactionCaptionsDialog");
+        if (!editor) return;
+        const auto dismiss = qScopeGuard([&] { if (editor->isVisible()) editor->reject(); });
+        auto *add = editor->findChild<QPushButton *>("AddReactionCaptionRange");
+        auto *ranges = editor->findChild<QTableWidget *>("ReactionCaptionRanges");
+        auto *buttons = editor->findChild<QDialogButtonBox *>();
+        QVERIFY(add && ranges && buttons);
+        add->click();
+        ranges->setCurrentCell(0, 1);
+        ranges->item(0, 0)->setText("Oxidation");
+        qobject_cast<QDoubleSpinBox *>(ranges->cellWidget(0, 1))->setValue(.05);
+        qobject_cast<QDoubleSpinBox *>(ranges->cellWidget(0, 2))->setValue(.15);
+        buttons->button(QDialogButtonBox::Ok)->click();
+    });
+    dialog->m_reactionCaptionEdit->click();
+    dialog->seek(.05); QVERIFY(dialog->m_caption->text().startsWith("Oxidation"));
+    QVERIFY(dialog->m_playerCaption->text().startsWith("Oxidation"));
+    dialog->seek(.15); QVERIFY(dialog->m_caption->text().startsWith("Reactant"));
+    dialog->seek(0);
     const auto camera=dialog->m_view->cameraState();const auto first=dialog->m_view->molecule();
     dialog->seek(.3);QVERIFY((dialog->m_view->molecule().atoms[1].position-first.atoms[1].position).length()>.1f);
     QCOMPARE(dialog->m_view->cameraState().rotation,camera.rotation);QCOMPARE(dialog->m_view->cameraState().centerOffset,camera.centerOffset);
-    dialog->seek(0);dialog->play(true);QTest::qWait(120);QVERIFY(dialog->m_time>0);dialog->play(false);
+    dialog->seek(0);dialog->play(true);QTRY_VERIFY_WITH_TIMEOUT(dialog->m_time>0,3000);dialog->play(false);
     dialog->m_view->selection().atoms={0};dialog->emphasize(1);dialog->seek(.2);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
     QTemporaryDir dir;QVERIFY(dialog->saveProject(dir.filePath("mechanism.ycmechanism")));
     QVERIFY(dialog->openProject(dir.filePath("mechanism.ycmechanism")));QCOMPARE(dialog->m_focusMode,1);QCOMPARE(dialog->m_view->molecule().atoms[1].displayOpacity,.2f);
+    dialog->seek(.1); QVERIFY(dialog->m_caption->text().startsWith("Oxidation"));
+    dialog->seek(.2); QVERIFY(!dialog->m_caption->text().startsWith("Oxidation"));
     if(dialog->m_view->isValid()) {
+        const auto captionCamera = dialog->m_view->cameraState();
+        const auto withName = dialog->renderOutputFrame(.1, {320, 180}, true, captionCamera);
+        dialog->m_useReactionCaptions = false;
+        const auto withStructure = dialog->renderOutputFrame(.1, {320, 180}, true, captionCamera);
+        dialog->m_useReactionCaptions = true;
+        QVERIFY(!withName.isNull());
+        QVERIFY(withName != withStructure);
         const auto gif=dir.filePath("mechanism.gif");QVERIFY2(dialog->exportAnimation(gif,"gif",320,10),qPrintable(dialog->m_status->text()));
         QImageReader reader(gif);QVERIFY(reader.canRead());QCOMPARE(reader.imageCount(),5);const auto firstImage=reader.read();reader.jumpToImage(4);const auto lastImage=reader.read();QVERIFY(!firstImage.isNull());QVERIFY(!lastImage.isNull());QVERIFY(firstImage!=lastImage);
         QVERIFY(dialog->exportAnimation(dir.path(),"png",320,10));const auto directories=QDir(dir.path()).entryList({"Youngcraft-Mechanism-*"},QDir::Dirs);QCOMPARE(directories.size(),1);QCOMPARE(QDir(dir.filePath(directories.first())).entryList({"*.png"},QDir::Files).size(),5);

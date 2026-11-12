@@ -46,6 +46,7 @@ namespace youngcraft {
 
 void MainWindow::setStatus(const QString &message, int timeout) {
     m_statusLabel->setText(message);
+    m_statusLabel->setToolTip(message);
     statusBar()->showMessage(message, timeout);
 }
 

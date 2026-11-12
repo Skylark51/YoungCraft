@@ -155,11 +155,25 @@ bool MoleculeView::createPrograms() {
         uniform float targetHeight;
         uniform float tileSize;
         uniform vec3 paper;
+        uniform float eyeGlow;
+        float eyeFlare(vec2 uv,vec2 eye) {
+            vec2 d=uv-eye;
+            float halo=0.65*exp(-dot(d,d)/0.00045);
+            float core=exp(-dot(d,d)/0.000016);
+            float rays=0.75*exp(-abs(d.x)/0.045-abs(d.y)/0.0018)
+                      +0.45*exp(-abs(d.x)/0.002-abs(d.y)/0.025);
+            return halo+core+rays;
+        }
         out vec4 color;
         void main(){
             vec2 point=vec2(gl_FragCoord.x,targetHeight-gl_FragCoord.y)/pixelScale+origin;
             vec4 ink=texture(motif,point/tileSize);
-            color=vec4(mix(paper,ink.rgb,ink.a),1.0);
+            vec3 base=mix(paper,ink.rgb,ink.a);
+            vec2 uv=point/tileSize;
+            float flare=eyeGlow*(eyeFlare(uv,vec2(0.410,0.299))+eyeFlare(uv,vec2(0.558,0.291)));
+            base=mix(base,vec3(0.55,0.88,1.0),clamp(flare*0.7,0.0,1.0));
+            base+=vec3(0.75,0.9,1.0)*flare*0.85;
+            color=vec4(base,1.0);
         }
     )");
     m_patternProgram->link();

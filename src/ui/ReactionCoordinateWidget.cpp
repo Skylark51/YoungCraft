@@ -128,7 +128,11 @@ bool ReactionCoordinateWidget::hasEnergies() const {
 }
 void ReactionCoordinateWidget::refresh() {m_images.clear();for(const auto &s:*m_steps)m_images.push_back(readImage(s.presentation));setVisible(active());update();}
 void ReactionCoordinateWidget::setEnabledPresentation(bool enabled){m_enabled=enabled;setVisible(active());update();emit configurationChanged();}
-void ReactionCoordinateWidget::setTime(double seconds){m_time=seconds;update();}
+void ReactionCoordinateWidget::setTime(double seconds, const QString &caption) {
+    m_time = seconds;
+    m_caption = caption;
+    update();
+}
 QVector<double> ReactionCoordinateWidget::stageTimes() const {
     QVector<double> times;if(m_steps->isEmpty())return times;
     double time=(*m_steps)[0].frames.size()>1?(*m_steps)[0].travelSeconds():0;times.push_back(time);
@@ -198,11 +202,20 @@ void ReactionCoordinateWidget::restoreSettings(const QJsonObject &s) {
     m_reference=qBound(0,s["reference"].toInt(),2);
     refresh();
 }
-void ReactionCoordinateWidget::paintEvent(QPaintEvent *){QPainter p(this);draw(p,rect(),m_time);}
-QImage ReactionCoordinateWidget::imageAtTime(QSize size,double seconds,bool transparent,bool force) const {
-    QImage result(size,QImage::Format_ARGB32_Premultiplied);result.fill(Qt::transparent);QPainter p(&result);draw(p,QRectF(QPointF(),QSizeF(size)),seconds,transparent,force);return result;
+void ReactionCoordinateWidget::paintEvent(QPaintEvent *) {
+    QPainter painter(this);
+    draw(painter, rect(), m_time, false, false, m_caption, true);
 }
-void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seconds,bool transparent,bool force) const {
+QImage ReactionCoordinateWidget::imageAtTime(QSize size, double seconds, bool transparent, bool force,
+                                             const QString &caption, bool showCaption) const {
+    QImage result(size, QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    QPainter painter(&result);
+    draw(painter, QRectF(QPointF(), QSizeF(size)), seconds, transparent, force, caption, showCaption);
+    return result;
+}
+void ReactionCoordinateWidget::draw(QPainter &p, const QRectF &bounds, double seconds, bool transparent, bool force,
+                                    const QString &captionText, bool showCaption) const {
     if(!active()&&!(force&&ready()))return;
     p.save();p.setRenderHints(QPainter::Antialiasing|QPainter::SmoothPixmapTransform);
     if(!transparent)p.fillRect(bounds,QColor(250,251,255));
@@ -308,8 +321,15 @@ void ReactionCoordinateWidget::draw(QPainter &p,const QRectF &bounds,double seco
     if(!m_images[pos.to].isNull())annotations(p,b.presentation["annotations"].toArray(),fitImage(m_images[pos.to],artwork).translated(26*(1-eased),0),u);
     if(m_images[pos.from].isNull()&&m_images[pos.to].isNull()){p.setPen(QColor(100,102,120));p.drawText(artwork,Qt::AlignCenter,QStringLiteral("이 구간의 2D 그림 미삽입"));}
     }
-    const QRectF caption=showEnergy?(showImages?QRectF(575,345,310,36):QRectF(575,37,310,36)):QRectF(190,390,520,26);
-    p.setFont(QFont("Arial",10,QFont::Bold));p.setPen(pos.collision?QColor(210,122,32):QColor(64,54,120));p.drawText(caption,Qt::AlignCenter|Qt::TextWordWrap,pos.collision?QStringLiteral("높은 장벽 · 충돌 / 재시도"):a.name+(pos.from==pos.to?QString():QStringLiteral(" → ")+b.name));
+    if (showCaption) {
+        const QRectF caption=showEnergy?(showImages?QRectF(575,345,310,36):QRectF(575,37,310,36)):QRectF(190,390,520,26);
+        const QString text = !captionText.isEmpty() ? captionText
+            : pos.collision ? QStringLiteral("높은 장벽 · 충돌 / 재시도")
+            : a.name + (pos.from == pos.to ? QString() : QStringLiteral(" → ") + b.name);
+        p.setFont(QFont("Arial",10,QFont::Bold));
+        p.setPen(pos.collision ? QColor(210,122,32) : QColor(64,54,120));
+        p.drawText(caption, Qt::AlignCenter|Qt::TextWordWrap, text);
+    }
     p.restore();
 }
 

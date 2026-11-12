@@ -18,27 +18,29 @@
 
 namespace youngcraft {
 
-void MoleculeView::setCubeGrid(const std::shared_ptr<const CubeGrid> &grid) {
+void MoleculeView::setCubeGrid(const std::shared_ptr<const CubeGrid> &grid, float isoValue) {
+    const bool isoChanged = isoValue > 0 && m_style.isoValue != isoValue;
+    if (isoValue > 0) m_style.isoValue = isoValue;
+    if (m_cubeGrid == grid) { if (isoChanged) rebuildIsosurfaces(); return; }
     m_potentialGrid.reset();
     m_cubeGrid = grid;
-    m_fitNewSurface = bool(grid);
+    m_fitNewSurface = bool(grid) && !m_positiveSurface;
     ++m_surfaceGeneration;
-    m_positiveSurface.reset();
-    m_negativeSurface.reset();
-    m_positiveSurfaceVertexCount = 0;
-    m_negativeSurfaceVertexCount = 0;
-    if (m_glReady) {
-        makeCurrent();
-        clearSurfaceBuffers();
-        doneCurrent();
+    if (grid && grid->valid) rebuildIsosurfaces();
+    else {
+        m_positiveSurface.reset(); m_negativeSurface.reset();
+        if (m_glReady) { makeCurrent(); clearSurfaceBuffers(); doneCurrent(); }
+        m_positiveSurfaceVertexCount = m_negativeSurfaceVertexCount = 0;
     }
-    if (m_cubeGrid && m_cubeGrid->valid) rebuildIsosurfaces();
     update();
 }
 
 void MoleculeView::setPotentialGrid(std::shared_ptr<const CubeGrid> grid, double minimum, double maximum, QColor low, QColor high) {
+    if (m_potentialGrid == grid && m_potentialMin == minimum && m_potentialMax == maximum
+            && m_potentialLow == low && m_potentialHigh == high) return;
+    const bool recolor = bool(grid) || bool(m_potentialGrid);
     m_potentialGrid = std::move(grid); m_potentialMin=minimum; m_potentialMax=maximum; m_potentialLow=low; m_potentialHigh=high;
-    if(m_glReady) { makeCurrent(); uploadSurfaceMeshes(); doneCurrent(); }
+    if (recolor && m_glReady) { makeCurrent(); uploadSurfaceMeshes(); doneCurrent(); }
     update();
 }
 
@@ -108,27 +110,39 @@ void MoleculeView::uploadSurfaceMeshes() {
 
 void MoleculeView::rebuildIsosurfaces() {
     if (!m_cubeGrid || !m_cubeGrid->valid) return;
-    const std::shared_ptr<const CubeGrid> grid = m_cubeGrid;
-    const RenderStyle style = m_style;
-    const quint64 generation = ++m_surfaceGeneration;
+    const auto grid = m_cubeGrid;
+    const float iso = m_style.isoValue;
+    const QString key = QString::number(quintptr(grid.get()), 16) + '/' + QString::number(double(iso), 'g', 17);
+    auto display = [this](const std::shared_ptr<SurfaceMesh> &positive, const std::shared_ptr<SurfaceMesh> &negative) {
+        if (m_positiveSurface == positive && m_negativeSurface == negative) return;
+        m_positiveSurface = positive; m_negativeSurface = negative;
+        if (m_fitNewSurface) { m_fitNewSurface = false; bestView(); }
+        if (m_glReady) { makeCurrent(); uploadSurfaceMeshes(); doneCurrent(); }
+        update();
+    };
+    if (auto *cached = m_surfaceCache.object(key)) { display(cached->positive, cached->negative); return; }
+    // One background mesh job per view; rapid changes coalesce to the latest request.
+    if (m_surfaceBuilding) return;
+    m_surfaceBuilding = true;
     QPointer<MoleculeView> receiver(this);
-    QThread *thread = QThread::create([receiver, grid, style, generation] {
-        const auto positive = std::make_shared<SurfaceMesh>(
-            IsosurfaceBuilder::build(*grid, style.isoValue, true));
-        const auto negative = std::make_shared<SurfaceMesh>(
-            IsosurfaceBuilder::build(*grid, style.isoValue, false));
+    QThread *thread = QThread::create([receiver, grid, iso, key] {
+        const auto positive = std::make_shared<SurfaceMesh>(IsosurfaceBuilder::build(*grid, iso, true));
+        const auto negative = std::make_shared<SurfaceMesh>(IsosurfaceBuilder::build(*grid, iso, false));
         if (!receiver) return;
-        QMetaObject::invokeMethod(receiver, [receiver, generation, positive, negative] {
-            if (!receiver || generation != receiver->m_surfaceGeneration) return;
-            receiver->m_positiveSurface = positive;
-            receiver->m_negativeSurface = negative;
-            if(receiver->m_fitNewSurface){receiver->m_fitNewSurface=false;receiver->bestView();}
-            if (receiver->m_glReady) {
-                receiver->makeCurrent();
-                receiver->uploadSurfaceMeshes();
-                receiver->doneCurrent();
-            }
-            receiver->update();
+        QMetaObject::invokeMethod(receiver, [receiver, grid, iso, key, positive, negative] {
+            if (!receiver) return;
+            receiver->m_surfaceBuilding = false;
+            const qsizetype bytes = (positive->positions.size() + positive->normals.size()
+                + negative->positions.size() + negative->normals.size()) * sizeof(QVector3D)
+                + grid->values.size() * sizeof(float);
+            receiver->m_surfaceCache.insert(key, new CachedSurface{grid, positive, negative},
+                int(qMin<qsizetype>(INT_MAX, qMax<qsizetype>(1, bytes / 1024))));
+            if (receiver->m_cubeGrid == grid && receiver->m_style.isoValue == iso) {
+                receiver->m_positiveSurface = positive; receiver->m_negativeSurface = negative;
+                if (receiver->m_fitNewSurface) { receiver->m_fitNewSurface = false; receiver->bestView(); }
+                if (receiver->m_glReady) { receiver->makeCurrent(); receiver->uploadSurfaceMeshes(); receiver->doneCurrent(); }
+                receiver->update();
+            } else receiver->rebuildIsosurfaces();
         }, Qt::QueuedConnection);
     });
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);

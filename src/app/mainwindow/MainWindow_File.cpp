@@ -23,6 +23,7 @@
 #include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QMimeData>
 #include <QUrl>
@@ -50,6 +51,7 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
+#include <algorithm>
 #include <functional>
 
 namespace youngcraft {
@@ -185,6 +187,8 @@ void MainWindow::activateDocument(int index) {
     }
     m_documentArea->setCurrentWidget(index >= 0 ? static_cast<QWidget *>(m_documentTabs) : m_emptyDocument->workspace);
     m_sidebars->setCurrentWidget(target->sidebar);
+    m_drawPanels->setCurrentWidget(target->drawBar);
+    if (m_drawingMode) m_structureTabs->setCurrentIndex(1);
     updateOutputSource();
     updatePanelActions();
     const bool ready = target == m_emptyDocument || target->workspace->property("loadFinished").toBool();
@@ -212,6 +216,8 @@ void MainWindow::closeDocument(int index) {
     }
     m_sidebars->removeWidget(document->sidebar);
     document->sidebar->deleteLater();
+    m_drawPanels->removeWidget(document->drawBar);
+    document->drawBar->deleteLater();
     page->deleteLater();
     activateDocument(m_documentTabs->currentIndex());
 }
@@ -241,12 +247,14 @@ bool MainWindow::moveDocumentTo(int index, MainWindow *target) {
         m_documentTabs->removeTab(index);
     }
     m_sidebars->removeWidget(document->sidebar);
+    m_drawPanels->removeWidget(document->drawBar);
     activateDocument(m_documentTabs->currentIndex());
 
     target->saveDocumentState();
     page->setParent(target->m_documentTabs);
     document->sidebar->setParent(target->m_sidebars);
     target->m_sidebars->addWidget(document->sidebar);
+    target->m_drawPanels->addWidget(document->drawBar);
     target->m_documents.insert(page, document);
     target->bindDocument(document);
     target->m_documentConnections.clear();
@@ -395,7 +403,6 @@ void MainWindow::onFileLoaded(const youngcraft::LoadedFile &loaded) {
     if (!m_data.frames.isEmpty()) showFrame(m_data.frames.size() - 1);
     m_analysis->selectDefaultTab();
     if (m_analysis->currentTab() == 2 && !m_data.scanPoints.isEmpty()) showScanPoint(0);
-    m_explorerDock->show();
     updatePanelActions();
     updateWindowTitle();
     QString message = QStringLiteral("열림: %1 | 원자 %2 | 프레임 %3 | 진동 %4")
@@ -429,7 +436,7 @@ void MainWindow::showCrystalMode(int mode) {
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
-    if (DocumentTabBar::dragSource(event->source(), event->mimeData()) || event->mimeData()->hasUrls()) event->acceptProposedAction();
+    if (DocumentTabBar::dragSource(event->source(), event->mimeData())) event->acceptProposedAction();
 }
 
 void MainWindow::dropEvent(QDropEvent *event) {
@@ -437,9 +444,47 @@ void MainWindow::dropEvent(QDropEvent *event) {
         if (source->dropInto(this)) event->acceptProposedAction();
         return;
     }
-    for (const QUrl &url : event->mimeData()->urls())
-        if (url.isLocalFile()) openFile(url.toLocalFile());
-    event->acceptProposedAction();
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+    const auto type = event->type();
+    if (type != QEvent::DragEnter && type != QEvent::DragMove && type != QEvent::Drop)
+        return QMainWindow::eventFilter(watched, event);
+
+    const auto *target = qobject_cast<QWidget *>(watched);
+    if (!target || target->window() != this) return QMainWindow::eventFilter(watched, event);
+
+    // Text fields and item views can consume drops before they reach MainWindow.
+    // Handle external file drags first and leave text and document-tab drags to Qt.
+    auto *drop = static_cast<QDropEvent *>(event);
+    if (drop->source() || !drop->mimeData()->hasUrls())
+        return QMainWindow::eventFilter(watched, event);
+
+    const auto urls = drop->mimeData()->urls();
+    if (!drop->possibleActions().testFlag(Qt::CopyAction) ||
+        std::none_of(urls.cbegin(), urls.cend(), [](const QUrl &url) { return url.isLocalFile(); })) {
+        drop->ignore();
+        return true;
+    }
+
+    if (type == QEvent::Drop) {
+        QStringList files;
+        for (const auto &url : urls) {
+            if (!url.isLocalFile()) continue;
+            const auto path = url.toLocalFile();
+            if (QFileInfo(path).isFile()) files.push_back(path);
+        }
+        if (files.isEmpty()) {
+            setStatus(QStringLiteral("끌어 놓은 항목에서 열 수 있는 파일을 찾지 못했습니다."));
+            drop->ignore();
+            return true;
+        }
+        for (const auto &path : files) openFile(path);
+    }
+    // Opening a file is read-only. Never report a MoveAction back to Explorer.
+    drop->setDropAction(Qt::CopyAction);
+    drop->accept();
+    return true;
 }
 
 void MainWindow::addRecentFile(const QString &path) {

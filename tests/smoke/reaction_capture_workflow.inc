@@ -125,10 +125,16 @@ void SmokeTest::reactionCaptureWorkflow() {
     QTRY_COMPARE_WITH_TIMEOUT(window.m_currentFile,tsPath,15000);
     QTest::qWait(150);
     QVERIFY(!window.findChild<QDialog *>("ReactionCaptureDialog"));
-    auto *toolbar=window.findChild<QToolBar *>("MainToolBar");QVERIFY(toolbar);
-    QAction *captureAction=nullptr;
-    for(auto *action:toolbar->actions())if(action->text()==QStringLiteral("맞춤 캡처")){captureAction=action;break;}
-    QVERIFY(captureAction);captureAction->trigger();
+    auto *exportAction = window.findChild<QAction *>("ToolbarExport");
+    QVERIFY(exportAction && exportAction->menu());
+    auto *exportMenu = exportAction->menu();
+    QVERIFY(QMetaObject::invokeMethod(exportMenu, "aboutToShow"));
+    QAction *captureAction = nullptr;
+    for (auto *action : exportMenu->actions()) {
+        if (action->text() == QStringLiteral("IRC·TS 캡처…")) captureAction = action;
+    }
+    QVERIFY(captureAction && captureAction->isEnabled());
+    captureAction->trigger();
     QTRY_VERIFY_WITH_TIMEOUT(window.findChild<QDialog *>("ReactionCaptureDialog"),15000);
     auto *dialog=dynamic_cast<ReactionCaptureDialog *>(window.findChild<QDialog *>("ReactionCaptureDialog"));QVERIFY(dialog);
     QVERIFY(dialog->m_si->isChecked());QVERIFY(!dialog->m_animation->isPlaying());

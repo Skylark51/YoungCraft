@@ -1,3 +1,4 @@
+#include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
 #include "render/MoleculeView.h"
 #include "animation/AnimationController.h"
@@ -8,7 +9,6 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
-#include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QLabel>
@@ -52,26 +52,36 @@ void MainWindow::ensureEditableDocument() {
     newDrawingDocument(original);
     setStatus(QStringLiteral("현재 구조의 편집 복사본을 새 탭에 만들었습니다. 원본 계산과 프레임은 보존됩니다."),8000);
 }
-void MainWindow::setupEditorControls() {
-    auto *layout=qobject_cast<QHBoxLayout *>(m_drawBar->layout());
-    auto *arm=new QPushButton(QStringLiteral("원자 / 결합 그리기"),m_drawBar);arm->setObjectName("ArmDrawingTool");arm->setCheckable(true);layout->insertWidget(0,arm);
+void MainWindow::setupEditorControls(QGridLayout *tools) {
+    auto *layout=qobject_cast<QVBoxLayout *>(m_drawBar->layout());
+    auto *arm=new QPushButton(QStringLiteral("원자 / 결합 그리기"),m_drawBar);arm->setObjectName("ArmDrawingTool");arm->setCheckable(true);
     arm->setToolTip(QStringLiteral("원소 또는 그리기 도구를 선택한 뒤 캔버스에 그립니다. 모드 진입만으로는 그려지지 않습니다."));
+    makeSidebarIconButton(arm, QStyle::SP_FileDialogContentsView);
+    tools->addWidget(arm, 0, 0);
     connect(arm,&QPushButton::clicked,m_drawBar,[view=m_view,element=m_drawElement](bool on){int z=atomicNumberFor(element->currentText());if(on&&z>0)view->setDrawingElement(z);else view->setDrawingArmed(false);});
     connect(m_view,&MoleculeView::drawingToolChanged,arm,&QPushButton::setChecked);
     auto *chain=new QPushButton(QStringLiteral("연속 결합"),m_drawBar);chain->setObjectName("ContinuousDrawingButton");
-    chain->setCheckable(true);chain->setChecked(true);layout->addWidget(chain);m_view->setChainDrawing(true);
+    chain->setCheckable(true);chain->setChecked(true);m_view->setChainDrawing(true);
     chain->setToolTip(QStringLiteral("클릭으로 사슬 연장 · 기존 원자 연결로 고리 닫기 · 30° 스냅 · Alt: 자유 배치 · Esc/우클릭: 사슬 끝내기"));
+    makeSidebarIconButton(chain, QStyle::SP_BrowserReload);
+    tools->addWidget(chain, 0, 1);
     connect(chain,&QPushButton::toggled,m_view,&MoleculeView::setChainDrawing);
-    auto *newChain=new QPushButton(QStringLiteral("새 사슬 (Esc)"),m_drawBar);newChain->setObjectName("EndDrawingChainButton");layout->addWidget(newChain);
+    auto *newChain=new QPushButton(QStringLiteral("새 사슬 (Esc)"),m_drawBar);newChain->setObjectName("EndDrawingChainButton");
+    makeSidebarIconButton(newChain, QStyle::SP_FileDialogNewFolder);
+    tools->addWidget(newChain, 0, 2);
     connect(newChain,&QPushButton::clicked,m_view,&MoleculeView::endDrawingChain);
-    auto *lab=new QPushButton(QStringLiteral("Lab Ligands…"),m_drawBar);lab->setObjectName("LabLigandsButton");layout->addWidget(lab);
+    auto *lab=new QPushButton(QStringLiteral("Lab Ligands…"),m_drawBar);lab->setObjectName("LabLigandsButton");
+    makeSidebarIconButton(lab, QStyle::SP_DirOpenIcon);
+    tools->addWidget(lab, 0, 3);
 
     auto *charge=new QSpinBox(m_drawBar);charge->setObjectName("DrawFormalCharge");charge->setRange(-4,4);charge->setPrefix("전하: ");layout->addWidget(charge);
-    auto *periodic=new QPushButton(QStringLiteral("주기율표"),m_drawBar);periodic->setObjectName("DrawPeriodicTable");layout->addWidget(periodic);
+    auto *periodic=new QPushButton(QStringLiteral("주기율표"),m_drawBar);periodic->setObjectName("DrawPeriodicTable");
+    makeSidebarIconButton(periodic, QStyle::SP_FileDialogListView);
+    tools->addWidget(periodic, 2, 0);
 
     auto *recent=new QComboBox(m_drawBar);recent->setObjectName("DrawRecentElements");recent->addItem(QStringLiteral("최근 원소"));recent->addItems(QSettings().value("drawing/recentElements").toStringList());recent->setMaximumWidth(100);layout->addWidget(recent);
     connect(recent,&QComboBox::textActivated,m_drawElement,[selector=m_drawElement,view=m_view](const QString&s){int z=atomicNumberFor(s);if(z>0){selector->setCurrentText(s);view->setDrawingElement(z);}});
-    auto *state=new QLabel(m_drawBar);state->setObjectName("DrawStateSummary");layout->addWidget(state);
+    auto *state=new QLabel(m_drawBar);state->setObjectName("DrawStateSummary");state->setWordWrap(true);layout->addWidget(state);
     auto refresh=[view=m_view,element=m_drawElement,order=m_drawBondOrder,autoH=m_autoHButton,charge,state]{DrawState s;s.element=atomicNumberFor(element->currentText());s.bondOrder=order->currentData().toDouble();s.formalCharge=charge->value();s.autoHydrogen=autoH->isChecked();view->setDrawingBondOrder(s.bondOrder);state->setText(QString("원소: %1 · 결합: %2 · 전하: %3 · 자동 수소: %4").arg(elementSymbol(s.element),s.bondOrder==0?"자동":QString::number(s.bondOrder)).arg(s.formalCharge).arg(s.autoHydrogen?"켜짐":"꺼짐")+(view->drawingArmed()?QStringLiteral(" · 그리기 준비"):QStringLiteral(" · 도구 선택 대기")));};
     connect(m_view,&MoleculeView::drawingToolChanged,m_drawBar,[refresh](bool){refresh();});
     connect(charge,qOverload<int>(&QSpinBox::valueChanged),m_drawBar,[refresh](int){refresh();});

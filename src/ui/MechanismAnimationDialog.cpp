@@ -201,6 +201,9 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     });
     auto *playerEdit=new QPushButton(QStringLiteral("2D / 에너지 설정…"));tools->addWidget(playerEdit);
     connect(playerEdit,&QPushButton::clicked,m_coordinateEdit,&QPushButton::click);
+    auto *playerCaptions = new QPushButton(QStringLiteral("반응 이름표…"));
+    tools->addWidget(playerCaptions);
+    connect(playerCaptions, &QPushButton::clicked, this, [this] { editReactionCaptions(m_player); });
     auto *playerLabels=new QCheckBox(QStringLiteral("원자 번호"));tools->addWidget(playerLabels);
     auto *playerHide=new QCheckBox(QStringLiteral("수소 모두 숨기기"));tools->addWidget(playerHide);
     auto *playerKeepH=new QPushButton(QStringLiteral("선택 수소만 표시"));tools->addWidget(playerKeepH);
@@ -229,6 +232,7 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     connect(m_view,&MoleculeView::cameraChanged,this,[this]{m_playerView->setCameraState(shotCamera(m_view->molecule(),m_view->cameraState()));});
     connect(m_playerView,&MoleculeView::cameraChanged,this,[this]{if(m_shotAtoms.isEmpty()&&!m_savedCameraEnabled)m_view->setCameraState(m_playerView->cameraState());});
     m_playerCaption=new QLabel;m_playerCaption->setWordWrap(true);
+    m_playerCaption->setTextFormat(Qt::PlainText);
     m_playerCaption->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
     playerLayout->addWidget(m_playerCaption);
     auto *playerControls=new QHBoxLayout;playerLayout->addLayout(playerControls);
@@ -275,7 +279,15 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     connect(m_coordinateEdit,&QPushButton::clicked,this,[this]{play(false);m_coordinate->edit(m_table->currentRow());});
     connect(m_coordinateMode,&QPushButton::toggled,this,[this](bool on){play(false);m_coordinate->setEnabledPresentation(on);});
     connect(m_coordinate,&ReactionCoordinateWidget::configurationChanged,this,[this]{updateControls();seek(m_time);if(m_coordinate->active())showPlaybackWindow();});
-    m_caption=new QLabel(QStringLiteral("반응 경로를 추가하세요"));m_caption->setWordWrap(true);rightLayout->addWidget(m_caption);
+    auto *captionRow = new QHBoxLayout;
+    m_caption=new QLabel(QStringLiteral("반응 경로를 추가하세요"));m_caption->setWordWrap(true);
+    m_caption->setTextFormat(Qt::PlainText);
+    captionRow->addWidget(m_caption, 1);
+    m_reactionCaptionEdit = new QPushButton(QStringLiteral("반응 이름표…"));
+    m_reactionCaptionEdit->setObjectName(QStringLiteral("MechanismReactionCaptions"));
+    captionRow->addWidget(m_reactionCaptionEdit);
+    rightLayout->addLayout(captionRow);
+    connect(m_reactionCaptionEdit, &QPushButton::clicked, this, [this] { editReactionCaptions(this); });
     auto *playback=new QHBoxLayout;rightLayout->addLayout(playback);
     m_play=new QPushButton(QStringLiteral("▶ 재생"));m_play->setObjectName("MechanismPlay");playback->addWidget(m_play);
     auto *start=new QPushButton(QStringLiteral("처음"));playback->addWidget(start);
@@ -342,7 +354,7 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     m_resolution=new QComboBox;for(int width:{640,960,1280,1920})m_resolution->addItem(QStringLiteral("%1 × %2").arg(width).arg(width*9/16),width);m_resolution->setCurrentIndex(1);exportSettings->addWidget(m_resolution);
     m_fps=new QSpinBox;m_fps->setRange(10,60);m_fps->setValue(25);m_fps->setSuffix(" fps");exportSettings->addWidget(m_fps);
     auto *alpha=new QLabel(QStringLiteral("PNG·GIF 투명 배경"));exportSettings->addWidget(alpha);
-    m_captions=new QCheckBox(QStringLiteral("단계 이름"));m_captions->setChecked(true);exportSettings->addWidget(m_captions);
+    m_captions=new QCheckBox(QStringLiteral("영상에 이름표 표시"));m_captions->setChecked(true);exportSettings->addWidget(m_captions);
     auto *exports=new QHBoxLayout;rightLayout->addLayout(exports);
     m_gif=new QPushButton(QStringLiteral("GIF 저장…"));m_mp4=new QPushButton(QStringLiteral("MP4 저장…"));m_png=new QPushButton(QStringLiteral("PNG 시퀀스…"));
     m_pptx=new QPushButton(QStringLiteral("발표용 장면…"));m_pptx->setObjectName("MechanismPowerPointExport");
@@ -385,6 +397,7 @@ void MechanismAnimationDialog::updateControls() {
     m_coordinateEdit->setEnabled(ready);m_coordinateMode->setEnabled(ready&&m_coordinate->ready());
     {const QSignalBlocker block(m_coordinateMode);m_coordinateMode->setChecked(m_coordinate->active());}
     m_playerOpen->setEnabled(ready);
+    m_reactionCaptionEdit->setEnabled(ready);
     m_player->setEnabled(!m_loading&&!m_exporting);
     m_playerPlay->setEnabled(ready);m_playerSlider->setEnabled(ready);m_playerLoop->setEnabled(ready);
     if(!m_valid)m_player->hide();
@@ -427,7 +440,10 @@ void MechanismAnimationDialog::populate() {
     if(m_table->currentRow()<0&&!m_steps.isEmpty())m_table->setCurrentCell(0,0);
 }
 bool MechanismAnimationDialog::setSteps(const QVector<MechanismStep> &steps) {
-    if(m_loading||m_exporting)return false;m_steps=steps;m_presentationStops.clear();m_keptHydrogens.clear();m_shotAtoms.clear();m_focusMode=-1;m_focus.clear();m_parked.clear();populate();return rebuild();
+    if(m_loading||m_exporting)return false;
+    m_reactionCaptions.clear();
+    m_useReactionCaptions = false;
+    m_steps=steps;m_presentationStops.clear();m_keptHydrogens.clear();m_shotAtoms.clear();m_focusMode=-1;m_focus.clear();m_parked.clear();populate();return rebuild();
 }
 bool MechanismAnimationDialog::rebuild(bool fit) {
     play(false);m_valid=false;
@@ -468,7 +484,7 @@ void MechanismAnimationDialog::fitTimeline() {
 void MechanismAnimationDialog::seek(double time) {
     if(!m_valid)return;
     m_time=qBound(0.,time,m_timeline.duration());
-    const double mapped=m_coordinate->mappedTime(m_time);
+    const auto reactionName = reactionCaptionAt(m_time);
     const auto molecule=playbackFrame(m_time);
     m_view->setAnimationMolecule(molecule);
     if(m_player->isVisible()) {
@@ -477,10 +493,11 @@ void MechanismAnimationDialog::seek(double time) {
             m_playerView->setCameraState(shotCamera(molecule,m_view->cameraState()));
     }
     {const QSignalBlocker block(m_exactTime);m_exactTime->setValue(m_time);}
-    m_coordinate->setTime(m_time);
+    m_coordinate->setTime(m_time, reactionName);
     {const QSignalBlocker block(m_slider);m_slider->setValue(qRound(10000*m_time/m_timeline.duration()));}
     {const QSignalBlocker block(m_playerSlider);m_playerSlider->setValue(m_slider->value());}
-    m_caption->setText(QStringLiteral("%1   ·   %2 / %3 s").arg(m_timeline.caption(mapped)).arg(m_time,0,'f',2).arg(m_timeline.duration(),0,'f',2));
+    const auto caption = reactionName.isEmpty() ? m_timeline.caption(m_coordinate->mappedTime(m_time)) : reactionName;
+    m_caption->setText(QStringLiteral("%1   ·   %2 / %3 s").arg(caption).arg(m_time,0,'f',2).arg(m_timeline.duration(),0,'f',2));
     m_playerCaption->setText(m_coordinate->impactFlash(m_time)>0?m_caption->text()+QStringLiteral("  ·  장벽 충돌"):m_caption->text());
 }
 void MechanismAnimationDialog::showPlaybackWindow() {
@@ -599,6 +616,14 @@ void MechanismAnimationDialog::refreshTimelineEvents() {
     }
     for(double time:m_presentationStops)
         if(time>0&&time<m_timeline.duration())events.push_back({time,QStringLiteral("발표 정지점"),QColor(196,53,105)});
+    if (m_useReactionCaptions) {
+        const QColor color(125, 74, 152);
+        for (const auto &caption : m_reactionCaptions) {
+            if (caption.start >= m_timeline.duration()) continue;
+            events.push_back({caption.start, QStringLiteral("반응 시작 · ") + caption.name, color});
+            events.push_back({qMin(caption.end, m_timeline.duration()), QStringLiteral("반응 끝 · ") + caption.name, color});
+        }
+    }
     for(double time:m_timeline.topologyChangeTimes())
         events.push_back({m_coordinate->timeForMapped(time),QStringLiteral("결합 변화"),QColor(35,154,125)});
     std::stable_sort(events.begin(),events.end(),[](const auto &a,const auto &b){return a.time<b.time;});
@@ -608,6 +633,167 @@ void MechanismAnimationDialog::refreshTimelineEvents() {
         marks.push_back({time/m_timeline.duration(),color});
     }
     slider->setMarks(std::move(marks));
+}
+
+void MechanismAnimationDialog::editReactionCaptions(QWidget *parent) {
+    if (!m_valid || m_loading || m_exporting) return;
+    play(false);
+    const double duration = m_timeline.duration();
+    const double originalTime = m_time;
+    const double lastMillisecond = std::ceil(duration * 1000.0 - 1e-9) / 1000.0;
+
+    QDialog dialog(parent);
+    dialog.setObjectName(QStringLiteral("ReactionCaptionsDialog"));
+    dialog.setWindowTitle(QStringLiteral("반응 이름표"));
+    dialog.resize(640, 400);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *mode = new QComboBox(&dialog);
+    mode->setObjectName(QStringLiteral("ReactionCaptionMode"));
+    mode->addItems({QStringLiteral("구조 이름 표시"), QStringLiteral("지정한 구간에 반응 이름 표시")});
+    mode->setCurrentIndex(m_useReactionCaptions ? 1 : 0);
+    layout->addWidget(mode);
+    auto *help = new QLabel(QStringLiteral("영상 재생 시간(초)으로 구간을 지정하세요. 구간 밖에서는 구조 이름을 표시합니다."));
+    help->setWordWrap(true);
+    layout->addWidget(help);
+
+    auto *table = new QTableWidget(0, 3, &dialog);
+    table->setObjectName(QStringLiteral("ReactionCaptionRanges"));
+    table->setHorizontalHeaderLabels({QStringLiteral("반응 이름"), QStringLiteral("시작 (초)"), QStringLiteral("끝 (초)")});
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    layout->addWidget(table, 1);
+
+    auto addRange = [table, duration, lastMillisecond](const ReactionCaption &caption) {
+        const int row = table->rowCount();
+        table->insertRow(row);
+        table->setItem(row, 0, new QTableWidgetItem(caption.name));
+        const double values[] = {caption.start, caption.end};
+        for (int i = 0; i < 2; ++i) {
+            auto *field = new QDoubleSpinBox(table);
+            field->setDecimals(3);
+            field->setRange(0, qMax(lastMillisecond, values[i]));
+            field->setSingleStep(.1);
+            field->setValue(i == 1 && values[i] == duration ? lastMillisecond : values[i]);
+            table->setCellWidget(row, i + 1, field);
+        }
+    };
+    for (const auto &caption : m_reactionCaptions) addRange(caption);
+    if (table->rowCount()) table->selectRow(0);
+
+    auto *previewRow = new QHBoxLayout;
+    layout->addLayout(previewRow);
+    previewRow->addWidget(new QLabel(QStringLiteral("미리보기 시점")));
+    auto *slider = new QSlider(Qt::Horizontal, &dialog);
+    slider->setAccessibleName(QStringLiteral("이름표 구간 미리보기"));
+    slider->setRange(0, 10000);
+    slider->setValue(qRound(10000 * m_time / duration));
+    previewRow->addWidget(slider, 1);
+    auto *previewTime = new QDoubleSpinBox(&dialog);
+    previewTime->setDecimals(3);
+    previewTime->setRange(0, lastMillisecond);
+    previewTime->setSuffix(QStringLiteral(" s"));
+    previewTime->setValue(m_time == duration ? lastMillisecond : m_time);
+    previewRow->addWidget(previewTime);
+    connect(slider, &QSlider::valueChanged, &dialog, [duration, lastMillisecond, previewTime](int value) {
+        previewTime->setValue(value == 10000 ? lastMillisecond : duration * value / 10000.);
+    });
+    connect(previewTime, &QDoubleSpinBox::valueChanged, &dialog, [this, slider, duration](double time) {
+        const QSignalBlocker block(slider);
+        seek(time);
+        slider->setValue(qRound(10000 * m_time / duration));
+    });
+
+    auto *tools = new QHBoxLayout;
+    layout->addLayout(tools);
+    auto *add = new QPushButton(QStringLiteral("구간 추가"));
+    add->setObjectName(QStringLiteral("AddReactionCaptionRange"));
+    auto *remove = new QPushButton(QStringLiteral("선택 구간 삭제"));
+    auto *markStart = new QPushButton(QStringLiteral("시작으로 지정"));
+    auto *markEnd = new QPushButton(QStringLiteral("끝으로 지정"));
+    for (auto *button : {add, remove, markStart, markEnd}) tools->addWidget(button);
+    auto updateButtons = [=] {
+        const bool selected = table->currentRow() >= 0;
+        add->setEnabled(table->rowCount() < 200);
+        for (auto *button : {remove, markStart, markEnd}) button->setEnabled(selected);
+    };
+    connect(table, &QTableWidget::itemSelectionChanged, &dialog, updateButtons);
+    connect(add, &QPushButton::clicked, &dialog, [=] {
+        const double start = previewTime->value();
+        addRange({{}, start < lastMillisecond ? start : 0., duration});
+        table->setCurrentCell(table->rowCount() - 1, 0);
+        table->editItem(table->currentItem());
+        mode->setCurrentIndex(1);
+        updateButtons();
+    });
+    connect(remove, &QPushButton::clicked, &dialog, [=] {
+        table->removeRow(table->currentRow());
+        updateButtons();
+    });
+    for (auto *button : {markStart, markEnd}) {
+        const int column = button == markStart ? 1 : 2;
+        connect(button, &QPushButton::clicked, &dialog, [=] {
+            if (auto *field = qobject_cast<QDoubleSpinBox *>(table->cellWidget(table->currentRow(), column)))
+                field->setValue(previewTime->value());
+        });
+    }
+    updateButtons();
+
+    auto *feedback = new QLabel(&dialog);
+    feedback->setWordWrap(true);
+    layout->addWidget(feedback);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    QVector<ReactionCaption> result;
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+        result.clear();
+        for (int row = 0; row < table->rowCount(); ++row) {
+            const auto name = table->item(row, 0)->text().trimmed();
+            const double start = qobject_cast<QDoubleSpinBox *>(table->cellWidget(row, 1))->value();
+            const double end = qobject_cast<QDoubleSpinBox *>(table->cellWidget(row, 2))->value();
+            if (name.isEmpty() || start >= qMin(end, duration) || end > lastMillisecond) {
+                feedback->setText(QStringLiteral("%1행의 반응 이름과 시작·끝 시간을 확인하세요.").arg(row + 1));
+                table->selectRow(row);
+                return;
+            }
+            result.push_back({name, start, qMin(end, duration)});
+        }
+        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.start < b.start; });
+        for (int i = 1; i < result.size(); ++i) {
+            if (result[i].start >= result[i - 1].end) continue;
+            feedback->setText(QStringLiteral("겹치는 구간이 있습니다. 각 재생 시점에는 반응 이름 하나를 지정하세요."));
+            return;
+        }
+        dialog.accept();
+    });
+    if (dialog.exec() != QDialog::Accepted) {
+        seek(originalTime);
+        return;
+    }
+    m_reactionCaptions = std::move(result);
+    m_useReactionCaptions = mode->currentIndex() == 1;
+    refreshTimelineEvents();
+    seek(m_time);
+}
+
+QString MechanismAnimationDialog::reactionCaptionAt(double time) const {
+    if (!m_useReactionCaptions) return {};
+    const double duration = m_timeline.duration();
+    constexpr double tolerance = 1e-9;
+    for (const auto &caption : m_reactionCaptions) {
+        if (caption.start >= duration || time + tolerance < caption.start) break;
+        if (time + tolerance < caption.end || (time >= duration - tolerance && caption.end >= duration - tolerance))
+            return caption.name;
+    }
+    return {};
+}
+
+QJsonObject MechanismAnimationDialog::reactionCaptionSettings() const {
+    QJsonArray ranges;
+    for (const auto &caption : m_reactionCaptions)
+        ranges.append(QJsonObject{{"name", caption.name}, {"start", caption.start}, {"end", caption.end}});
+    return {{"enabled", m_useReactionCaptions}, {"ranges", ranges}};
 }
 
 void MechanismAnimationDialog::refreshStageTools() {
@@ -833,6 +1019,7 @@ bool MechanismAnimationDialog::saveProject(const QString &path) {
     if(!m_valid||m_loading||m_exporting)return false;
     auto root=QJsonDocument::fromJson(MechanismTimeline::saveProject(m_steps,m_options)).object();
     root["reactionCoordinate"]=m_coordinate->settings();
+    root["reactionCaptions"] = reactionCaptionSettings();
     QJsonArray stops;for(double time:m_presentationStops)stops.append(time);root["presentationStops"]=stops;
     const auto c=m_view->cameraState();QJsonArray keep;for(int id:m_focus)keep.append(id);
     QJsonArray parked;for(int id:m_parked)parked.append(id);root["parked"]=parked;root["parkStart"]=m_parkStart;
@@ -859,6 +1046,19 @@ bool MechanismAnimationDialog::openProject(const QString &path) {
     {const QSignalBlocker a(m_align),b(m_preserve),c(m_keep),d(m_lift);m_align->setChecked(options.align);m_preserve->setChecked(options.preserveBonds);m_keep->setChecked(options.keepDeparted);m_lift->setValue(options.lift);}
     if(!setSteps(steps))return false;
     const auto root=QJsonDocument::fromJson(bytes).object();m_focusMode=root["focusMode"].toInt(-1);if(m_focusMode < -1||m_focusMode>2)m_focusMode=-1;
+    const auto captions = root["reactionCaptions"].toObject();
+    m_useReactionCaptions = captions["enabled"].toBool();
+    for (const auto &value : captions["ranges"].toArray()) {
+        if (m_reactionCaptions.size() == 200) break;
+        const auto range = value.toObject();
+        const auto name = range["name"].toString().trimmed();
+        const double start = range["start"].toDouble(-1);
+        const double end = range["end"].toDouble(-1);
+        if (!name.isEmpty() && start >= 0 && end > start && std::isfinite(end))
+            m_reactionCaptions.push_back({name, start, end});
+    }
+    std::stable_sort(m_reactionCaptions.begin(), m_reactionCaptions.end(),
+        [](const auto &a, const auto &b) { return a.start < b.start; });
     for(const auto &value:root["presentationStops"].toArray()) {
         const double time=value.toDouble(-1);
         if(time>0&&std::isfinite(time))m_presentationStops.push_back(time);
@@ -957,18 +1157,22 @@ QImage MechanismAnimationDialog::renderOutputFrame(double time,QSize size,bool t
     m_view->setCameraState(camera);
     auto image=m_view->imageAtSize({structureWidth,structureHeight},transparent,true);
     if(image.isNull())return {};
+    const auto reactionName = reactionCaptionAt(time);
     if(combined) {
         QImage full(size,QImage::Format_ARGB32_Premultiplied);
         full.fill(Qt::transparent);
         QPainter painter(&full);
         painter.drawImage(0,0,image);
-        if(sideBySide)painter.drawImage(structureWidth,0,m_coordinate->imageAtTime({width-structureWidth,height},time,transparent,forceGraph));
-        else painter.drawImage(0,structureHeight,m_coordinate->imageAtTime({width,height-structureHeight},time,transparent,forceGraph));
+        const auto graphSize = sideBySide ? QSize(width - structureWidth, height) : QSize(width, height - structureHeight);
+        const auto graphOrigin = sideBySide ? QPoint(structureWidth, 0) : QPoint(0, structureHeight);
+        painter.drawImage(graphOrigin, m_coordinate->imageAtTime(graphSize, time, transparent, forceGraph,
+            reactionName, m_captions->isChecked()));
         return full;
     }
     if(m_captions->isChecked()) {
         QPainter painter(&image);QFont font=painter.font();font.setPixelSize(qMax(14,height/30));painter.setFont(font);
-        const QString text=m_timeline.caption(m_coordinate->mappedTime(time));const QRect box(12,height-qMax(60,height/9),width-24,qMax(48,height/10));
+        const auto text = reactionName.isEmpty() ? m_timeline.caption(m_coordinate->mappedTime(time)) : reactionName;
+        const QRect box(12,height-qMax(60,height/9),width-24,qMax(48,height/10));
         if(!transparent)painter.fillRect(box,QColor(255,255,255,210));
         painter.setPen(QColor(35,45,55));painter.drawText(box.adjusted(10,2,-10,-2),Qt::AlignCenter|Qt::TextWordWrap,text);
     }
@@ -1095,7 +1299,10 @@ bool MechanismAnimationDialog::exportAnimation(const QString &path,const QString
         while(!input.atEnd()){const auto data=input.read(1024*1024);if(data.isEmpty()||output.write(data)!=data.size()){m_status->setText(QStringLiteral("MP4 파일 쓰기 실패"));return false;}}
         if(!output.commit()){m_status->setText(output.errorString());return false;}
     } else if(format=="png") {
-        QSaveFile manifest(directory+"/timeline.json");const auto json=QJsonDocument(QJsonObject{{"fps",fps},{"frames",count},{"duration",m_timeline.duration()},{"project",QJsonDocument::fromJson(MechanismTimeline::saveProject(m_steps,m_options)).object()}}).toJson();
+        auto project = QJsonDocument::fromJson(MechanismTimeline::saveProject(m_steps,m_options)).object();
+        project["reactionCaptions"] = reactionCaptionSettings();
+        project["captions"] = m_captions->isChecked();
+        QSaveFile manifest(directory+"/timeline.json");const auto json=QJsonDocument(QJsonObject{{"fps",fps},{"frames",count},{"duration",m_timeline.duration()},{"project",project}}).toJson();
         if(!manifest.open(QIODevice::WriteOnly)||manifest.write(json)!=json.size()||!manifest.commit()){m_status->setText(QStringLiteral("타임라인 기록 저장 실패"));return false;}
     }
     m_status->setText(QStringLiteral("저장 완료 · %1 프레임: %2").arg(count).arg(format=="png"?directory:path));return true;

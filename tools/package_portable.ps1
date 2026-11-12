@@ -4,7 +4,9 @@ param(
     [string]$BuildDir = '',
     [string]$DistDir = '',
     [string]$ZipPath = '',
-    [string]$Python = 'python'
+    [string]$Python = 'python',
+    [string]$ApplicationPath = '',
+    [switch]$ReuseMmRuntime
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,21 +23,23 @@ if (-not $actualDist.Equals($expectedDist, [StringComparison]::OrdinalIgnoreCase
 
 $cache = Join-Path $BuildDir 'CMakeCache.txt'
 if (-not (Test-Path -LiteralPath $cache)) { throw "CMake build cache가 없습니다: $cache" }
-$qtLine = Get-Content -LiteralPath $cache -Encoding UTF8 | Where-Object { $_ -match '^Qt6_DIR:PATH=' } | Select-Object -First 1
+$qtLine = Get-Content -LiteralPath $cache -Encoding UTF8 | Where-Object { $_ -match '^Qt6_DIR:[^=]+=' } | Select-Object -First 1
 if (-not $qtLine) { throw 'Qt6_DIR을 CMakeCache에서 찾지 못했습니다.' }
-$qtCmakeDir = $qtLine.Substring('Qt6_DIR:PATH='.Length)
+$qtCmakeDir = ($qtLine -split '=', 2)[1]
 $qtRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $qtCmakeDir))
 $windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
 if (-not (Test-Path -LiteralPath $windeployqt)) { throw "windeployqt가 없습니다: $windeployqt" }
 
 & cmake --build $BuildDir --config Release --target Youngcraft
 if ($LASTEXITCODE -ne 0) { throw "Release 빌드 실패: $LASTEXITCODE" }
-$application = Join-Path $ProjectRoot 'Youngcraft.exe'
+$application = if ($ApplicationPath) { [IO.Path]::GetFullPath($ApplicationPath) } else { Join-Path $ProjectRoot 'Youngcraft.exe' }
 if (-not (Test-Path -LiteralPath $application)) { throw "실행 파일이 없습니다: $application" }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
-    -ProjectRoot $ProjectRoot -Python $Python
-if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
+if (-not $ReuseMmRuntime) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
+        -ProjectRoot $ProjectRoot -Python $Python
+    if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
+}
 $mmSource = Join-Path $ProjectRoot 'build-mm-runtime/YoungcraftMM'
 if (-not (Test-Path -LiteralPath (Join-Path $mmSource 'YoungcraftMM.exe'))) {
     throw "MM worker가 없습니다: $mmSource"
@@ -47,6 +51,7 @@ $stage = Join-Path $env:TEMP ('YoungcraftPortable-' + [Guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 try {
     Copy-Item -LiteralPath $application -Destination (Join-Path $stage 'Youngcraft.exe') -Force
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'resources/gaussian-remote.json') -Destination (Join-Path $stage 'youngcraft-server.json') -Force
     & $windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage 'Youngcraft.exe')
     if ($LASTEXITCODE -ne 0) { throw "windeployqt 실패: $LASTEXITCODE" }
     # Some Qt SDKs do not discover MSVC's redistributables in windeployqt.

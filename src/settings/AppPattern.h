@@ -45,12 +45,17 @@ inline void drawMotif(QPainter &p, const QRect &bounds, int motif, QColor ink) {
 
 
 inline bool active(const QWidget *widget) {
+    if(widget->window()->property("solidWorkspace").toBool())return false;
     const auto value=widget->window()->property("appPattern");
     return value.isValid() && value.toInt()>=0 && value.toInt()<6;
 }
 
 // Use one window-space origin, so motifs do not restart at the square GL view.
 inline bool paintBackdrop(QPainter &p,QWidget *widget,bool fill=true) {
+    if(widget->window()->property("solidWorkspace").toBool()) {
+        if(fill)p.fillRect(widget->rect(),widget->window()->palette().color(QPalette::Window));
+        return true;
+    }
     if(!active(widget))return false;
     auto *window=widget->window();
     const auto offset=widget->mapTo(window,QPoint());

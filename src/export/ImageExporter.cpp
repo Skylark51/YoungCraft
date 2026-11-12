@@ -6,6 +6,9 @@
 #include <QClipboard>
 #include <QColorSpace>
 #include <QDir>
+#include <QFileInfo>
+#include <QDataStream>
+#include <limits>
 #include <QFile>
 #include <QSaveFile>
 #include <QHash>
@@ -127,6 +130,34 @@ QVector<quint8> quantizeGifFrame(const QImage &source, const QSize &size, bool t
     return pixels;
 }
 
+// Baseline RGBA TIFF writer: available even when the optional Qt TIFF plugin is absent.
+bool saveTiff(const QImage &image,const QString &path,QString *error) {
+    const auto rgba=image.convertToFormat(QImage::Format_RGBA8888);
+    const quint64 byteCount=quint64(rgba.width())*quint64(rgba.height())*4;
+    constexpr quint16 entryCount=15;
+    constexpr quint32 bitsOffset=8+2+entryCount*12+4;
+    constexpr quint32 xResolution=bitsOffset+8,yResolution=xResolution+8,pixelOffset=yResolution+8;
+    if(rgba.isNull()||byteCount>std::numeric_limits<quint32>::max()-pixelOffset){
+        if(error)*error=QStringLiteral("TIFF 크기가 지원 범위를 벗어났습니다.");return false;
+    }
+    QSaveFile file(path);if(!file.open(QIODevice::WriteOnly)){if(error)*error=file.errorString();return false;}
+    QDataStream stream(&file);stream.setByteOrder(QDataStream::LittleEndian);
+    stream.writeRawData("II",2);stream<<quint16(42)<<quint32(8)<<entryCount;
+    const auto tag=[&](quint16 id,quint16 type,quint32 count,quint32 value){stream<<id<<type<<count<<value;};
+    tag(256,4,1,quint32(rgba.width()));tag(257,4,1,quint32(rgba.height()));tag(258,3,4,bitsOffset);
+    tag(259,3,1,1);tag(262,3,1,2);tag(273,4,1,pixelOffset);tag(274,3,1,1);tag(277,3,1,4);
+    tag(278,4,1,quint32(rgba.height()));tag(279,4,1,quint32(byteCount));tag(282,5,1,xResolution);
+    tag(283,5,1,yResolution);tag(284,3,1,1);tag(296,3,1,2);tag(338,3,1,2);
+    stream<<quint32(0)<<quint16(8)<<quint16(8)<<quint16(8)<<quint16(8);
+    const auto resolution=[&](int dpm){stream<<quint32(dpm>0?qRound64(double(dpm)*254):960000)<<quint32(10000);};
+    resolution(image.dotsPerMeterX());resolution(image.dotsPerMeterY());
+    for(int row=0;row<rgba.height();++row){
+        if(file.write(reinterpret_cast<const char*>(rgba.constScanLine(row)),qint64(rgba.width())*4)!=qint64(rgba.width())*4){if(error)*error=file.errorString();return false;}
+    }
+    if(stream.status()!=QDataStream::Ok||!file.commit()){if(error)*error=file.errorString();return false;}
+    return true;
+}
+
 } // namespace
 
 QImage ImageExporter::supersample(const QImage &image, int factor, bool transparent) {
@@ -151,7 +182,16 @@ QImage ImageExporter::supersample(const QImage &image, int factor, bool transpar
 
 bool ImageExporter::saveImage(const QImage &image, const QString &path, int supersampleFactor,
                               bool transparent, QString *error) {
-    const QImage output = supersample(image, supersampleFactor, transparent);
+    QImage output = supersample(image, supersampleFactor, transparent);
+    if(output.isNull()){if(error)*error=QStringLiteral("저장할 이미지가 없습니다.");return false;}
+    const auto suffix=QFileInfo(path).suffix().toLower();
+    if(suffix=="gif")return saveGif({output},path,100,transparent,false,error);
+    if(suffix=="tif"||suffix=="tiff")return saveTiff(output,path,error);
+    if(suffix=="jpg"||suffix=="jpeg"||suffix=="bmp"){
+        QImage opaque(output.size(),QImage::Format_RGB32);opaque.fill(Qt::white);
+        opaque.setDotsPerMeterX(output.dotsPerMeterX());opaque.setDotsPerMeterY(output.dotsPerMeterY());
+        {QPainter painter(&opaque);painter.drawImage(0,0,output);}output=opaque;
+    }
     if (output.save(path)) return true;
     if (error) *error = QStringLiteral("이미지를 저장할 수 없습니다: %1").arg(path);
     return false;

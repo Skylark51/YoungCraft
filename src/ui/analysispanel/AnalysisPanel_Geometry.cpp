@@ -1,3 +1,4 @@
+#include "ui/SidebarButton.h"
 #include "ui/AnalysisPanel.h"
 #include "ui/ScanResultsDialog.h"
 
@@ -41,6 +42,7 @@ QWidget *AnalysisPanel::makeGeometryTab() {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     m_openOptimizationGraph = new QPushButton(QStringLiteral("최적화 그래프..."),page);
+    makeSidebarIconButton(m_openOptimizationGraph, QStyle::SP_FileDialogDetailedView);
     m_openOptimizationGraph->setObjectName("OpenOptimizationGraph");
     layout->addWidget(m_openOptimizationGraph);
     m_optimizationResults=new QDialog(this);m_optimizationResults->setObjectName("OptimizationResultsDialog");
@@ -67,7 +69,9 @@ QWidget *AnalysisPanel::makeGeometryTab() {
     right->addWidget(m_frameSlider);
     auto *buttons = new QHBoxLayout;
     auto *play = new QPushButton(QStringLiteral("재생 / 일시정지"));
+    makeSidebarIconButton(play, QStyle::SP_MediaPlay);
     auto *last = new QPushButton(QStringLiteral("최종 구조"));
+    makeSidebarIconButton(last, QStyle::SP_MediaSkipForward);
     buttons->addWidget(play); buttons->addWidget(last);
     right->addLayout(buttons);
     layout->addLayout(right);

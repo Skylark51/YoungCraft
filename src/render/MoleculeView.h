@@ -15,6 +15,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
 #include <QQuaternion>
+#include <QCache>
 
 #include <memory>
 
@@ -41,7 +42,7 @@ public:
     void setEditedMolecule(const Molecule &molecule);
     void setCoordinates(const QVector<QVector3D> &coordinates);
     void setFrequencyMode(const FrequencyMode *mode);
-    void setCubeGrid(const std::shared_ptr<const CubeGrid> &grid);
+    void setCubeGrid(const std::shared_ptr<const CubeGrid> &grid, float isoValue = -1.0f);
     void clearCubeGrid();
     void setPotentialGrid(std::shared_ptr<const CubeGrid> grid, double minimum, double maximum, QColor low, QColor high);
     void setStyle(const RenderStyle &style);
@@ -268,6 +269,12 @@ private:
     std::shared_ptr<SurfaceMesh> m_positiveSurface;
     std::shared_ptr<SurfaceMesh> m_negativeSurface;
     quint64 m_surfaceGeneration = 0;
+    struct CachedSurface {
+        std::shared_ptr<const CubeGrid> grid; // Keep pointer identity valid while cached.
+        std::shared_ptr<SurfaceMesh> positive, negative;
+    };
+    QCache<QString, CachedSurface> m_surfaceCache{256 * 1024}; // KiB
+    bool m_surfaceBuilding = false;
     QVector3D m_center;
     float m_radius = 1.0f;
     QVector3D m_target;

@@ -55,10 +55,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setAcceptDrops(true);
     createMenus();
     createToolBar();
+    qApp->installEventFilter(this);
     const QSettings settings;
-    restoreGeometry(settings.value(QStringLiteral("window/geometry")).toByteArray());
+    if (!restoreGeometry(settings.value(QStringLiteral("window/geometry")).toByteArray())) resize(1400, 900);
     restoreState(settings.value(QStringLiteral("window/sidebarPanelState")).toByteArray());
-    if (width() < 900 || height() < 600) resize(1400, 900);
     updateWindowTitle();
 }
 

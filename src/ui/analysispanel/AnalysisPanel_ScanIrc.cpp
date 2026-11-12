@@ -1,3 +1,4 @@
+#include "ui/SidebarButton.h"
 #include "ui/AnalysisPanel.h"
 
 #include "analysis/AnalysisEngine.h"
@@ -43,6 +44,7 @@ QWidget *AnalysisPanel::makeScanTab() {
     m_scanStatus->setWordWrap(true);
     outer->addWidget(m_scanStatus);
     auto *openGraph = new QPushButton(QStringLiteral("스캔 그래프..."));
+    makeSidebarIconButton(openGraph, QStyle::SP_FileDialogDetailedView);
     openGraph->setObjectName(QStringLiteral("OpenScanGraph"));
     outer->addWidget(openGraph);
     connect(openGraph, &QPushButton::clicked, this, [this] {
