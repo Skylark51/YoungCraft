@@ -3679,13 +3679,22 @@ void SmokeTest::orbitalCacheAndDetachedWindow() {
     data.orbitals={{1,-13.6,2,{},"Alpha"},{2,1.2,0,{},"Alpha"}};
     owner.m_analysis->setData(data);
     open->click(); QVERIFY(dialog->isVisible()); QVERIFY(!dialog->isModal());
-    QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
+    QTRY_VERIFY(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
+    const auto frame=dialog->frameGeometry();
+    for(int repeat=0;repeat<4;++repeat){open->click();QTest::qWait(20);QCOMPARE(dialog->frameGeometry(),frame);}
     const auto preview=qEnvironmentVariable("YOUNGCRAFT_ORBITAL_WINDOW_PREVIEW");
     if(!preview.isEmpty()){QTest::qWait(100);QVERIFY(dialog->grab().save(preview));}
     dialog->resize(420,480);QTest::qWait(50);
     QVERIFY(dialog->screen()->availableGeometry().contains(dialog->geometry()));
     if(!preview.isEmpty())QVERIFY(dialog->grab().save(preview+".small.png"));
+    const auto smallSize=dialog->size();
     dialog->close(); QVERIFY(!dialog->isVisible()); open->click(); QVERIFY(dialog->isVisible());
+    QTRY_VERIFY(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
+    QCOMPARE(dialog->size(),smallSize);
+    // A user-moved window must be recovered from outside the screen without growing.
+    dialog->move(-600,-200);open->click();
+    QTRY_VERIFY(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
+    QCOMPARE(dialog->size(),smallSize);
     MoleculeView view;
     auto grid=std::make_shared<CubeGrid>(); grid->valid=true;grid->nx=grid->ny=grid->nz=2;
     grid->axisX={1,0,0};grid->axisY={0,1,0};grid->axisZ={0,0,1};grid->values={-1,1,-1,1,-1,1,-1,1};

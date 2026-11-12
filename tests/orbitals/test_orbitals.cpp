@@ -13,6 +13,12 @@
 #include <QTemporaryDir>
 #include <QThread>
 #include <QtTest>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUuid>
+#include <QStandardPaths>
 using namespace youngcraft;
 static QByteArray fchk(bool beta=false) {
     QByteArray text="Fixture\nSP UHF STO-3G\nNumber of atoms                            I                1\nNumber of alpha electrons                  I                1\nNumber of beta electrons                   I                0\nAtomic numbers                             I   N=           1\n 1\nCurrent cartesian coordinates              R   N=           3\n 0.0 0.0 0.0\nAlpha Orbital Energies                      R   N=           3\n -0.5 0.1 0.4\n";
@@ -26,6 +32,53 @@ static QByteArray cube(bool mo=false) {
 class OrbitalTest : public QObject {
     Q_OBJECT
 private slots:
+    void passwordHelperUsesPrivateIpc() {
+        QLocalServer server;server.setSocketOptions(QLocalServer::UserAccessOption);
+        const auto endpoint="Youngcraft-test-"+QUuid::createUuid().toString(QUuid::Id128);QVERIFY(server.listen(endpoint));
+        const auto token=QUuid::createUuid().toString();
+        QByteArray received;int requests=0;
+        connect(&server,&QLocalServer::newConnection,this,[&]{
+            auto *socket=server.nextPendingConnection();socket->setParent(&server);
+            connect(socket,&QLocalSocket::readyRead,this,[&,socket]{
+                received+=socket->readAll();if(!received.endsWith('\n'))return;
+                const auto request=QJsonDocument::fromJson(received).object();
+                QCOMPARE(request["token"].toString(),token);QCOMPARE(request["scope"].toString(),QString("fixture@host:22"));
+                QVERIFY(request["allowPrompt"].toBool());++requests;
+                socket->write(QJsonDocument(QJsonObject{{"ok",true},{"password","fixture-only-password"}}).toJson(QJsonDocument::Compact)+'\n');socket->flush();socket->disconnectFromServer();
+            });
+        });
+        QProcess helper;auto env=QProcessEnvironment::systemEnvironment();
+        env.insert("YOUNGCRAFT_SSH_BROKER",endpoint);env.insert("YOUNGCRAFT_SSH_TOKEN",token);
+        env.insert("YOUNGCRAFT_SSH_SCOPE","fixture@host:22");env.insert("YOUNGCRAFT_SSH_ALLOW_PROMPT","1");
+        QVERIFY(!env.toStringList().join('\n').contains("fixture-only-password"));
+        helper.setProcessEnvironment(env);
+        helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{"fixture@host password:"});
+        QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);
+        QCOMPARE(helper.exitCode(),0);QCOMPARE(requests,1);
+        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helper.readAllStandardError().isEmpty());
+        QVERIFY(!received.contains("fixture-only-password"));
+#ifdef Q_OS_WIN
+        // Exercise the actual Windows OpenSSH askpass launcher without using an account.
+        const auto keygen=QStandardPaths::findExecutable("ssh-keygen");QVERIFY(!keygen.isEmpty());
+        QTemporaryDir portable(QDir::tempPath()+QStringLiteral("/Youngcraft 한글 공백-XXXXXX"));QVERIFY(portable.isValid());
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",portable.filePath("YoungcraftSshAskpass.exe")));
+        const auto keyPath=portable.filePath("fixture-key");QProcess makeKey;
+        makeKey.start(keygen,{"-q","-t","ed25519","-N","fixture-only-password","-f",keyPath});
+        QVERIFY(makeKey.waitForFinished(10000));QCOMPARE(makeKey.exitCode(),0);
+        auto sshEnv=env;sshEnv.insert("SSH_ASKPASS",".\\YoungcraftSshAskpass.exe");
+        sshEnv.insert("SSH_ASKPASS_REQUIRE","force");sshEnv.insert("DISPLAY","Youngcraft");
+        sshEnv.insert("PATH",QDir::toNativeSeparators(QCoreApplication::applicationDirPath())+';'+sshEnv.value("PATH"));
+        received.clear();QProcess decrypt;decrypt.setWorkingDirectory(portable.path());decrypt.setProcessEnvironment(sshEnv);
+        decrypt.start(keygen,{"-y","-f",keyPath});decrypt.closeWriteChannel();
+        QTRY_VERIFY_WITH_TIMEOUT(decrypt.state()==QProcess::NotRunning,10000);
+        QVERIFY2(decrypt.exitCode()==0,qPrintable(QString::fromUtf8(decrypt.readAllStandardError())));
+        QVERIFY(decrypt.readAllStandardOutput().startsWith("ssh-ed25519 "));QCOMPARE(requests,2);
+#endif
+        // Missing broker information must fail closed, with no credential output.
+        env.remove("YOUNGCRAFT_SSH_TOKEN");helper.setProcessEnvironment(env);
+        helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{});
+        QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);QCOMPARE(helper.exitCode(),1);QVERIFY(helper.readAllStandardOutput().isEmpty());
+    }
     void fchkOccupationsAndSpin() {
         QTemporaryDir dir;const auto path=dir.filePath("test.fchk");QVERIFY(write(path,fchk(true)));
         const auto r=FchkParser::parse(path);QVERIFY(r.success);QCOMPARE(r.data.orbitals.size(),6);
@@ -119,7 +172,8 @@ private slots:
         GaussianRemoteSettings::initializeDefaults(path);
         QVERIFY(QSettings().value("orbitals/remoteEnabled").toBool());QVERIFY(QSettings().value("orbitals/autoGenerateHomo").toBool());
         QCOMPARE(GaussianRemoteSettings::load().host,QString("user@host"));QCOMPARE(GaussianRemoteSettings::load().port,10022);
-        QCOMPARE(GaussianRemoteSettings::load().configFile,QDir::homePath()+"/.ssh/lion.conf");
+        QVERIFY(GaussianRemoteSettings::load().configFile.isEmpty());
+        QVERIFY(GaussianRemoteSettings::load().passwordAuthentication);
         QSettings().setValue("orbitals/remotePort",20022);GaussianRemoteSettings::initializeDefaults(path);
         QCOMPARE(GaussianRemoteSettings::load().port,20022);
     }
@@ -132,7 +186,7 @@ private slots:
     }
     void realRemoteServerIfConfigured() {
         const auto host=qEnvironmentVariable("YOUNGCRAFT_REMOTE_HOST");if(host.isEmpty())QSKIP("Remote integration not requested");
-        QSettings settings;settings.setValue("orbitals/remoteEnabled",true);settings.setValue("orbitals/remoteHost",host);
+        QSettings settings;settings.setValue("orbitals/remoteEnabled",true);settings.setValue("orbitals/remotePasswordAuthentication",false);settings.setValue("orbitals/remoteHost",host);
         settings.setValue("orbitals/remotePort",qEnvironmentVariableIntValue("YOUNGCRAFT_REMOTE_PORT"));
         settings.setValue("orbitals/remoteConfig",qEnvironmentVariable("YOUNGCRAFT_REMOTE_CONFIG"));
         settings.setValue("orbitals/remoteGaussianDirectory","/opt/gaussian/g16");

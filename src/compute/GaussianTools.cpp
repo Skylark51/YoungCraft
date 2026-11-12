@@ -1,4 +1,5 @@
 #include "compute/GaussianRemote.h"
+#include "compute/OrbitalDiagnostics.h"
 #include <QThread>
 #include "compute/GaussianTools.h"
 #include "io/FchkParser.h"
@@ -98,6 +99,8 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
         QString::number(info.size()), QString::number(info.lastModified().toMSecsSinceEpoch()),
         QString::fromUtf8(options)}).toJson(QJsonDocument::Compact));
     if (auto *cached = m_cache.object(key)) {
+        m_lastResultSource="memory";
+        recordOrbitalDiagnostic({{"event","cube-memory-hit"},{"kind",kind},{"points",points}});
         const auto surface = cached->surface, potential = cached->potential;
         emit status(QStringLiteral("저장된 오비탈을 바로 표시합니다."));
         emit ready(surface, potential); return;
@@ -108,7 +111,7 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
     m_worker = QThread::create([this, source, kind, points, densityType, remote, settings,
                                      cubegen, formchk, options, key, cacheRoot, token] {
         std::shared_ptr<const CubeGrid> surface, potential;
-        QString error;
+        QString error; QString resultSource="generated";
         auto progress = [this, token](const QString &message) {
             QMetaObject::invokeMethod(this, [this, token, message] {
                 if (m_cancelToken == token && !token->load()) emit status(message);
@@ -130,7 +133,7 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
             auto s = std::make_shared<CubeGrid>(CubeParser::parse(surfacePath));
             auto p = mep ? std::make_shared<CubeGrid>(CubeParser::parse(potentialPath)) : nullptr;
             if (s->valid && (!mep || (p && p->valid))) {
-                surface = s; potential = p; progress(QStringLiteral("디스크에 저장된 오비탈을 불러왔습니다."));
+                surface = s; potential = p; resultSource="disk"; recordOrbitalDiagnostic({{"event","cube-disk-hit"},{"kind",kind},{"points",points}}); progress(QStringLiteral("디스크에 저장된 오비탈을 불러왔습니다."));
             }
         }
         QTemporaryDir work;
@@ -154,6 +157,7 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
             return true;
         };
         if (!surface && error.isEmpty() && !token->load()) {
+            recordOrbitalDiagnostic({{"event","cube-generation-start"},{"kind",kind},{"points",points}});
             if (remote && !settings.error().isEmpty()) error = settings.error();
             if (!remote) {
                 for (const auto &program : QFileInfo(source).suffix().compare("chk", Qt::CaseInsensitive) == 0
@@ -221,7 +225,7 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
                 }
             }
         }
-        QMetaObject::invokeMethod(this, [this, token, key, surface, potential, error] {
+        QMetaObject::invokeMethod(this, [this, token, key, surface, potential, error, resultSource] {
             if (m_cancelToken != token) return;
             m_worker->wait(); delete m_worker; m_worker = nullptr; m_cancelToken.reset();
             if (token->load()) emit failed(QStringLiteral("계산을 취소했습니다."));
@@ -230,6 +234,7 @@ void GaussianTools::generate(const QString &source, const QString &kind, int poi
             else {
                 const qsizetype bytes = (surface->values.size() + (potential ? potential->values.size() : 0)) * sizeof(float);
                 m_cache.insert(key, new CachedOrbital{surface, potential}, int(qMin<qsizetype>(INT_MAX, qMax<qsizetype>(1, bytes / 1024))));
+                m_lastResultSource=resultSource;
                 emit ready(surface, potential);
             }
         }, Qt::QueuedConnection);

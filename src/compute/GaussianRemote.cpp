@@ -1,4 +1,5 @@
 #include "compute/GaussianRemote.h"
+#include "compute/SshPasswordBroker.h"
 #include "io/FchkParser.h"
 #include <QCryptographicHash>
 #include <QCoreApplication>
@@ -21,13 +22,18 @@ void GaussianRemoteSettings::initializeDefaults(const QString &profilePath) {
     const auto profile=QJsonDocument::fromJson(file.readAll()).object();
     QSettings settings;
     for(auto it=profile.begin();it!=profile.end();++it) {
-        if(!QStringList{"remoteEnabled","autoGenerateHomo","remoteHost","remotePort","remoteConfig","remoteIdentity","remoteGaussianDirectory","remoteCheckpointDirectory"}.contains(it.key()))continue;
+        if(!QStringList{"remoteEnabled","autoGenerateHomo","remoteHost","remotePort","remoteConfig","remoteIdentity","remoteGaussianDirectory","remoteCheckpointDirectory","remotePasswordAuthentication"}.contains(it.key()))continue;
         const auto key="orbitals/"+it.key();if(settings.contains(key))continue;
         auto value=it.value().toVariant();
         if((it.key()=="remoteConfig"||it.key()=="remoteIdentity")&&value.toString().startsWith("~/"))
             value=QDir::homePath()+value.toString().mid(1);
         settings.setValue(key,value);
     }
+    // Retire the missing config path shipped by the previous portable version.
+    const auto obsolete=QDir::homePath()+"/.ssh/lion.conf";
+    if(settings.value("orbitals/remotePasswordAuthentication",true).toBool()
+        && settings.value("orbitals/remoteConfig").toString()==obsolete && !QFileInfo::exists(obsolete))
+        settings.remove("orbitals/remoteConfig");
     settings.sync();
 }
 GaussianRemoteSettings GaussianRemoteSettings::load() {
@@ -37,7 +43,8 @@ GaussianRemoteSettings GaussianRemoteSettings::load() {
             s.value("orbitals/remoteIdentity").toString().trimmed(),
             s.value("orbitals/remoteGaussianDirectory", "/opt/gaussian/g16").toString().trimmed(),
             s.value("orbitals/remoteCheckpointDirectory").toString().trimmed(),
-            s.value("orbitals/remotePort", 22).toInt()};
+            s.value("orbitals/remotePort", 22).toInt(),
+            s.value("orbitals/remotePasswordAuthentication", true).toBool()};
 }
 QString GaussianRemoteSettings::error() const {
     static const QRegularExpression hostPattern(QStringLiteral("^(?:[A-Za-z0-9_][A-Za-z0-9_.-]*@)?[A-Za-z0-9_][A-Za-z0-9_.-]*$"));
@@ -47,7 +54,7 @@ QString GaussianRemoteSettings::error() const {
         return QStringLiteral("서버 Gaussian 폴더는 절대 경로로 지정하세요.");
     if (!checkpointDirectory.isEmpty() && (!checkpointDirectory.startsWith('/') || checkpointDirectory.contains('\n') || checkpointDirectory.contains('\r')))
         return QStringLiteral("서버 CHK 폴더는 절대 경로로 지정하세요.");
-    for (const auto &path : {configFile, identityFile})
+    for (const auto &path : QStringList{configFile, passwordAuthentication ? QString() : identityFile})
         if (!path.isEmpty() && !QFileInfo(path).isFile()) return QStringLiteral("SSH 설정/키 파일을 찾을 수 없습니다: %1").arg(path);
     for (const auto &name : {"ssh", "scp"})
         if (QStandardPaths::findExecutable(QString::fromLatin1(name)).isEmpty()) return QStringLiteral("Windows OpenSSH %1 실행 파일을 찾을 수 없습니다.").arg(name);
@@ -74,10 +81,12 @@ public:
     bool cancelled() const { return cancel && cancel->load(); }
     void status(const QString &s) { stage=s; if (progress) progress(s); }
     QStringList options(bool scp) const {
-        QStringList args{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=15",
+        QStringList args{"-o", settings.passwordAuthentication ? "BatchMode=no" : "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=15",
                          "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"};
         if (!settings.configFile.isEmpty()) args << "-F" << settings.configFile;
-        if (!settings.identityFile.isEmpty()) args << "-i" << settings.identityFile << "-o" << "IdentitiesOnly=yes";
+        if (!settings.passwordAuthentication && !settings.identityFile.isEmpty()) args << "-i" << settings.identityFile << "-o" << "IdentitiesOnly=yes";
+        if (settings.passwordAuthentication) args << "-o" << "PreferredAuthentications=password,keyboard-interactive"
+            << "-o" << "PubkeyAuthentication=no" << "-o" << "NumberOfPasswordPrompts=1";
         args << (scp ? "-P" : "-p") << QString::number(settings.port);
         return args;
     }
@@ -85,7 +94,10 @@ public:
                  int timeoutMs, QByteArray *output = nullptr, bool cleanup = false) {
         if (!cleanup && cancelled()) { error = QStringLiteral("계산을 취소했습니다."); return false; }
         QProcess p;
+        p.setWorkingDirectory(QCoreApplication::applicationDirPath());
         p.setProcessChannelMode(QProcess::MergedChannels);
+        if (settings.passwordAuthentication)
+            p.setProcessEnvironment(SshPasswordBroker::environment(settings.host+':'+QString::number(settings.port), !cleanup));
         p.start(QStandardPaths::findExecutable(program), args);
         if (!p.waitForStarted(10000)) {
             error = QStringLiteral("%1 시작 실패: %2").arg(program, p.errorString()); return false;
@@ -103,14 +115,15 @@ public:
         log += p.readAll();
         if (output) *output = log;
         if (p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0) {
-            error = stage + QStringLiteral("\n서버 %1 실패 (%2):\n%3\nSSH 키 인증, 호스트 키 등록, Gaussian 경로를 확인하세요.")
+            if (settings.passwordAuthentication && log.contains("Permission denied")) SshPasswordBroker::forgetPasswords();
+            error = stage + QStringLiteral("\n서버 %1 실패 (%2):\n%3\n비밀번호 로그인, 호스트 키 등록, Gaussian 경로를 확인하세요.")
                 .arg(program).arg(p.exitCode()).arg(QString::fromUtf8(log.right(16000)));
             return false;
         }
         return true;
     }
     QString prefix() const { return "set -e\numask 077\nwork=\"$HOME/" + relative + "\"\n"; }
-    bool shell(const QString &script, int timeout = 120000, QByteArray *output = nullptr, bool cleanup = false) {
+    bool shell(const QString &script, int timeout = 180000, QByteArray *output = nullptr, bool cleanup = false) {
         auto args = options(false); args << settings.host << "bash -s";
         return process("ssh", args, (prefix() + script + '\n').toUtf8(), timeout, output, cleanup);
     }

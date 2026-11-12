@@ -49,6 +49,22 @@ if(BUILD_TESTING)
 endif()
 add_subdirectory(src/app)
 
+qt_add_executable(YoungcraftSshAskpass src/app/SshAskpass.cpp)
+target_link_libraries(YoungcraftSshAskpass PRIVATE Qt6::Core Qt6::Network)
+youngcraft_enable_warnings(YoungcraftSshAskpass)
+add_custom_target(youngcraft_ssh_password_helper
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Youngcraft>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:YoungcraftSshAskpass>" "$<TARGET_FILE_DIR:Youngcraft>/YoungcraftSshAskpass.exe"
+    DEPENDS YoungcraftSshAskpass VERBATIM)
+add_dependencies(Youngcraft youngcraft_ssh_password_helper)
+if(BUILD_TESTING)
+    foreach(_ssh_test test_orbitals test_smoke)
+        add_dependencies(${_ssh_test} youngcraft_ssh_password_helper)
+        add_custom_command(TARGET ${_ssh_test} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:YoungcraftSshAskpass>" "$<TARGET_FILE_DIR:${_ssh_test}>/YoungcraftSshAskpass.exe")
+    endforeach()
+endif()
+
 if(WIN32)
     target_sources(Youngcraft PRIVATE resources/youngcraft.rc)
     target_include_directories(Youngcraft PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/resources)
@@ -135,7 +151,7 @@ if(BUILD_TESTING)
         VERBATIM)
 endif()
 
-install(TARGETS Youngcraft RUNTIME DESTINATION .)
+install(TARGETS Youngcraft YoungcraftSshAskpass RUNTIME DESTINATION .)
 install(DIRECTORY resources/fragments DESTINATION resources)
 install(FILES licenses/Avogadro-fragments-BSD-3-Clause.txt DESTINATION licenses)
 install(DIRECTORY xtb_runtime/ DESTINATION xtb_runtime)

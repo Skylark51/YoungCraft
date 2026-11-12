@@ -1,5 +1,6 @@
 #include "compute/GaussianConnection.h"
 #include "compute/GaussianRemote.h"
+#include "compute/SshPasswordBroker.h"
 #include <QCoreApplication>
 #include <QPointer>
 #include <QSettings>
@@ -13,8 +14,9 @@ GaussianConnection *GaussianConnection::instance() {
 }
 GaussianConnection::GaussianConnection(QObject *parent) : QObject(parent) {
     m_text = QStringLiteral("계산 서버 연결 대기 중…");
+    m_process.setWorkingDirectory(QCoreApplication::applicationDirPath());
     m_process.setProcessChannelMode(QProcess::MergedChannels);
-    m_timeout.setSingleShot(true); m_timeout.setInterval(25000);
+    m_timeout.setSingleShot(true); m_timeout.setInterval(180000);
     connect(&m_process,&QProcess::readyReadStandardOutput,this,[this]{m_output+=m_process.readAll();m_output=m_output.right(16000);});
     connect(&m_process,&QProcess::errorOccurred,this,[this](QProcess::ProcessError error){
         if(error==QProcess::FailedToStart){m_timeout.stop();publish(QStringLiteral("서버 자동 연결 실패: ")+m_process.errorString(),false);}
@@ -24,7 +26,10 @@ GaussianConnection::GaussianConnection(QObject *parent) : QObject(parent) {
         m_timeout.stop();m_output+=m_process.readAll();
         if(exit==QProcess::NormalExit&&code==0&&m_output.contains("YOUNGCRAFT_GAUSSIAN_READY"))
             publish(QStringLiteral("서버 연결됨 · %1 · Gaussian 사용 가능").arg(GaussianRemoteSettings::load().host),true);
-        else publish(QStringLiteral("서버 연결 실패 · %1").arg(QString::fromUtf8(m_output).trimmed().right(1000)),false);
+        else {
+            if (m_output.contains("Permission denied")) SshPasswordBroker::forgetPasswords();
+            publish(QStringLiteral("서버 연결 실패 · %1").arg(QString::fromUtf8(m_output).trimmed().right(1000)),false);
+        }
     });
 }
 void GaussianConnection::publish(const QString &text,bool connected) {m_text=text;m_connected=connected;emit changed(text,connected);}
@@ -33,12 +38,19 @@ void GaussianConnection::connectNow(bool force) {
     if(!QSettings().value("orbitals/remoteEnabled",false).toBool()){publish(QStringLiteral("로컬 Gaussian 실행 모드"),false);return;}
     const auto settings=GaussianRemoteSettings::load();
     if(const auto error=settings.error();!error.isEmpty()){publish(QStringLiteral("서버 설정 확인: ")+error,false);return;}
-    const auto signature=settings.host+QString::number(settings.port)+settings.configFile+settings.identityFile+settings.gaussianDirectory;
+    if(settings.passwordAuthentication && !force && !SshPasswordBroker::instance()->hasSession()) {
+        publish(QStringLiteral("라이온 서버 비밀번호 로그인 필요 · ‘비밀번호 로그인’을 누르세요."),false); return;
+    }
+    const auto signature=settings.host+QString::number(settings.port)+settings.configFile+settings.identityFile+settings.gaussianDirectory+QString::number(settings.passwordAuthentication);
     if(!force&&m_connected&&m_signature==signature)return;
     m_signature=signature;m_output.clear();publish(QStringLiteral("서버 자동 연결 중 · %1:%2").arg(settings.host).arg(settings.port),false);
-    QStringList args{"-o","BatchMode=yes","-o","StrictHostKeyChecking=yes","-o","ConnectTimeout=15","-p",QString::number(settings.port)};
+    QStringList args{"-o",settings.passwordAuthentication ? "BatchMode=no" : "BatchMode=yes","-o","StrictHostKeyChecking=yes","-o","ConnectTimeout=15","-p",QString::number(settings.port)};
     if(!settings.configFile.isEmpty())args<<"-F"<<settings.configFile;
-    if(!settings.identityFile.isEmpty())args<<"-i"<<settings.identityFile<<"-o"<<"IdentitiesOnly=yes";
+    if(!settings.passwordAuthentication && !settings.identityFile.isEmpty())args<<"-i"<<settings.identityFile<<"-o"<<"IdentitiesOnly=yes";
+    if(settings.passwordAuthentication) {
+        args<<"-o"<<"PreferredAuthentications=password,keyboard-interactive"<<"-o"<<"PubkeyAuthentication=no"<<"-o"<<"NumberOfPasswordPrompts=1";
+        m_process.setProcessEnvironment(SshPasswordBroker::environment(settings.host+':'+QString::number(settings.port)));
+    } else m_process.setProcessEnvironment(QProcessEnvironment::systemEnvironment());
     args<<settings.host<<"bash -s";
     m_process.start(QStandardPaths::findExecutable("ssh"),args);
     const auto script="set -e\ntest -x "+GaussianRemote::quote(settings.gaussianDirectory+"/formchk")

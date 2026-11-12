@@ -3,6 +3,7 @@
 #include "compute/GaussianTools.h"
 #include <QWidget>
 #include <QPointer>
+#include <QSet>
 class QTableWidget;
 class QTabWidget;
 class QDoubleSpinBox;
@@ -35,6 +36,9 @@ private:
     void exportTable();
     bool chooseFrontier(bool lumo);
     void updateGenerationButtons();
+    QString orbitalSelectionKey(int row) const;
+    QSet<QString> m_renderedSelections;
+    QString m_requestedSelection;
     CalculationData m_data;
     QPointer<MoleculeView> m_view;
     GaussianTools *m_runner;
