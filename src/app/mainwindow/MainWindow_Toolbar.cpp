@@ -1,74 +1,41 @@
+#include "ui/SidebarButton.h"
+#include "ui/SidebarFlowLayout.h"
 #include "app/MainWindow.h"
 
-#include "analysis/AnalysisEngine.h"
-#include "app/ParseWorker.h"
-#include "animation/AnimationController.h"
-#include "export/ImageExporter.h"
+#include "export/ReactionCapture.h"
 #include "render/MoleculeView.h"
 #include "ui/AnalysisPanel.h"
-#include "ui/StyleEditorDialog.h"
 #include "ui/AppPattern.h"
 #include "ui/DialogThemeSync.h"
 
 #include <QActionGroup>
-#include <QAbstractSpinBox>
-#include <QApplication>
-#include <QCloseEvent>
-#include <QCursor>
 #include <QDockWidget>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QDoubleSpinBox>
-#include <QFileDialog>
 #include <QFileInfo>
-#include <QFormLayout>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QDir>
-#include <QKeyEvent>
-#include <QLabel>
-#include <QLineEdit>
-#include <QMessageBox>
-#include <QMenuBar>
-#include <QPushButton>
-#include <QSettings>
-#include <QStandardPaths>
-#include <QSpinBox>
-#include <QStatusBar>
-#include <QTextEdit>
-#include <QThread>
-#include <QToolBar>
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
-
-#include <functional>
-#include <cmath>
+#include <QGridLayout>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
-#include <QRadialGradient>
-#include <QIcon>
-#include <QButtonGroup>
-#include <QHBoxLayout>
+#include <QScrollArea>
+#include <QSettings>
+#include <QTabWidget>
+#include <QTimer>
+#include <QToolBar>
 #include <QToolButton>
+#include <QTabBar>
+#include <QTreeWidget>
+#include <QVBoxLayout>
+
+#include <algorithm>
+#include <cmath>
 
 namespace youngcraft {
 namespace {
 using uiPattern::drawMotif;
-QString sidebarPatternStyle(int motif,const QColor &,const QColor &) {
-    if(motif<0 || motif>5)return {};
-    return QStringLiteral(
-        "QDockWidget#ResultExplorerDock QAbstractItemView, QDockWidget#ResultExplorerDock QScrollArea, "
-        "QDockWidget#ResultExplorerDock QStackedWidget, QDockWidget#ResultExplorerDock QSplitter, "
-        "QTabWidget#SidebarPatternTabs::pane, QWidget[sidebarPatternPaper=\"true\"] "
-        "{background:transparent; background-image:none;}"
-        "QDockWidget#ResultExplorerDock QHeaderView::section, QDockWidget#ResultExplorerDock::title {background:transparent;}");
-}
 
 class PatternToolBar final : public QToolBar {
 public:
     explicit PatternToolBar(const QString &title,QWidget *parent):QToolBar(title,parent){}
     void setMotif(int motif) { m_motif=motif;setProperty("patternTemplate",motif);update(); }
-    void setMotifInk(const QColor &ink) { m_ink=ink;update(); }
 protected:
     void paintEvent(QPaintEvent *event) override {
         QToolBar::paintEvent(event);
@@ -77,7 +44,6 @@ protected:
     }
 private:
     int m_motif=-1;
-    QColor m_ink=QColor("#446781");
 };
 
 QIcon motifIcon(int motif) {
@@ -89,21 +55,6 @@ QIcon motifIcon(int motif) {
     if(motif==0){p.translate(2,2);p.scale(.25,.25);drawMotif(p,QRect(0,0,96,96),motif,QColor("#617e8d"));}
     else drawMotif(p,QRect(2,2,24,24),motif,QColor("#617e8d"));p.end();
     pix.setDevicePixelRatio(2);return QIcon(pix);
-}
-
-QIcon captionedIcon(const QIcon &base,const QString &caption,const QString &shortcut={}) {
-    QIcon result;
-    for(auto state:{QIcon::Off,QIcon::On}){
-        QPixmap pix(92,84);pix.fill(Qt::transparent);pix.setDevicePixelRatio(2);
-        QPainter p(&pix);p.setRenderHint(QPainter::Antialiasing);p.setPen(state==QIcon::On?Qt::white:QColor("#344c60"));
-        QFont font(QStringLiteral("Segoe UI"));font.setPixelSize(8);font.setBold(true);p.setFont(font);
-        p.drawText(QRectF(1,0,45,10),Qt::AlignLeft|Qt::AlignVCenter,caption);
-        base.paint(&p,QRect(10,10,26,26),Qt::AlignCenter,QIcon::Normal,state);
-        font.setPixelSize(7);font.setBold(false);p.setFont(font);
-        p.drawText(QRectF(0,33,45,9),Qt::AlignRight|Qt::AlignBottom,shortcut);
-        p.end();result.addPixmap(pix,QIcon::Normal,state);result.addPixmap(pix,QIcon::Active,state);
-    }
-    return result;
 }
 
 QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
@@ -144,10 +95,36 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
         p.drawEllipse(QPointF(19,22),1,1);p.drawEllipse(QPointF(23,12),1,1);
         p.drawEllipse(QPointF(27,18),1,1);break;
     }
+    case 25: p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(21,4,21,28);p.drawLine(24,10,26,10);p.drawLine(24,15,26,15);p.drawLine(24,20,26,20);break;
+    case 26: p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(3,19,29,19);p.drawLine(8,24,24,24);break;
+    case 27: p.drawLine(16,3,16,29);p.drawLine(3,16,29,16);
+        p.drawPolyline(QPolygonF{{12,7},{16,3},{20,7}});p.drawPolyline(QPolygonF{{25,12},{29,16},{25,20}});
+        p.drawPolyline(QPolygonF{{12,25},{16,29},{20,25}});p.drawPolyline(QPolygonF{{7,12},{3,16},{7,20}});break;
+    case 28: p.drawRoundedRect(QRectF(6,13,20,15),2,2);p.drawArc(QRectF(10,3,12,20),0,180*16);p.drawLine(16,18,16,23);break;
+    case 29: p.drawLine(5,7,27,7);p.drawLine(5,16,27,16);p.drawLine(5,25,27,25);
+        p.setBrush(ink);p.drawEllipse(QPointF(12,7),3,3);p.drawEllipse(QPointF(22,16),3,3);p.drawEllipse(QPointF(15,25),3,3);break;
+    case 30: p.drawRect(2,5,21,21);p.drawLine(9,5,9,26);p.drawLine(16,5,16,26);
+        p.drawLine(2,12,23,12);p.drawLine(2,19,23,19);p.drawLine(24,15,30,15);p.drawLine(27,12,27,18);break;
+    case 31: p.drawLine(4,5,13,5);p.drawLine(4,5,4,14);p.drawLine(28,5,19,5);p.drawLine(28,5,28,14);
+        p.drawLine(4,27,13,27);p.drawLine(4,27,4,18);p.drawLine(28,27,19,27);p.drawLine(28,27,28,18);
+        p.drawEllipse(QPointF(16,16),5,5);break;
+    case 32: p.drawPolyline(QPolygonF{{12,10},{5,10},{5,28},{27,28},{27,10},{20,10}});
+        p.drawLine(16,20,16,3);p.drawPolyline(QPolygonF{{11,8},{16,3},{21,8}});break;
     case 20: {p.drawEllipse(QPointF(11,16),8,8);QFont font=p.font();font.setBold(true);font.setPixelSize(15);p.setFont(font);p.drawText(QRectF(16,1,15,18),Qt::AlignCenter,QStringLiteral("#"));break;}
     default: p.drawRoundedRect(QRectF(3,8,17,10),5,5);p.drawRoundedRect(QRectF(12,15,17,10),5,5);p.drawLine(12,16,20,16);break;
     }
     p.end();
+    if(id==2 || id==9) {
+        // Center the actual glyph, including asymmetric pencil strokes, within its bitmap.
+        const auto pixels=pix.toImage();QRect bounds;
+        for(int y=0;y<pixels.height();++y)for(int x=0;x<pixels.width();++x)
+            if(qAlpha(pixels.pixel(x,y)))bounds=bounds.united(QRect(x,y,1,1));
+        if(!bounds.isEmpty()) {
+            QPixmap centered(pix.size());centered.fill(Qt::transparent);QPainter align(&centered);
+            align.drawPixmap(QPoint((pix.width()-bounds.width())/2-bounds.x(),(pix.height()-bounds.height())/2-bounds.y()),pix);
+            align.end();pix=centered;
+        }
+    }
     pix.setDevicePixelRatio(2);
     QIcon icon(pix);
     QPixmap checked=pix;
@@ -157,70 +134,271 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     tint.end();
     icon.addPixmap(checked,QIcon::Normal,QIcon::On);
     icon.addPixmap(checked,QIcon::Active,QIcon::On);
-    const QStringList captions={QStringLiteral("새 구조"),QStringLiteral("열기"),QStringLiteral("그리기"),"MM opt",QStringLiteral("복사"),QStringLiteral("캡처"),QStringLiteral("H 숨김"),QStringLiteral("H 표시"),QStringLiteral("중앙"),QStringLiteral("뷰"),QStringLiteral("동기화"),QStringLiteral("패널"),"OPT","FREQ","SCAN","IRC","TD-DFT","Atoms","Orbitals","XYZ",QStringLiteral("원자 번호"),"Output","QM opt",QStringLiteral("탐색"),QStringLiteral("프로젝트")};
-    const QMap<int,QString> shortcuts={{0,"Ctrl+N"},{1,"Ctrl+O"},{3,"Ctrl+Alt+O"},{4,"Ctrl+I"},{5,"Ctrl+Alt+I"}};
-    return captionedIcon(icon,captions.value(id),shortcuts.value(id));
+    return icon;
 }
 }
 
 
 void MainWindow::createToolBar() {
-    auto *toolbar = new PatternToolBar(QStringLiteral("주 도구 모음"),this);
-    addToolBar(toolbar);
+    auto *toolbar = new PatternToolBar(QStringLiteral("주 도구 모음"), this);
     toolbar->setObjectName(QStringLiteral("MainToolBar"));
     toolbar->setMovable(false);
+    toolbar->setAllowedAreas(Qt::TopToolBarArea);
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    toolbar->setIconSize(QSize(46,42));
-    int iconIndex=0;
-    auto add = [this, toolbar, &iconIndex](const QString &text, const std::function<void()> &function) {
-        auto *action = toolbar->addAction(actionIcon(iconIndex), text);
-        action->setProperty("toolbarIconId",iconIndex);if(iconIndex==0)action->setShortcut(QKeySequence("Ctrl+N"));++iconIndex;
-        action->setToolTip(text); action->setStatusTip(text);
-        connect(action, &QAction::triggered, function);
+    toolbar->setIconSize(QSize(sidebarIconSize, sidebarIconSize));
+    addToolBar(toolbar);
+
+    const auto addCommonAction = [this, toolbar](const char *name, const QString &label, int icon) {
+        auto *action = findChild<QAction *>(QString::fromLatin1(name));
+        action->setIconText(label);
+        action->setProperty("toolbarIconId", icon);
+        toolbar->addAction(action);
     };
-    add(QStringLiteral("새 구조"), [this] { newDrawingDocument(); });
-    add(QStringLiteral("열기"), [this] { openFile(); });
-    // SI project library: user-invoked, never shown on application startup.
-    auto *projects=toolbar->addAction(actionIcon(24),QStringLiteral("프로젝트 · Reaction Pathway"));
-    projects->setObjectName(QStringLiteral("ProjectLibraryAction"));
-    projects->setProperty("toolbarIconId",24);
-    projects->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+P")));
-    projects->setToolTip(QStringLiteral("프로젝트 서지관리 · Reaction Pathway (Ctrl+Shift+P)"));
-    connect(projects,&QAction::triggered,this,&MainWindow::openProjectLibrary);
-    add(QStringLiteral("구조 그리기"), [this] {
+    addCommonAction("NewStructure", QStringLiteral("새 구조"), 0);
+    addCommonAction("OpenStructureFile", QStringLiteral("열기"), 1);
+    toolbar->addSeparator();
+    addCommonAction("MMOptimizationAction", QStringLiteral("MM 최적화"), 3);
+    addCommonAction("QMOptimizationAction", QStringLiteral("xTB"), 22);
+    toolbar->addSeparator();
+    addCommonAction("CopyStructureImage", QStringLiteral("이미지 복사"), 4);
+    addCommonAction("CustomStructureCapture", QStringLiteral("맞춤 캡처"), 5);
+
+    const auto addPopup = [this, toolbar](const QString &title, const QString &name, int iconId) {
+        auto *action = new QAction(title, toolbar);
+        action->setObjectName(name);
+        action->setProperty("toolbarIconId", iconId);
+        action->setMenu(new QMenu(title, this));
+        toolbar->addAction(action);
+        auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
+        button->setPopupMode(QToolButton::InstantPopup);
+        return action;
+    };
+    auto *exportAction = addPopup(QStringLiteral("내보내기"), QStringLiteral("ToolbarExport"), 32);
+    auto *exportMenu = exportAction->menu();
+    exportMenu->setToolTipsVisible(true);
+    exportMenu->addAction(findChild<QAction *>(QStringLiteral("SaveStructureImage")));
+    exportMenu->addAction(findChild<QAction *>(QStringLiteral("OpenMultiCapture")));
+    auto *ircCapture = exportMenu->addAction(QStringLiteral("IRC·TS 캡처…"), this, [this] { openReactionCapture(); });
+    connect(exportMenu, &QMenu::aboutToShow, this, [this, ircCapture] {
+        const auto paths = ReactionCapture::companionPaths(m_currentFile);
+        QString reason;
+        if (paths.isEmpty() || m_view->molecule().isEmpty()) {
+            reason = QStringLiteral("-freq-ts-freq.out 파일을 열어야 합니다.");
+        } else {
+            const auto mode = std::find_if(m_data.frequencies.cbegin(), m_data.frequencies.cend(),
+                [](const FrequencyMode &frequency) { return frequency.imaginary || frequency.wavenumber < 0; });
+            if (mode == m_data.frequencies.cend() || mode->displacement.size() != m_data.molecule.atoms.size())
+                reason = QStringLiteral("유효한 허수 진동 모드가 필요합니다.");
+            else if (!std::all_of(paths.cbegin(), paths.cend(), [](const QString &path) { return QFileInfo(path).isFile(); }))
+                reason = QStringLiteral("같은 폴더에 정방향·역방향 IRC 결과 파일이 필요합니다.");
+        }
+        ircCapture->setEnabled(reason.isEmpty());
+        ircCapture->setText(reason.isEmpty() ? QStringLiteral("IRC·TS 캡처…")
+            : QStringLiteral("IRC·TS 캡처 · %1").arg(reason));
+    });
+    exportMenu->addAction(QStringLiteral("메커니즘 영상…"), this, &MainWindow::openMechanismAnimation);
+
+    auto *viewMenu = findChild<QMenu *>(QStringLiteral("ViewMenu"));
+    toolbar->addSeparator();
+    const auto addDockToggle = [toolbar](QDockWidget *dock, const QString &name, const QString &label, int iconId) {
+        auto *action = dock->toggleViewAction();
+        action->setObjectName(name);
+        action->setIconText(label);
+        action->setToolTip(label);
+        action->setProperty("toolbarIconId", iconId);
+        toolbar->addAction(action);
+    };
+    addDockToggle(m_explorerDock, QStringLiteral("ToggleResultsSidebar"), QStringLiteral("결과 패널"), 11);
+    addDockToggle(m_structureDock, QStringLiteral("ToggleStructureSidebar"), QStringLiteral("구조 패널"), 25);
+
+    const auto addButton = [](QAction *action, QWidget *parent) {
+        auto *button = new QToolButton(parent);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        sizeSidebarButton(button);
+        button->setAccessibleName(action->text());
+        button->setDefaultAction(action);
+        if (action->menu()) button->setPopupMode(QToolButton::InstantPopup);
+        return button;
+    };
+
+    m_analysisMenu = viewMenu->addMenu(QStringLiteral("분석 종류"));
+    auto *analysisGroup = new QActionGroup(m_analysisMenu);
+    auto *analysisGrid = new SidebarFlowLayout(m_analysisShortcuts);
+    analysisGrid->setObjectName("AnalysisShortcutFlow");
+    analysisGrid->setContentsMargins(0, 0, 0, 0);
+    analysisGrid->setSpacing(4);
+    const QStringList labels = {QStringLiteral("Opt"), QStringLiteral("Freq"),
+        QStringLiteral("Scan"), QStringLiteral("IRC"), QStringLiteral("TD-DFT"),
+        QStringLiteral("원자 속성"), QStringLiteral("Orbitals"), QStringLiteral("XYZ")};
+    const auto titles = m_analysis->tabTitles();
+    for (int i = 0; i < titles.size(); ++i) {
+        auto *action = m_analysisMenu->addAction(labels[i], this, [this, i] {
+            m_explorerDock->show();
+            m_analysis->setCurrentTab(i);
+        });
+        action->setObjectName(QStringLiteral("AnalysisPanelTab%1").arg(i));
+        action->setToolTip(titles[i]);
+        action->setProperty("analysisTab", i);
+        action->setProperty("toolbarIconId", 12 + i);
+        action->setCheckable(true);
+        analysisGroup->addAction(action);
+        auto *button = addButton(action, m_analysisShortcuts);
+        button->setObjectName(QStringLiteral("AnalysisShortcut%1").arg(i));
+        analysisGrid->addWidget(button);
+    }
+    auto *output = m_outputDock->toggleViewAction();
+    output->setObjectName(QStringLiteral("ToggleOutputSource"));
+    output->setToolTip(QStringLiteral("Output 원문 · 결과 출처 확인 / Ctrl+F 검색"));
+    output->setProperty("toolbarIconId", 26);
+    viewMenu->addAction(output);
+    connect(output, &QAction::triggered, this, [this](bool visible) { if (visible) updateOutputSource(); });
+    auto *navigator = viewMenu->addAction(QStringLiteral("계산 결과 탐색 트리"));
+    navigator->setObjectName(QStringLiteral("ToggleResultNavigator"));
+    navigator->setCheckable(true);
+    navigator->setChecked(QSettings().value(QStringLiteral("ui/showResultNavigator"), false).toBool());
+    connect(navigator, &QAction::toggled, this, [this](bool visible) {
+        QSettings().setValue(QStringLiteral("ui/showResultNavigator"), visible);
+        for (auto *sidebar : m_sidebars->findChildren<QTreeWidget *>()) {
+            auto *panel=sidebar->parentWidget()->findChild<AnalysisPanel*>();
+            sidebar->setVisible(visible && (!panel || (panel->currentTab()!=1 && panel->currentTab()!=6 && panel->currentTab()!=7)));
+        }
+    });
+    output->setIconText(QStringLiteral("원문 보기"));
+    toolbar->addAction(output);
+    auto *sourceButton = addButton(output, m_analysisShortcuts);
+    sourceButton->setObjectName(QStringLiteral("ResultSourceButton"));
+    analysisGrid->addWidget(sourceButton);
+    for (auto *action : toolbar->actions()) {
+        if (auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action))) {
+            sizeSidebarButton(button);
+            button->setAccessibleName(action->iconText());
+        }
+    }
+
+    auto *displayPage = m_structureTabs->widget(0);
+    auto *displayLayout = static_cast<QVBoxLayout *>(displayPage->layout());
+    auto *displayTools = new SidebarFlowLayout;
+    displayTools->setObjectName("StructureDisplayFlow");
+    displayTools->setSpacing(4);
+    displayLayout->addLayout(displayTools);
+    displayLayout->addStretch();
+    const auto addDisplayButton = [&](QAction *action, int iconId) {
+        action->setProperty("toolbarIconId", iconId);
+        displayTools->addWidget(addButton(action, displayPage));
+    };
+    addDisplayButton(findChild<QAction *>("BestStructureView"), 31);
+    addDisplayButton(findChild<QAction *>("CenterStructureView"), 8);
+    addDisplayButton(findChild<QAction *>("HideCarbonHydrogens"), 6);
+    addDisplayButton(findChild<QAction *>("RestoreCarbonHydrogens"), 7);
+    addDisplayButton(findChild<QAction *>("ShowAtomNumbers"), 20);
+    addDisplayButton(m_atomFocusMenu->menuAction(), 17);
+    addDisplayButton(m_syncViewsAction, 10);
+
+    auto *tabs = m_structureTabs->tabBar();
+    tabs->setExpanding(false);
+    for (int tab = 0; tab < tabs->count(); ++tab) {
+        const auto label = tabs->tabText(tab);
+        tabs->setTabToolTip(tab, label);
+        tabs->setAccessibleTabName(tab, label);
+        tabs->setTabText(tab, {});
+    }
+
+    auto *editPage = qobject_cast<QScrollArea *>(m_structureTabs->widget(1))->widget();
+    auto *editLayout = static_cast<QVBoxLayout *>(editPage->layout());
+    auto *editButtons = new SidebarFlowLayout;
+    editButtons->setObjectName("StructureEditFlow");
+    editButtons->setSpacing(4);
+    editLayout->insertLayout(0, editButtons);
+    const auto addEditButton = [&](QAction *action, int iconId) {
+        action->setProperty("toolbarIconId", iconId);
+        editButtons->addWidget(addButton(action, editPage));
+    };
+    auto *draw = new QAction(QStringLiteral("현재 구조 편집"), editPage);
+    draw->setObjectName(QStringLiteral("DrawCurrentStructure"));
+    connect(draw, &QAction::triggered, this, [this] {
         if (!m_currentFile.isEmpty()) newDrawingDocument(m_view->molecule());
         else setDrawingMode(!m_drawingMode);
     });
-    add(QStringLiteral("MM opt"), [this] { startMMOptimization(); });
-    auto *qm=toolbar->addAction(actionIcon(22),QStringLiteral("QM opt · xTB"));qm->setObjectName("QMOptimizationAction");qm->setProperty("toolbarIconId",22);
-    qm->setToolTip(QStringLiteral("QM opt · GFN2 / GFN1 xTB 구조 최적화"));connect(qm,&QAction::triggered,this,[this]{startXtbCalculation();});
-    add(QStringLiteral("이미지 복사"), [this] { copyImage(); });
-    add(QStringLiteral("맞춤 캡처"), [this] { openReactionCapture(); });
-    add(QStringLiteral("수소 숨기기"), [this] { setCarbonHydrogensVisible(false); });
-    add(QStringLiteral("수소 숨기기 초기화"), [this] { setCarbonHydrogensVisible(true); });
-    add(QStringLiteral("가운데 배치"), [this] { m_view->centerOnMolecule(); });
-    add(QStringLiteral("베스트 뷰"), [this] { m_view->bestView(); });
-    m_syncViewsAction->setIcon(actionIcon(10));
-    m_syncViewsAction->setToolTip(QStringLiteral("뷰 동기화"));
-    m_syncViewsAction->setProperty("toolbarIconId",10);
-    toolbar->addAction(m_syncViewsAction);
+    addEditButton(draw, 2);
 
-    auto *spacer = new QWidget(toolbar);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    toolbar->addWidget(spacer);
-    auto *mechanism = new QToolButton(toolbar);
-    mechanism->setObjectName(QStringLiteral("MechanismAnimationButton"));
-    mechanism->setText(QStringLiteral("메커니즘 영상"));
-    mechanism->setToolTip(QStringLiteral("여러 구조·IRC·XYZ 파일로 부드러운 전체 반응 애니메이션 만들기"));
-    connect(mechanism,&QToolButton::clicked,this,&MainWindow::openMechanismAnimation);
-    toolbar->addWidget(mechanism);
-    auto *atomFocus = new QToolButton(toolbar);
-    atomFocus->setObjectName(QStringLiteral("AtomFocusButton"));
-    atomFocus->setText(QStringLiteral("숨김·반투명"));
-    atomFocus->setToolTip(QStringLiteral("선택 원자 강조 · 같은 원자 순서의 열린 창·탭에 함께 적용"));
-    atomFocus->setPopupMode(QToolButton::InstantPopup);
-    atomFocus->setMenu(m_atomFocusMenu);
-    toolbar->addWidget(atomFocus);
+    m_viewportEditMenu = new QMenu(QStringLiteral("정밀 편집"), editPage);
+    auto *editTools = new QActionGroup(m_viewportEditMenu);
+    editTools->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
+    const QStringList editNames = {QStringLiteral("원자 이동"), QStringLiteral("조각 각도"),
+        QStringLiteral("조각 비틀림"), QStringLiteral("분자 이동"), QStringLiteral("분자 회전")};
+    const QStringList editHints = {QStringLiteral("선택 원자를 왼쪽 버튼으로 드래그 · Ctrl+D"),
+        QStringLiteral("가지 원자를 드래그하여 각도 조정"), QStringLiteral("가지 원자를 드래그하여 결합축 회전"),
+        QStringLiteral("분자를 왼쪽 버튼으로 드래그하여 이동"), QStringLiteral("분자를 왼쪽 버튼으로 드래그하여 회전")};
+    m_viewportEditMenu->setToolTipsVisible(true);
+    for (int mode = 0; mode < editNames.size(); ++mode) {
+        auto *action = m_viewportEditMenu->addAction(editNames[mode]);
+        action->setObjectName(QStringLiteral("GeometryDragTool%1").arg(mode));
+        action->setToolTip(editHints[mode]);
+        action->setCheckable(true);
+        if (mode == 0) addEditButton(action, 27);
+        editTools->addAction(action);
+        connect(action, &QAction::triggered, this, [this, mode, hint = editHints[mode]](bool on) {
+            setAtomDragMode(on);
+            if (!on) return;
+            m_view->setTransformMode(mode);
+            m_workspace->setCurrentWidget(m_moleculeWorkspace);
+            updatePanelActions();
+            setStatus(hint, 0);
+        });
+    }
+    auto *centricTool = m_viewportEditMenu->addAction(QStringLiteral("결합 중심 편집"));
+    centricTool->setObjectName(QStringLiteral("BondCentricTool"));
+    centricTool->setCheckable(true);
+    centricTool->setToolTip(QStringLiteral("결합 끝점 드래그: 각도 · Ctrl: 비틀림 · 오른쪽: 거리 · Alt: 반대쪽"));
+    editTools->addAction(centricTool);
+    connect(centricTool, &QAction::triggered, this, [this, centricTool](bool on) {
+        if (on) {
+            ensureEditableDocument();
+            setDrawingMode(false);
+            setAtomDragMode(false);
+            m_workspace->setCurrentWidget(m_moleculeWorkspace);
+            setStatus(centricTool->toolTip(), 0);
+        }
+        m_view->setBondCentricMode(on);
+        updatePanelActions();
+    });
+    m_viewportEditMenu->addSeparator();
+    auto *freezeCore = m_viewportEditMenu->addAction(QStringLiteral("구조 고정"), this, [this] {
+        auto edited = m_view->molecule();
+        const auto ids = m_view->selection().atoms;
+        for (int i = 0; i < edited.atoms.size(); ++i)
+            if (ids.isEmpty() || ids.contains(i)) edited.atoms[i].optimizationFixed = true;
+        commitEditedMolecule(edited, false);
+        setStatus(QStringLiteral("원자 %1개 고정 · 추가 원자는 MM / xTB에서 자유 최적화됩니다.")
+            .arg(ids.isEmpty() ? edited.atoms.size() : ids.size()), 8000);
+    });
+    freezeCore->setObjectName(QStringLiteral("FreezeOptimizationCore"));
+    addEditButton(freezeCore, 28);
+    freezeCore->setToolTip(QStringLiteral("선택 원자를 고정합니다. 선택이 없으면 현재 구조 전체를 고정합니다."));
+    m_viewportEditMenu->addAction(QStringLiteral("고정 해제"), this, [this] {
+        auto edited = m_view->molecule();
+        const auto ids = m_view->selection().atoms;
+        for (int i = 0; i < edited.atoms.size(); ++i)
+            if (ids.isEmpty() || ids.contains(i)) edited.atoms[i].optimizationFixed = false;
+        commitEditedMolecule(edited, false);
+        setStatus(QStringLiteral("최적화 고정을 해제했습니다."));
+    })->setObjectName(QStringLiteral("UnfreezeOptimizationCore"));
+    m_viewportEditMenu->addSeparator();
+    m_viewportEditMenu->addAction(QStringLiteral("편집 도구 종료"), this, [this] {
+        m_view->setBondCentricMode(false);
+        if (m_dragAtoms) setAtomDragMode(false);
+        if (m_drawingMode) setDrawingMode(false);
+        updatePanelActions();
+    });
+
+    addEditButton(m_viewportEditMenu->menuAction(), 29);
+    m_viewportEditMenu->addSeparator();
+    m_viewportEditMenu->addAction(m_geometryAction);
+    auto *insertMenu = new QMenu(QStringLiteral("조각 / 리간드"), editPage);
+    insertMenu->addAction(QStringLiteral("조각 / 리간드 삽입…"), this, [this] { openFragmentBrowser(); });
+    insertMenu->addAction(QStringLiteral("금속–리간드–산소 조합…"), this, &MainWindow::buildLabComplex);
+    addEditButton(insertMenu->menuAction(), 30);
+
     struct Theme { QString name, description, paper, surface, tint, ink, border; };
     const QVector<Theme> themes = {
         {QStringLiteral("구름 소다"), QStringLiteral("맑은 소다빛 종이 · 차분한 블루 잉크"), "#edf4fa", "#fbfdff", "#c5dfee", "#446781", "#c2d3df"},
@@ -228,45 +406,53 @@ void MainWindow::createToolBar() {
         {QStringLiteral("라일락 노트"), QStringLiteral("보랏빛 안개 · 따뜻한 노트 종이"), "#f2eef8", "#fefcff", "#dbceec", "#6d5b85", "#d4c9e1"},
         {QStringLiteral("오트밀 아틀리에"), QStringLiteral("오트밀 종이 · 부드러운 모카 잉크"), "#f6f1e7", "#fffdf7", "#e6d8bb", "#79634c", "#ded1bc"},
         {QStringLiteral("로즈 밀크"), QStringLiteral("빛바랜 장미 · 우윳빛 도자기"), "#f8eef0", "#fffcfc", "#edced7", "#865e6d", "#e4cbd3"},
-        {QStringLiteral("살구 다실"), QStringLiteral("살구빛 햇살 · 크림색 찻잔"), "#faf0e8", "#fffdf9", "#f0d2b8", "#865f49", "#e5cfbd"}
+        {QStringLiteral("살구 다실"), QStringLiteral("살구빛 햇살 · 크림색 찻잔"), "#faf0e8", "#fffdf9", "#f0d2b8", "#865f49", "#e5cfbd"},
+        {QStringLiteral("교수님이 보고있어"), QStringLiteral("교수님 사진 배경 · 불투명도 60% · 차분한 블루 그레이"), "#edf1f5", "#fbfcfe", "#ced9e3", "#4c6278", "#c7d1dc"}
     };
-    auto *swatches=new QWidget(toolbar);
-    swatches->setObjectName(QStringLiteral("AppThemeSelector"));
-    auto *swatchLayout=new QHBoxLayout(swatches);
-    swatchLayout->setContentsMargins(6,0,2,0);swatchLayout->setSpacing(4);
-    auto *paletteLabel=new QLabel(QStringLiteral("palette"),swatches);
-    paletteLabel->setFont(QFont(QStringLiteral("Segoe Print"),10,QFont::DemiBold));
-    paletteLabel->setToolTip(QStringLiteral("오늘의 파스텔 팔레트를 골라보세요"));
-    swatchLayout->addWidget(paletteLabel);
-    auto *themeGroup=new QButtonGroup(swatches);
-    themeGroup->setExclusive(true);
-    for(int i=0;i<themes.size();++i) {
-        const auto &t=themes[i];
-        auto *button=new QToolButton(swatches);
-        button->setObjectName(QStringLiteral("PastelTheme%1").arg(i));
-        button->setAccessibleName(t.name);
-        button->setToolTip(t.name+QStringLiteral(" · ")+t.description);
-        button->setStatusTip(button->toolTip());
-        button->setCheckable(true);button->setFixedSize(32,32);button->setIconSize(QSize(24,24));
-        QPixmap chip(48,48);chip.fill(Qt::transparent);
-        QPainter painter(&chip);painter.setRenderHint(QPainter::Antialiasing);painter.scale(2,2);
-        painter.setPen(QPen(QColor(t.border),1));painter.setBrush(QColor(t.tint));
-        painter.drawEllipse(QRectF(2,2,20,20));
-        painter.setPen(Qt::NoPen);painter.setBrush(QColor(t.surface));painter.drawEllipse(QRectF(6,6,8,8));
-        painter.setBrush(QColor(t.ink));painter.drawEllipse(QRectF(15,14,5,5));painter.end();
-        chip.setDevicePixelRatio(2);button->setIcon(QIcon(chip));
-        button->setStyleSheet(QStringLiteral(
-            "QToolButton { padding:2px; border:2px solid transparent; border-radius:10px; background:transparent; }"
-            "QToolButton:hover { border-color:%1; background:%2; }"
-            "QToolButton:checked { border-color:%3; background:%2; }"
-            "QToolButton:focus { border-style:dashed; border-color:%3; }").arg(t.border,t.surface,t.ink));
-        themeGroup->addButton(button,i);swatchLayout->addWidget(button);
+    auto *themeMenu = viewMenu->addMenu(QStringLiteral("테마"));
+    auto *paletteMenu = themeMenu->addMenu(QStringLiteral("팔레트"));
+    paletteMenu->setObjectName(QStringLiteral("AppThemeSelector"));
+    paletteMenu->setToolTipsVisible(true);
+    auto *themeGroup = new QActionGroup(paletteMenu);
+    for (int i = 0; i < themes.size(); ++i) {
+        const auto &theme = themes[i];
+        auto *action = paletteMenu->addAction(theme.name);
+        action->setObjectName(QStringLiteral("PastelTheme%1").arg(i));
+        action->setToolTip(theme.description);
+        action->setCheckable(true);
+        QPixmap chip(24, 24);
+        chip.fill(Qt::transparent);
+        QPainter painter(&chip);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QColor(theme.border));
+        painter.setBrush(QColor(theme.tint));
+        painter.drawEllipse(QRectF(2, 2, 20, 20));
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(theme.surface));
+        painter.drawEllipse(QRectF(6, 6, 8, 8));
+        painter.setBrush(QColor(theme.ink));
+        painter.drawEllipse(QRectF(15, 14, 5, 5));
+        painter.end();
+        action->setIcon(QIcon(chip));
+        action->setData(i);
+        themeGroup->addAction(action);
     }
-    toolbar->addWidget(swatches);
-    auto applyTheme = [this,toolbar,themes,themeGroup](int index) {
+    auto applyTheme = [this,themes,themeGroup](int index) {
         index = qBound(0, index, int(themes.size())-1);
         const auto &t=themes[index];
+        setProperty("professorBackdrop", index == 6);
+        auto *glowTimer=findChild<QTimer*>(QStringLiteral("ProfessorGlowTimer"));
+        if(!glowTimer) {
+            glowTimer=new QTimer(this);glowTimer->setObjectName(QStringLiteral("ProfessorGlowTimer"));
+            glowTimer->setInterval(40);
+            connect(glowTimer,&QTimer::timeout,this,[this]{
+                if(isMinimized())return;
+                for(auto *view:findChildren<MoleculeView*>())if(view->isVisible())view->update();
+            });
+        }
+        if(index==6)glowTimer->start();else glowTimer->stop();
         const QString text="#34404b",field=t.surface;
+        const QString border=QColor(t.ink).lighter(150).name();
         setProperty("appPattern",QSettings().value(QStringLiteral("ui/patternTemplate"),-1).toInt());
         setProperty("appPatternPaper",QColor(t.paper));
         setProperty("appPatternInk",QColor(t.ink));
@@ -284,165 +470,125 @@ void MainWindow::createToolBar() {
         colors.setColor(QPalette::ToolTipBase,QColor(field));
         colors.setColor(QPalette::ToolTipText,QColor(text));
         setPalette(colors);
-        for(auto *bar:findChildren<QToolBar *>())
-            if(auto *patternBar=dynamic_cast<PatternToolBar *>(bar))patternBar->setMotifInk(QColor(t.ink));
         setStyleSheet(QStringLiteral(
             "QMainWindow,QDockWidget,QToolBar,QStatusBar { background:%1; color:%2; }"
             "QLabel,QCheckBox,QRadioButton,QGroupBox { color:%2; }"
             "QToolBar { border:0; spacing:4px; padding:4px; }"
+            "QDockWidget { border:0; }"
+            "QDockWidget::title { background:%7; color:%2; padding:1px 8px; text-align:left; }"
+            "QDockWidget::close-button { subcontrol-position:top right; width:20px; height:20px; }"
+            "QDockWidget::close-button:hover { background:%4; border:1px solid %3; }"
+            "QMainWindow::separator { background:%6; width:4px; height:4px; }"
+            "QMainWindow::separator:hover { background:%3; }"
+            "QDockWidget QStackedWidget,QDockWidget QScrollArea,QDockWidget QTabWidget::pane { background:%1; border:0; }"
+            "QWidget#StructureToolsContainer,QWidget#StructureDisplayPage,QWidget#StructureEditPage,QDockWidget QScrollArea > QWidget { background:%1; }"
+            "QDockWidget QAbstractItemView { border:1px solid %6; border-radius:4px; }"
+            "QHeaderView::section { background:%7; color:%2; border:0; padding:4px; }"
             "QToolButton,QPushButton,QComboBox { padding:5px; border:1px solid %6; border-radius:6px; background:%4; color:%2; }"
             "QToolButton:checked,QPushButton:checked,QTabBar::tab:selected { background:%3; color:%5; }"
             "QToolButton:hover,QPushButton:hover { border:1px solid %3; background:%7; }"
             "QToolButton:checked:hover,QPushButton:checked:hover { background:%3; }"
-            "QTabBar::tab { padding:6px 12px; color:%2; background:%1; }"
+            "QToolButton:disabled,QPushButton:disabled,QToolButton:disabled:checked,QPushButton:disabled:checked { color:#68717b; background:%1; border-color:%6; }"
+            "QToolButton[sidebarButton=true],QPushButton[sidebarButton=true] { padding:0; border-radius:7px; }"
+            "QToolButton:checked,QPushButton:checked { border-color:%3; }"
+            "QToolButton[sidebarButton=true]::menu-indicator { image:none; width:0; }"
+            "QToolButton[sidebarButton=true]:focus,QPushButton[sidebarButton=true]:focus { border:1px solid %3; }"
+            "QTabWidget::pane { border:1px solid %6; background:%1; }"
+            "QTabWidget#DocumentTabs::pane { border:0; }"
+            "QTabBar::tab { padding:6px 12px; color:%2; background:%4; border:1px solid %6; }"
+            "QTabBar::tab:hover { background:%7; }"
+            "QTabBar::tab:selected { background:%3; color:%5; border-color:%3; }"
+            "QTabWidget#StructureToolsTabs QTabBar::tab { width:30px; height:30px; padding:0;"
+            " margin-right:4px; border:1px solid %6; border-radius:7px; background:%4; }"
+            "QTabWidget#StructureToolsTabs QTabBar::tab:hover { border-color:%3; background:%7; }"
+            "QTabWidget#StructureToolsTabs QTabBar::tab:selected { border-color:%3; background:%3; }"
             "QAbstractItemView,QPlainTextEdit,QTextEdit,QLineEdit,QSpinBox,QDoubleSpinBox { background:%4; color:%2; selection-background-color:%3; selection-color:white; }"
             "QMenuBar,QMenu { background:%1; color:%2; } QMenu::item:selected { background:%3; color:%5; }"
             "QWidget#MoleculeViewport { background:%1; }"
             "QToolTip { background:%4; color:%2; border:1px solid %6; padding:5px; }"
-        ).arg(t.paper,text,t.ink,field,QStringLiteral("#ffffff"),t.border,t.tint)
-            +sidebarPatternStyle(QSettings().value(QStringLiteral("ui/patternTemplate"),-1).toInt(),QColor(t.ink),QColor(t.paper)));
-        for(auto *a:toolbar->actions())if(a->property("toolbarIconId").isValid())a->setIcon(actionIcon(a->property("toolbarIconId").toInt(),QColor(t.ink)));
-        m_explorerDock->toggleViewAction()->setIcon(actionIcon(11,QColor(t.ink)));
-        for(auto *action:findChildren<QAction *>())
-            if(action->property("analysisTab").isValid())action->setIcon(actionIcon(12+action->property("analysisTab").toInt(),QColor(t.ink)));
-        m_atomLabelsAction->setIcon(actionIcon(20,QColor(t.ink)));
-        themeGroup->button(index)->setChecked(true);
+        ).arg(t.paper,text,t.ink,field,QStringLiteral("#ffffff"),border,t.tint));
+        for (auto *action : findChildren<QAction *>()) {
+            const auto iconId = action->property("toolbarIconId");
+            if (iconId.isValid()) action->setIcon(actionIcon(iconId.toInt(), QColor(t.ink)));
+        }
+        for (int tab = 0; tab < m_structureTabs->count(); ++tab)
+            m_structureTabs->setTabIcon(tab, actionIcon(tab == 0 ? 9 : 2, QColor(t.ink)));
+        themeGroup->actions().at(index)->setChecked(true);
         for(auto *view:findChildren<MoleculeView *>())view->update();
         for(auto *surface:findChildren<QWidget *>(QStringLiteral("MoleculeViewport")))surface->update();
         QSettings().setValue(QStringLiteral("ui/theme"), index);
         uiPattern::synchronizeDialogs(this);
     };
-    connect(themeGroup,&QButtonGroup::idClicked,this,applyTheme);
+    connect(themeGroup, &QActionGroup::triggered, this, [applyTheme](QAction *action) {
+        applyTheme(action->data().toInt());
+    });
 
-    addToolBarBreak(Qt::TopToolBarArea);
-    auto *panels = new PatternToolBar(QStringLiteral("분석 패널 도구 모음"),this);
-    addToolBar(panels);
-    panels->setObjectName(QStringLiteral("AnalysisToolBar"));
-    panels->setMovable(false);
-    panels->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    panels->setIconSize(QSize(46,42));
-    panels->setStyleSheet(QStringLiteral("QToolButton { padding:3px; }"));
-    auto *togglePanel=m_explorerDock->toggleViewAction();
-    togglePanel->setIcon(actionIcon(11));
-    togglePanel->setToolTip(QStringLiteral("분석 패널 표시/숨기기"));
-    togglePanel->setStatusTip(togglePanel->toolTip());
-    panels->addAction(togglePanel);
-    panels->addSeparator();
-    const QStringList titles = {QStringLiteral("Opt"), QStringLiteral("Freq"),
-        QStringLiteral("Scan"), QStringLiteral("IRC"), QStringLiteral("TD-DFT"),
-        QStringLiteral("Atom Properties"), QStringLiteral("Orbitals"), QStringLiteral("XYZ")};
-    const QStringList descriptions = {QStringLiteral("Opt · 구조 최적화 단계와 에너지 표시/숨기기"),
-        QStringLiteral("Freq · 진동 모드와 스펙트럼 표시/숨기기"),
-        QStringLiteral("Scan · 좌표 스캔과 에너지 곡선 표시/숨기기"),
-        QStringLiteral("IRC · 반응 경로와 에너지 표시/숨기기"),
-        QStringLiteral("TD-DFT · 전자 여기 상태와 흡수 스펙트럼 표시/숨기기"),
-        QStringLiteral("Atom Properties · 원자별 전하와 속성 표시/숨기기"),
-        QStringLiteral("Orbitals · 분자 궤도와 에너지 준위 표시/숨기기"),
-        QStringLiteral("XYZ · 현재 구조의 XYZ 좌표 표시/숨기기")};
-    for (int i = 0; i < titles.size(); ++i) {
-        auto *action = panels->addAction(actionIcon(12+i),titles[i]);
-        action->setObjectName(QStringLiteral("AnalysisPanelTab%1").arg(i));
-        action->setProperty("analysisTab", i);
-        action->setCheckable(true);
-        action->setToolTip(descriptions[i]);
-        action->setStatusTip(descriptions[i]);
-        connect(action, &QAction::triggered, this, [this, i] {
-            if (m_explorerDock->isVisible() && m_analysis->currentTab() == i) {
-                m_explorerDock->hide();
-            } else {
-                m_analysis->setCurrentTab(i);
-                m_explorerDock->show();
-                m_explorerDock->raise();
-            }
-            updatePanelActions();
-        });
-    }
-    auto *output=m_outputDock->toggleViewAction();output->setObjectName("ToggleOutputSource");
-    output->setIcon(actionIcon(21));output->setToolTip(QStringLiteral("Output 원문 · 결과 출처 확인 / Ctrl+F 검색"));panels->addAction(output);
-    connect(output,&QAction::triggered,this,[this](bool visible){if(visible)updateOutputSource();});
-    auto *navigator=panels->addAction(actionIcon(23),QStringLiteral("계산 결과 탐색 트리"));
-    navigator->setObjectName("ToggleResultNavigator");navigator->setCheckable(true);
-    navigator->setChecked(QSettings().value(QStringLiteral("ui/showResultNavigator"),false).toBool());
-    navigator->setToolTip(QStringLiteral("계산 결과 탐색 목록 표시/숨기기 · 분석 탭과 같은 결과를 탐색합니다"));
-    connect(navigator,&QAction::toggled,this,[this](bool visible){QSettings().setValue(QStringLiteral("ui/showResultNavigator"),visible);for(auto *tree:findChildren<QTreeWidget*>())tree->setVisible(visible);});
-    panels->addSeparator();
-    m_atomLabelsAction->setIcon(actionIcon(20));
-    m_atomLabelsAction->setStatusTip(m_atomLabelsAction->toolTip());
-    panels->addAction(m_atomLabelsAction);
-    panels->addSeparator();
-    auto toolIcon=[](int kind){
-        QPixmap pix(52,52);pix.fill(Qt::transparent);QPainter p(&pix);p.setRenderHint(QPainter::Antialiasing);p.scale(2,2);
-        p.setPen(QPen(QColor("#54748b"),1.7));p.setBrush(QColor("#c5dfee"));
-        if(kind==0){p.drawEllipse(QPointF(9,13),4,4);p.drawLine(14,13,23,13);p.drawLine(20,10,23,13);p.drawLine(20,16,23,13);}
-        else if(kind==5){p.drawLine(5,19,12,8);p.drawLine(12,8,22,18);p.drawArc(QRectF(7,11,11,11),15*16,120*16);}
-        else if(kind==6||kind==7){p.drawRoundedRect(QRectF(7,11,13,11),2,2);p.drawArc(QRectF(10,4,7,12),0,180*16);if(kind==7){p.setPen(QPen(QColor("#b77777"),2));p.drawLine(4,23,23,4);}}
-        else {p.drawLine(6,14,13,7);p.drawLine(13,7,20,14);for(auto c:{QPointF(6,14),QPointF(13,7),QPointF(20,14)})p.drawEllipse(c,2.5,2.5);
-            if(kind==2||kind==4){p.drawArc(QRectF(3,6,20,18),190*16,140*16);p.drawLine(21,20,23,15);p.drawLine(21,20,17,19);}
-            else {p.drawLine(5,22,22,22);p.drawLine(19,19,22,22);p.drawLine(19,25,22,22);}
-            if(kind>=3&&kind<=4){p.setPen(QPen(QColor("#ae8cbd"),1));p.setBrush(Qt::NoBrush);p.drawRoundedRect(QRectF(1,1,24,24),3,3);}
-        }
-        p.end();pix.setDevicePixelRatio(2);return QIcon(pix);
-    };
-    auto *editTools=new QActionGroup(this);editTools->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
-    const QStringList editNames={QStringLiteral("원자 / 선택 원자 이동 · 왼쪽 드래그"),QStringLiteral("Fragment 각도 조정 · 가지 원자 드래그"),QStringLiteral("Fragment 결합축 회전 · 가지 원자 드래그"),QStringLiteral("클릭한 분자 이동 · 왼쪽 드래그"),QStringLiteral("클릭한 분자 회전 · 왼쪽 드래그")};
-    for(int mode=0;mode<editNames.size();++mode){auto *a=panels->addAction(captionedIcon(toolIcon(mode),QStringList{QStringLiteral("원자 이동"),QStringLiteral("조각 각도"),QStringLiteral("조각 비틀림"),QStringLiteral("분자 이동"),QStringLiteral("분자 회전")}[mode],mode==0?QStringLiteral("Ctrl+D"):QString()),editNames[mode]);a->setObjectName(QStringLiteral("GeometryDragTool%1").arg(mode));a->setToolTip(editNames[mode]);a->setCheckable(true);editTools->addAction(a);
-        connect(a,&QAction::triggered,this,[this,mode](bool on){if(!on){setAtomDragMode(false);return;}setAtomDragMode(true);m_view->setTransformMode(mode);updatePanelActions();setStatus(QStringLiteral("%1 · 우클릭: 시점 회전 · 가운데 버튼: 시점 이동").arg(QStringList{"원자 이동","Fragment 각도","Fragment 비틀림","분자 이동","분자 회전"}[mode]),0);});}
-    auto *centricTool=panels->addAction(captionedIcon(toolIcon(5),QStringLiteral("결합 각도")),QStringLiteral("Fragment 각도 / 비틀림 · 결합 중심 편집"));centricTool->setObjectName("BondCentricTool");centricTool->setCheckable(true);editTools->addAction(centricTool);
-    centricTool->setToolTip(QStringLiteral("결합 클릭 후 끝점 드래그: 각도 · Ctrl: 비틀림 · 오른쪽: 거리 · Alt: 반대쪽"));
-    connect(centricTool,&QAction::triggered,this,[this](bool on){if(!on){m_view->setBondCentricMode(false);return;}ensureEditableDocument();setDrawingMode(false);setAtomDragMode(false);m_view->setBondCentricMode(true);updatePanelActions();setStatus(QStringLiteral("결합을 클릭하고 끝점을 드래그하세요. Ctrl: 비틀림 · 오른쪽: 거리 · Alt: 반대쪽"),0);});
-    auto *freezeCore=panels->addAction(captionedIcon(toolIcon(6),QStringLiteral("구조 고정")),QStringLiteral("현재 구조 고정 · 선택 원자가 있으면 선택만 고정"));freezeCore->setObjectName("FreezeOptimizationCore");
-    freezeCore->setToolTip(QStringLiteral("기존 구조를 고정한 뒤 새 조각을 추가하세요. MM / xTB에서 추가한 부분만 최적화합니다. 선택이 있으면 선택만 고정합니다."));
-    connect(freezeCore,&QAction::triggered,this,[this]{auto edited=m_view->molecule();auto ids=m_view->selection().atoms;if(ids.isEmpty())for(int i=0;i<edited.atoms.size();++i)ids.insert(i);for(int i:ids)edited.atoms[i].optimizationFixed=true;commitEditedMolecule(edited,false);setStatus(QStringLiteral("원자 %1개 고정 · 추가 원자는 MM / xTB에서 자유 최적화됩니다.").arg(ids.size()),8000);});
-    auto *unfreeze=panels->addAction(captionedIcon(toolIcon(7),QStringLiteral("고정 해제")),QStringLiteral("최적화 고정 해제 · 선택 또는 전체"));unfreeze->setObjectName("UnfreezeOptimizationCore");
-    connect(unfreeze,&QAction::triggered,this,[this]{auto edited=m_view->molecule();const auto ids=m_view->selection().atoms;for(int i=0;i<edited.atoms.size();++i)if(ids.isEmpty()||ids.contains(i))edited.atoms[i].optimizationFixed=false;commitEditedMolecule(edited,false);setStatus(QStringLiteral("최적화 고정을 해제했습니다."));});
-    auto *patternSpacer=new QWidget(panels);
-    patternSpacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
-    panels->addWidget(patternSpacer);
-    auto *templates=new QWidget(panels);
-    templates->setObjectName(QStringLiteral("AppPatternSelector"));
-    auto *templateRow=new QHBoxLayout(templates);
-    templateRow->setContentsMargins(6,0,2,0);templateRow->setSpacing(4);
-    auto *templateLabel=new QLabel(QStringLiteral("pattern"),templates);
-    templateLabel->setFont(paletteLabel->font());
-    // Give both rows the same width so the six options line up vertically.
-    const int labelWidth=qMax(paletteLabel->sizeHint().width(),templateLabel->sizeHint().width());
-    paletteLabel->setFixedWidth(labelWidth);templateLabel->setFixedWidth(labelWidth);
-    templateLabel->setToolTip(QStringLiteral("문양 템플릿 · 다시 누르면 기본 종이로 돌아갑니다"));
-    templateRow->addWidget(templateLabel);
-    auto *patternGroup=new QButtonGroup(templates);patternGroup->setExclusive(false);
+    auto *patternMenu = themeMenu->addMenu(QStringLiteral("대화상자·시작 화면 문양"));
+    patternMenu->setObjectName(QStringLiteral("AppPatternSelector"));
+    patternMenu->setToolTipsVisible(true);
+    auto *patternGroup = new QActionGroup(patternMenu);
+    patternGroup->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
     const QStringList names={QStringLiteral("달빛 몽환"),QStringLiteral("랩 모눈"),QStringLiteral("트윌 사선"),QStringLiteral("소다 물결"),QStringLiteral("보태니컬 잎"),QStringLiteral("분자 격자")};
     const QStringList motifDescriptions={QStringLiteral("초승달 · 별빛 · 옅은 빛무리가 떠 있는 꿈속의 하늘"),QStringLiteral("정갈한 실험실 그래프 종이"),QStringLiteral("비스듬히 짜인 가벼운 패브릭"),QStringLiteral("부드럽게 이어지는 잔물결"),QStringLiteral("식물 표본을 닮은 잎사귀"),QStringLiteral("육각 고리와 원자로 이어진 화학 문양")};
-    for(int i=0;i<6;++i){
-        auto *button=new QToolButton(templates);
-        button->setObjectName(QStringLiteral("PatternTemplate%1").arg(i));
-        button->setAccessibleName(names[i]);button->setToolTip(names[i]+QStringLiteral(" · ")+motifDescriptions[i]+QStringLiteral("\n색상 팔레트와 자유롭게 조합 · 다시 누르면 문양 해제"));
-        button->setStatusTip(button->toolTip());button->setCheckable(true);
-        button->setFixedSize(32,32);button->setIconSize(QSize(28,28));button->setIcon(motifIcon(i));
-        button->setStyleSheet(QStringLiteral("QToolButton {padding:0;border:2px solid transparent;border-radius:8px;background:transparent;} QToolButton:hover {border-color:#9aafb9;} QToolButton:checked {border-color:#4d7589;background:#e7f0f4;} QToolButton:focus {border-style:dashed;border-color:#4d7589;}"));
-        patternGroup->addButton(button,i);templateRow->addWidget(button);
-    }
-    panels->addWidget(templates);
-    auto applyPattern=[this,toolbar,panels,patternGroup,applyTheme](int index){
-        index=qBound(-1,index,5);
-        for(int i=0;i<6;++i)patternGroup->button(i)->setChecked(i==index);
-        toolbar->setMotif(index);panels->setMotif(index);
-        QSettings().setValue(QStringLiteral("ui/patternTemplate"),index);
-        applyTheme(QSettings().value(QStringLiteral("ui/theme"),0).toInt());
+    auto applyPattern = [toolbar, patternGroup, applyTheme](int index) {
+        index = qBound(-1, index, 5);
+        for (auto *action : patternGroup->actions()) action->setChecked(action->data().toInt() == index);
+        toolbar->setMotif(index);
+        QSettings().setValue(QStringLiteral("ui/patternTemplate"), index);
+        applyTheme(QSettings().value(QStringLiteral("ui/theme"), 0).toInt());
     };
-    connect(patternGroup,&QButtonGroup::idClicked,this,[patternGroup,applyPattern](int id){applyPattern(patternGroup->button(id)->isChecked()?id:-1);});
-    applyPattern(QSettings().value(QStringLiteral("ui/patternTemplate"),-1).toInt());
-    connect(m_explorerDock, &QDockWidget::visibilityChanged, this, &MainWindow::updatePanelActions);
+    patternMenu->addAction(QStringLiteral("문양 없음"), this, [applyPattern] { applyPattern(-1); });
+    for (int i = 0; i < names.size(); ++i) {
+        auto *action = patternMenu->addAction(motifIcon(i), names[i]);
+        action->setObjectName(QStringLiteral("PatternTemplate%1").arg(i));
+        action->setToolTip(motifDescriptions[i]);
+        action->setCheckable(true);
+        action->setData(i);
+        patternGroup->addAction(action);
+    }
+    connect(patternGroup, &QActionGroup::triggered, this, [applyPattern](QAction *action) {
+        applyPattern(action->isChecked() ? action->data().toInt() : -1);
+    });
+    applyPattern(QSettings().value(QStringLiteral("ui/patternTemplate"), -1).toInt());
     updatePanelActions();
-    applyTheme(QSettings().value(QStringLiteral("ui/theme"),0).toInt());
 }
 
 void MainWindow::updatePanelActions() {
-    for(int i=0;i<5;++i)if(auto *a=findChild<QAction *>(QStringLiteral("GeometryDragTool%1").arg(i)))a->setChecked(m_dragAtoms&&m_view&&m_view->transformMode()==i);
-    if(auto *a=findChild<QAction *>("BondCentricTool"))a->setChecked(m_view&&m_view->bondCentricMode());
-    for (auto *action : findChildren<QAction *>()) {
-        const auto tab = action->property("analysisTab");
-        if (tab.isValid()) action->setChecked(m_explorerDock->isVisible() && m_analysis->currentTab() == tab.toInt());
+    if (!m_viewportEditMenu) return;
+    m_explorer->setVisible(QSettings().value("ui/showResultNavigator",false).toBool() && m_analysis->currentTab()!=1 && m_analysis->currentTab()!=6 && m_analysis->currentTab()!=7);
+    const bool hasStructure = !m_view->molecule().isEmpty();
+    for (const auto *name : {"MMOptimizationAction", "QMOptimizationAction",
+                             "CopyStructureImage"}) {
+        findChild<QAction *>(QString::fromLatin1(name))->setEnabled(hasStructure);
     }
+    m_structureTabs->widget(0)->setEnabled(hasStructure);
+    m_viewportEditMenu->menuAction()->setEnabled(hasStructure);
+    m_structureTabs->findChild<QAction *>(QStringLiteral("DrawCurrentStructure"))->setEnabled(
+        hasStructure || !m_drawingMode);
+    m_drawPanels->setVisible(m_drawingMode);
+
+    const bool bondCentric = m_view->bondCentricMode();
+    m_viewportEditMenu->findChild<QAction *>(QStringLiteral("BondCentricTool"))->setChecked(bondCentric);
+    for (int mode = 0; mode < 5; ++mode) {
+        auto *action = m_viewportEditMenu->findChild<QAction *>(QStringLiteral("GeometryDragTool%1").arg(mode));
+        action->setEnabled(hasStructure);
+        action->setChecked(m_dragAtoms && m_view->transformMode() == mode);
+    }
+    m_viewportEditMenu->findChild<QAction *>(QStringLiteral("FreezeOptimizationCore"))->setEnabled(hasStructure);
+
+    const auto placeShortcut = [](QToolButton *button, bool visible) {
+        button->setVisible(visible);
+    };
+    for (auto *action : m_analysisMenu->actions()) {
+        const int index = action->property("analysisTab").toInt();
+        action->setChecked(index == m_analysis->currentTab());
+        auto *button = m_analysisShortcuts->findChild<QToolButton *>(QStringLiteral("AnalysisShortcut%1").arg(index));
+        placeShortcut(button, m_analysis->hasTabData(index));
+    }
+    auto *sourceButton = m_analysisShortcuts->findChild<QToolButton *>(QStringLiteral("ResultSourceButton"));
+    placeShortcut(sourceButton, !m_data.filePath.isEmpty());
+    m_analysisShortcuts->layout()->invalidate();
+    m_analysisShortcuts->updateGeometry();
 }
 
 } // namespace youngcraft

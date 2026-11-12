@@ -49,6 +49,7 @@
 namespace youngcraft {
 
 void MainWindow::populateExplorer() {
+    updatePanelActions();
     updateOutputSource();
     m_explorer->clear();
     if (m_data.filePath.isEmpty() && m_data.molecule.atoms.isEmpty()) {

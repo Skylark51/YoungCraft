@@ -81,6 +81,14 @@ float tangent(float a,float b,double da,double db) {
 }
 }
 
+double MechanismStep::travelSeconds() const {
+    return seconds/qBound(.1,presentation["speed"].toDouble(1),10.);
+}
+
+double MechanismStep::holdSeconds() const {
+    return qBound(0.,presentation["hold"].toDouble(),30.);
+}
+
 MechanismStep MechanismStep::fromCalculation(const CalculationData &data,bool usePath) {
     MechanismStep step;step.path=data.filePath;step.name=QFileInfo(data.filePath).completeBaseName();step.molecule=data.molecule;
     QVector<int> indices;
@@ -95,8 +103,25 @@ MechanismStep MechanismStep::fromCalculation(const CalculationData &data,bool us
         for(int i=0;i<data.frames.size();++i)indices.push_back(i);
     }
     if(indices.isEmpty()&&!data.frames.isEmpty())indices.push_back(data.frames.size()-1);
-    for(int index:indices)if(index>=0&&index<data.frames.size()&&data.frames[index].coordinates.size()==step.molecule.atoms.size())
+    QHash<int,double> absolute,relative;
+    auto collect=[&](const auto &points){
+        for(const auto &point:points) {
+            if(std::isfinite(point.energyHartree))absolute.insert(point.frameIndex,point.energyHartree);
+            if(std::isfinite(point.relativeKcal))relative.insert(point.frameIndex,point.relativeKcal);
+        }
+    };
+    collect(data.scanPoints);collect(data.ircPoints);
+    QJsonArray energies,relativeEnergies;
+    for(int index:indices)if(index>=0&&index<data.frames.size()&&data.frames[index].coordinates.size()==step.molecule.atoms.size()) {
         step.frames.push_back(data.frames[index].coordinates);
+        double value=data.frames[index].metrics.energyHartree;
+        if(!std::isfinite(value))value=absolute.value(index,kNaN);
+        const double kcal=relative.value(index,kNaN);
+        energies.append(std::isfinite(value)?QJsonValue(value):QJsonValue());
+        relativeEnergies.append(std::isfinite(kcal)?QJsonValue(kcal):QJsonValue());
+    }
+    if(!energies.isEmpty())step.presentation["sourceEnergiesHartree"]=energies;
+    if(!relative.isEmpty())step.presentation["sourceEnergiesKcal"]=relativeEnergies;
     if(step.frames.isEmpty()) { QVector<QVector3D> frame;for(const auto&a:step.molecule.atoms)frame.push_back(a.position);step.frames.push_back(frame); }
     if(!step.frames.isEmpty())for(int i=0;i<step.molecule.atoms.size();++i)step.molecule.atoms[i].position=step.frames.last()[i];
     return step;
@@ -149,14 +174,14 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
             : QStringLiteral("공통 %1 · 추가 %2 · 이전 단계 이탈 %3%4").arg(common).arg(mapping.size()-common)
                 .arg(steps[stage-1].molecule.atoms.size()-[&]{int n=0;for(int id:built.m_mappings[stage-1])if(used.contains(id))++n;return n;}())
                 .arg(step.mapping.isEmpty()?QStringLiteral(" · 자동 대응 확인"):QStringLiteral(" · 수동 대응")));
-        nodeCount+=frames.size();allFrames.push_back(frames);
+        nodeCount+=frames.size()+(step.holdSeconds()>0?1:0);allFrames.push_back(frames);
         if(nodeCount*built.m_tracks.size()>2000000)return fail(QStringLiteral("경로가 너무 큽니다. 파일을 나누거나 경로 프레임 수를 줄여주세요."));
     }
     double time=0;
     for(int stage=0;stage<steps.size();++stage) {
         const auto &frames=allFrames[stage];const auto &map=built.m_mappings[stage];
         for(int f=0;f<frames.size();++f) {
-            if(stage>0||f>0)time+=steps[stage].seconds/qMax(1,int(frames.size())-(stage==0?1:0));
+            if(stage>0||f>0)time+=steps[stage].travelSeconds()/qMax(1,int(frames.size())-(stage==0?1:0));
             Node node;node.time=time;node.step=stage;node.positions.resize(built.trackCount());node.presence.fill(0,built.trackCount());
             for(int i=0;i<map.size();++i){node.positions[map[i]]=frames[f][i];node.presence[map[i]]=1;}
             auto topology=steps[stage].molecule;
@@ -166,9 +191,14 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
             }
             built.m_nodes.push_back(node);
         }
+        built.m_stageEnds.push_back(built.m_nodes.size()-1);
+        if(const double hold=steps[stage].holdSeconds();hold>0) {
+            auto node=built.m_nodes.last();
+            time+=hold;node.time=time;built.m_nodes.push_back(node);
+        }
     }
     // Hold the endpoints without a discontinuous wrap when presentation playback ends.
-    if(built.m_nodes.size()==1){auto last=built.m_nodes.first();last.time=steps.first().seconds;built.m_nodes.push_back(last);}
+    if(built.m_nodes.size()==1){auto last=built.m_nodes.first();last.time=steps.first().travelSeconds();built.m_nodes.push_back(last);}
     for(int track=0;track<built.trackCount();++track) {
         int last=-1,first=-1;
         for(int n=0;n<built.m_nodes.size();++n)if(built.m_nodes[n].presence[track]>0){first=n;break;}
@@ -182,19 +212,95 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
     }
     // Preserve internal bonds of departing fragments, never their link to the reacting core.
     QMap<quint64,Bond> previous;
-    for(auto &node:built.m_nodes) {
-        QMap<quint64,Bond> current;for(const auto&bond:node.bonds)current.insert(key(bond),bond);
+    for(int i=0;i<built.m_nodes.size();++i) {
+        auto &node=built.m_nodes[i];
+        QMap<quint64,Bond> current;
+        for(const auto &bond:node.bonds)current.insert(key(bond),bond);
         for(auto it=previous.cbegin();it!=previous.cend();++it) {
             const auto &b=it.value();
-            if(node.presence[b.first]<1&&node.presence[b.second]<1&&node.presence[b.first]>0&&node.presence[b.second]>0&&!current.contains(it.key()))
+            if(node.presence[b.first]<1&&node.presence[b.second]<1&&node.presence[b.first]>0&&node.presence[b.second]>0&&!current.contains(it.key())) {
                 node.bonds.push_back(b);
+                current.insert(it.key(),b);
+            }
         }
-        previous.clear();
-        for(const auto&bond:node.bonds)previous.insert(key(bond),bond);
+        bool changed=previous.size()!=current.size();
+        for(auto a=previous.cbegin(),b=current.cbegin();!changed&&a!=previous.cend();++a,++b)
+            changed=a.key()!=b.key()||std::abs(a->order-b->order)>.1||a->style!=b->style;
+        if(i>0&&changed)built.m_topologyChanges.push_back((built.m_nodes[i-1].time+node.time)/2);
+        previous=std::move(current);
+    }
+    for(int stage=0;stage+1<steps.size();++stage) {
+        const auto marks=steps[stage].presentation["photoCleavages"].toArray();
+        if(marks.isEmpty())continue;
+        const auto nodes=built.cleavageNodes(stage);
+        const auto &mapping=built.m_mappings[stage];
+        for(const auto &mark:marks) {
+            const auto pair=mark.toArray();
+            if(pair.size()<2||pair.size()>3)continue;
+            const int first=pair[0].toInt(-1),second=pair[1].toInt(-1);
+            if(first<0||second<0||first>=mapping.size()||second>=mapping.size())continue;
+            Bond bond;bond.first=mapping[first];bond.second=mapping[second];
+            const auto id=key(bond);
+            const auto occurrences=nodes.value(id);
+            const int occurrence=pair.size()==3?pair[2].toInt(-1):0;
+            if(occurrence<0||occurrence>=occurrences.size())continue;
+            auto eventTime=[&](int node){return (built.m_nodes[node-1].time+built.m_nodes[node].time)/2;};
+            const double midpoint=eventTime(occurrences[occurrence]);
+            double start=qMax(built.m_nodes[built.m_stageEnds[stage]].time,midpoint-.28);
+            double end=qMin(built.m_nodes[built.m_stageEnds[stage+1]].time,midpoint+.18);
+            if(occurrence>0)start=qMax(start,(midpoint+eventTime(occurrences[occurrence-1]))/2);
+            if(occurrence+1<occurrences.size())end=qMin(end,(midpoint+eventTime(occurrences[occurrence+1]))/2);
+            built.m_photoCleavages.push_back({bond,start,end});
+        }
     }
     built.emphasize({},2);
     for(int i=0;i<built.trackCount();++i){built.m_visible[i]=built.m_tracks[i].visible;built.m_opacity[i]=built.m_tracks[i].displayOpacity;}
     *this=std::move(built);return true;
+}
+
+QMap<quint64,QVector<int>> MechanismTimeline::cleavageNodes(int stage) const {
+    QMap<quint64,QVector<int>> lost;
+    if(stage<0||stage+1>=m_stageEnds.size())return lost;
+    QSet<quint64> source;
+    for(const auto &bond:m_nodes[m_stageEnds[stage]].bonds)source.insert(key(bond));
+    auto previous=source;
+    for(int n=m_stageEnds[stage]+1;n<=m_stageEnds[stage+1];++n) {
+        QSet<quint64> current;
+        for(const auto &bond:m_nodes[n].bonds) {
+            const auto id=key(bond);
+            if(source.contains(id))current.insert(id);
+        }
+        for(auto id:previous)if(!current.contains(id))lost[id].push_back(n);
+        previous=std::move(current);
+    }
+    return lost;
+}
+
+QVector<double> MechanismTimeline::cleavageTimes(int stage,int first,int second) const {
+    if(stage<0||stage>=m_mappings.size())return {};
+    const auto &map=m_mappings[stage];
+    if(first<0||second<0||first>=map.size()||second>=map.size())return {};
+    Bond bond;bond.first=map[first];bond.second=map[second];
+    QVector<double> times;
+    for(int node:cleavageNodes(stage).value(key(bond)))
+        times.push_back((m_nodes[node-1].time+m_nodes[node].time)/2);
+    return times;
+}
+
+QVector<QPair<int,int>> MechanismTimeline::cleavableBonds(int stage) const {
+    QVector<QPair<int,int>> pairs;
+    const auto lost=cleavageNodes(stage);
+    if(lost.isEmpty())return pairs;
+    const auto &mapping=m_mappings[stage];
+    QHash<int,int> local;
+    for(int i=0;i<mapping.size();++i)local.insert(mapping[i],i);
+    for(const auto &bond:m_nodes[m_stageEnds[stage]].bonds) {
+        if(lost.contains(key(bond))&&local.contains(bond.first)&&local.contains(bond.second)) {
+            const int first=local.value(bond.first),second=local.value(bond.second);
+            pairs.push_back({qMin(first,second),qMax(first,second)});
+        }
+    }
+    return pairs;
 }
 
 Molecule MechanismTimeline::sample(double time) const {
@@ -216,8 +322,21 @@ Molecule MechanismTimeline::sample(double time) const {
         atom.displayOpacity=((1-e)*a.presence[i]+e*b.presence[i])*m_opacity[i];
         atom.visible=m_visible[i]&&atom.displayOpacity>.001f;
     }
+    QHash<quint64,float> flashes;
+    for(const auto &cleavage:m_photoCleavages) {
+        if(time<=cleavage.start||time>=cleavage.end)continue;
+        const double phase=3.141592653589793*(time-cleavage.start)/(cleavage.end-cleavage.start);
+        const float pulse=float(std::sin(phase)*(.35+.65*std::pow(std::sin(3*phase),2)));
+        flashes[key(cleavage.bond)]=pulse;
+        for(int atom:{cleavage.bond.first,cleavage.bond.second})
+            result.atoms[atom].displayFlash=qMax(result.atoms[atom].displayFlash,pulse);
+    }
     QMap<quint64,Bond> oldBonds,newBonds;for(const auto&bond:a.bonds)oldBonds.insert(key(bond),bond);for(const auto&bond:b.bonds)newBonds.insert(key(bond),bond);
-    auto add=[&](Bond bond,float opacity){bond.displayOpacity=opacity;if(opacity>.001f)result.bonds.push_back(bond);};
+    auto add=[&](Bond bond,float opacity){
+        bond.displayOpacity=opacity;
+        if(!flashes.isEmpty())bond.displayFlash=flashes.value(key(bond));
+        if(opacity>.001f)result.bonds.push_back(bond);
+    };
     for(auto iter=oldBonds.cbegin();iter!=oldBonds.cend();++iter) {
         const auto newer=newBonds.constFind(iter.key());
         if(newer==newBonds.cend())add(iter.value(),1-e);

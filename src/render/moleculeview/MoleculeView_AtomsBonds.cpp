@@ -18,12 +18,19 @@
 
 namespace youngcraft {
 
+static QColor photoFlash(const QColor &color, float strength) {
+    if(strength<=0)return color;
+    return QColor::fromRgbF(color.redF()+(1-color.redF())*strength,
+                           color.greenF()+(.97f-color.greenF())*strength,
+                           color.blueF()+(.42f-color.blueF())*strength,color.alphaF());
+}
+
 QColor MoleculeView::atomRenderColor(const Atom &atom) const {
     QColor color;
     if (m_style.monochrome) color = elementColor(atom.atomicNumber, true);
     else if (atom.colorOverride.isValid()) color = atom.colorOverride;
     else color = m_style.elementColors.value(atom.atomicNumber, elementColor(atom.atomicNumber));
-    return color;
+    return photoFlash(color,atom.displayFlash);
 }
 
 float MoleculeView::atomVisualRadius(const Atom &atom) const {
@@ -161,7 +168,10 @@ void MoleculeView::drawColoredBond(const Bond &bond) {
     const QVector3D axis = vector / length;
     const QVector3D side = stableBondSideVector(bond, axis);
     auto bondEndpointColor = [this](const Atom &atom) {
-        return atomRenderColor(atom);
+        if(atom.displayFlash<=0)return atomRenderColor(atom);
+        auto base=atom;
+        base.displayFlash=0;
+        return atomRenderColor(base);
     };
     QColor firstColor = m_style.bondColor, secondColor = m_style.bondColor;
     if (m_style.bondColorMode == BondColorMode::EndpointAtoms) {
@@ -173,6 +183,8 @@ void MoleculeView::drawColoredBond(const Bond &bond) {
                                           (a.green() + b.green()) / 2,
                                           (a.blue() + b.blue()) / 2);
     }
+    firstColor=photoFlash(firstColor,bond.displayFlash);
+    secondColor=photoFlash(secondColor,bond.displayFlash);
     const float spacing = m_style.bondRadius * m_style.doubleBondSpacing;
     const float firstRadius = atomVisualRadius(first);
     const float secondRadius = atomVisualRadius(second);

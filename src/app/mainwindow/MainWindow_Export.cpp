@@ -28,6 +28,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QVBoxLayout>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
@@ -38,6 +39,9 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSettings>
+#include <QSaveFile>
+#include <QImageWriter>
+#include <cmath>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QTextEdit>
@@ -111,16 +115,61 @@ void MainWindow::copyImage() {
     setStatus(QStringLiteral("투명 배경 고해상도 그림을 복사했습니다 (%1 × %2 px, 600 dpi)").arg(image.width()).arg(image.height()));
 }
 
+void MainWindow::saveStructure() {
+    if(m_view->molecule().isEmpty()){setStatus(QStringLiteral("저장할 구조가 없습니다"));return;}
+    QDialog choice(this);choice.setObjectName("SaveStructureChoice");choice.setWindowTitle(QStringLiteral("저장 형식 선택"));
+    auto *layout=new QVBoxLayout(&choice);layout->addWidget(new QLabel(QStringLiteral("무엇을 저장할까요?"),&choice));
+    auto *picture=new QPushButton(QStringLiteral("그림 저장"),&choice);picture->setObjectName("SavePictureChoice");
+    auto *xyz=new QPushButton(QStringLiteral("XYZ 좌표 저장"),&choice);xyz->setObjectName("SaveXYZChoice");
+    layout->addWidget(picture);layout->addWidget(xyz);
+    auto *cancel=new QDialogButtonBox(QDialogButtonBox::Cancel,&choice);cancel->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));layout->addWidget(cancel);
+    bool coordinates=false;
+    connect(picture,&QPushButton::clicked,&choice,&QDialog::accept);
+    connect(xyz,&QPushButton::clicked,&choice,[&]{coordinates=true;choice.accept();});
+    connect(cancel,&QDialogButtonBox::rejected,&choice,&QDialog::reject);
+    if(choice.exec()!=QDialog::Accepted)return;
+    if(coordinates)saveXYZ();else saveImage();
+}
+
+void MainWindow::saveXYZ() {
+    const auto molecule=m_view->molecule();
+    if(molecule.isEmpty()){setStatus(QStringLiteral("저장할 구조가 없습니다"));return;}
+    QString text=QStringLiteral("%1\n%2\n").arg(molecule.atoms.size()).arg(molecule.title.simplified());
+    for(const auto &atom:molecule.atoms){
+        if(!std::isfinite(atom.position.x())||!std::isfinite(atom.position.y())||!std::isfinite(atom.position.z())){
+            QMessageBox::warning(this,QStringLiteral("XYZ 저장 실패"),QStringLiteral("유효하지 않은 원자 좌표가 있습니다."));return;
+        }
+        text+=QStringLiteral("%1 %2 %3 %4\n").arg(atom.element.isEmpty()?elementSymbol(atom.atomicNumber):atom.element)
+            .arg(atom.position.x(),0,'f',8).arg(atom.position.y(),0,'f',8).arg(atom.position.z(),0,'f',8);
+    }
+    QString path=QFileDialog::getSaveFileName(this,QStringLiteral("XYZ 좌표 저장"),QStringLiteral("structure.xyz"),QStringLiteral("XYZ 좌표 (*.xyz)"));
+    if(path.isEmpty())return;
+    if(QFileInfo(path).suffix().compare(QStringLiteral("xyz"),Qt::CaseInsensitive)!=0)path+=QStringLiteral(".xyz");
+    QSaveFile file(path);const auto bytes=text.toUtf8();
+    if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){
+        QMessageBox::warning(this,QStringLiteral("XYZ 저장 실패"),file.errorString());return;
+    }
+    setStatus(QStringLiteral("XYZ 저장 완료: %1 (%2개 원자)").arg(path).arg(molecule.atoms.size()));
+}
+
 void MainWindow::saveImage() {
-    if (m_data.molecule.isEmpty()) { setStatus(QStringLiteral("저장할 구조가 없습니다")); return; }
-    const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("그림 저장"), {}, QStringLiteral("PNG 그림 (*.png);;JPEG 그림 (*.jpg *.jpeg)"));
+    if (m_view->molecule().isEmpty()) { setStatus(QStringLiteral("저장할 구조가 없습니다")); return; }
+    QString filters=QStringLiteral("PNG 그림 (*.png);;GIF 그림 (*.gif);;JPEG 그림 (*.jpg *.jpeg);;TIFF 그림 (*.tif *.tiff);;BMP 그림 (*.bmp)");
+    if(QImageWriter::supportedImageFormats().contains("webp"))filters+=QStringLiteral(";;WebP 그림 (*.webp)");
+    QString selected=QStringLiteral("PNG 그림 (*.png)");
+    QString path=QFileDialog::getSaveFileName(this,QStringLiteral("그림 저장"),{},filters,&selected);
     if (path.isEmpty()) return;
+    if(QFileInfo(path).suffix().isEmpty()){
+        const QString extension=selected.contains("TIFF")?"tif":selected.contains("JPEG")?"jpg":selected.contains("GIF")?"gif":selected.contains("BMP")?"bmp":selected.contains("WebP")?"webp":"png";
+        path+=QStringLiteral(".")+extension;
+    }
+    const auto suffix=QFileInfo(path).suffix().toLower();
     bool sizeAccepted = false;
     const int longEdge = QInputDialog::getInt(this, QStringLiteral("그림 해상도"),
-        QStringLiteral("긴 변의 픽셀 수 (600 dpi 정보 포함)"), 3000, 512, 8192, 256, &sizeAccepted);
+        suffix=="gif"?QStringLiteral("긴 변의 픽셀 수"):QStringLiteral("긴 변의 픽셀 수 (600 dpi 정보 포함)"), 3000, 512, 8192, 256, &sizeAccepted);
     if (!sizeAccepted) return;
     bool transparent = false;
-    if (QFileInfo(path).suffix().compare(QStringLiteral("png"), Qt::CaseInsensitive) == 0) {
+    if (suffix=="png"||suffix=="gif"||suffix=="tif"||suffix=="tiff"||suffix=="webp") {
         const auto answer = QMessageBox::question(this, QStringLiteral("투명 배경"),
                                                    QStringLiteral("배경을 투명하게 저장할까요?"),
                                                    QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
@@ -132,7 +181,7 @@ void MainWindow::saveImage() {
     const auto pixels = m_view->size().scaled(longEdge, longEdge, Qt::KeepAspectRatio);
     const auto image = m_view->imageAtSize(pixels, transparent);
     if (image.isNull()) { QMessageBox::warning(this, QStringLiteral("그림 저장 실패"), QStringLiteral("이 해상도로 렌더링할 수 없습니다. 픽셀 수를 줄여주세요.")); return; }
-    if (ImageExporter::saveImage(image, path, 1, transparent, &error)) setStatus(QStringLiteral("그림 저장 완료: %1 (%2 × %3 px, 600 dpi)").arg(path).arg(image.width()).arg(image.height()));
+    if (ImageExporter::saveImage(image, path, 1, transparent, &error)) setStatus((suffix=="gif"?QStringLiteral("그림 저장 완료: %1 (%2 × %3 px)"):QStringLiteral("그림 저장 완료: %1 (%2 × %3 px, 600 dpi)")).arg(path).arg(image.width()).arg(image.height()));
     else QMessageBox::warning(this, QStringLiteral("그림 저장 실패"), error);
 }
 

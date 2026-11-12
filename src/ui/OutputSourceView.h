@@ -1,4 +1,6 @@
 #pragma once
+
+#include "ui/SidebarButton.h"
 #include "model/Molecule.h"
 #include <QPlainTextEdit>
 #include <QApplication>
@@ -58,12 +60,23 @@ public:
     explicit OutputSourceView(QWidget *parent=nullptr):QWidget(parent) {
         setObjectName("OutputSourceView");auto *layout=new QVBoxLayout(this);layout->setContentsMargins(6,6,6,6);
         m_path=new QLabel(QStringLiteral("원문 파일 없음 · 계산 output을 열어 주세요.")); m_path->setTextInteractionFlags(Qt::TextSelectableByMouse);m_path->setWordWrap(true);layout->addWidget(m_path);
-        auto *row=new QHBoxLayout;m_sections=new QComboBox;m_sections->setObjectName("OutputSourceSections");row->addWidget(m_sections,1);
-        auto *reload=new QPushButton(QStringLiteral("다시 읽기"));row->addWidget(reload);
+        auto *row=new QHBoxLayout;m_sections=new QComboBox;m_sections->setObjectName("OutputSourceSections");
+        m_sections->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        m_sections->setMinimumContentsLength(16);
+        row->addWidget(m_sections,1);
+        auto *reload=new QPushButton(QStringLiteral("다시 읽기"));
+        makeSidebarIconButton(reload, QStyle::SP_BrowserReload);
+        row->addWidget(reload);
         auto *line=new QSpinBox;line->setObjectName("OutputGoToLine");line->setRange(1,100000000);line->setPrefix(QStringLiteral("행 "));row->addWidget(line);
-        auto *go=new QPushButton(QStringLiteral("이동"));row->addWidget(go);layout->addLayout(row);
+        auto *go=new QPushButton(QStringLiteral("이동"));
+        makeSidebarIconButton(go, QStyle::SP_ArrowForward);
+        row->addWidget(go);layout->addLayout(row);
         auto *findRow=new QHBoxLayout;m_find=new QLineEdit;m_find->setObjectName("OutputFind");m_find->setPlaceholderText(QStringLiteral("원문 검색 · Enter 다음 / Shift+Enter 이전"));findRow->addWidget(m_find,1);
-        auto *previous=new QPushButton(QStringLiteral("이전")),*next=new QPushButton(QStringLiteral("다음"));findRow->addWidget(previous);findRow->addWidget(next);
+        auto *previous=new QPushButton(QStringLiteral("이전"));
+        makeSidebarIconButton(previous, QStyle::SP_ArrowUp);
+        auto *next=new QPushButton(QStringLiteral("다음"));
+        makeSidebarIconButton(next, QStyle::SP_ArrowDown);
+        findRow->addWidget(previous);findRow->addWidget(next);
         m_case=new QCheckBox(QStringLiteral("대소문자"));findRow->addWidget(m_case);layout->addLayout(findRow);
         m_text=new SourceText(this);layout->addWidget(m_text,1);m_status=new QLabel(QStringLiteral("output 원문을 열어 결과의 출처를 확인하세요."));layout->addWidget(m_status);
         connect(reload,&QPushButton::clicked,this,[this]{m_loaded=false;load();});

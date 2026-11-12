@@ -46,6 +46,7 @@ set(YOUNGCRAFT_CORE_SOURCES
     src/animation/AnimationController.cpp
     src/animation/MechanismTimeline.cpp
     src/export/ImageExporter.cpp
+    src/export/PowerPointVideo.cpp
     src/export/ReactionCapture.cpp
     src/render/IsosurfaceBuilder.cpp
 )
@@ -57,6 +58,9 @@ if(MSVC)
     set_source_files_properties(third_party/gemmi/symmetry.cpp PROPERTIES COMPILE_OPTIONS "/wd4244;/wd4267")
 endif()
 target_link_libraries(youngcraft_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
+if(WIN32)
+    target_link_libraries(youngcraft_core PRIVATE mfplat mfreadwrite mfuuid ole32)
+endif()
 
 if(MSVC)
     target_compile_options(youngcraft_core PRIVATE /utf-8 /W4)

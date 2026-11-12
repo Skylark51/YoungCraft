@@ -10,12 +10,13 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QGridLayout>
 #include <QRegularExpression>
 
 namespace youngcraft {
 class ConstraintEditor : public QWidget {
 public:
-    ConstraintEditor(const Molecule &m, const QVector<int> &selected, QWidget *parent = nullptr) : QWidget(parent), molecule(m), selection(selected) {
+    ConstraintEditor(const Molecule &m, const QVector<int> &selected, QWidget *parent = nullptr, bool compactButtons = false) : QWidget(parent), molecule(m), selection(selected) {
         setObjectName("ConstraintEditor");
         auto *layout = new QVBoxLayout(this); layout->setContentsMargins(0,0,0,0);
         auto *hint = new QLabel(QStringLiteral("Constraint · 원자 번호는 1부터, 거리 Å / 각도 °\n목표값을 유지하는 조화 restraint입니다. 선택 원자 2–4개를 추가하면 현재 값을 가져옵니다.\n고정 원자는 좌표가 변하지 않습니다. 기존 구조를 먼저 고정한 뒤 조각을 추가하세요."));
@@ -24,13 +25,14 @@ public:
         table->setHorizontalHeaderLabels({QStringLiteral("종류"),QStringLiteral("원자 번호 (순서대로)"),QStringLiteral("목표값")});
         table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         table->setMinimumHeight(100); table->setMaximumHeight(160); layout->addWidget(table);
-        auto *buttons = new QHBoxLayout; layout->addLayout(buttons);
+        auto *buttons = new QGridLayout; layout->addLayout(buttons);
+        const int columns=compactButtons?2:4;
         auto *add = new QPushButton(QStringLiteral("추가 / 선택 원자 가져오기")); add->setObjectName("AddConstraint");
         auto *remove = new QPushButton(QStringLiteral("선택 행 삭제")); remove->setObjectName("RemoveConstraint");
-        buttons->addWidget(add); buttons->addWidget(remove);
+        buttons->addWidget(add,0,0); buttons->addWidget(remove,0,1);
         auto *freeze = new QPushButton(QStringLiteral("선택 원자 고정")); freeze->setObjectName("FreezeSelectedAtoms");
         auto *all = new QPushButton(QStringLiteral("현재 전체 고정")); all->setObjectName("FreezeAllAtoms");
-        buttons->addWidget(freeze); buttons->addWidget(all);
+        buttons->addWidget(freeze,2/columns,2%columns); buttons->addWidget(all,3/columns,3%columns);
         auto appendFixed = [this](const QVector<int> &ids) {
             QVector<GeometryConstraint> entries; QString error;
             read(entries,&error);

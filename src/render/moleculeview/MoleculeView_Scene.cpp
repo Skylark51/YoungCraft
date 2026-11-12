@@ -5,6 +5,7 @@
 #include "render/IsosurfaceBuilder.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QClipboard>
 #include <QLineF>
 #include <QMetaObject>
@@ -24,20 +25,31 @@ namespace youngcraft {
 void MoleculeView::drawPatternBackground() {
     const int motif=window()->property("appPattern").toInt();
     const QColor ink=window()->property("appPatternInk").value<QColor>();
-    const int side=motif==0?96:motif==5?28:24;
-    const QString key=QString::number(motif)+ink.name();
+    const bool photograph=window()->property("professorBackdrop").toBool();
+    const int side=photograph?qMax(width(),height()):(motif==0?96:motif==5?28:24);
+    const QString key=photograph?QStringLiteral("professor-photo-v1"):QString::number(motif)+ink.name();
     if(!m_patternTexture)glGenTextures(1,&m_patternTexture);
     glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,m_patternTexture);
     if(key!=m_patternTextureKey){
-        QImage tile(side*2,side*2,QImage::Format_RGBA8888);tile.fill(Qt::transparent);
-        {QPainter painter(&tile);painter.scale(2,2);auto color=ink;color.setAlpha(38);
-         uiPattern::drawMotif(painter,QRect(0,0,side,side),motif,color);}
+        QImage tile;
+        if(photograph) {
+            tile=QImage(1024,1024,QImage::Format_RGBA8888);tile.fill(Qt::transparent);
+            const QImage photo(QStringLiteral(":/youngcraft/professor-watching.png"));
+            const QSize fitted=photo.size().scaled(tile.size(),Qt::KeepAspectRatio);
+            QPainter painter(&tile);painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            painter.setOpacity(0.60);
+            painter.drawImage(QRect(QPoint((tile.width()-fitted.width())/2,(tile.height()-fitted.height())/2),fitted),photo);
+        } else {
+            tile=QImage(side*2,side*2,QImage::Format_RGBA8888);tile.fill(Qt::transparent);
+            QPainter painter(&tile);painter.scale(2,2);auto color=ink;color.setAlpha(38);
+            uiPattern::drawMotif(painter,QRect(0,0,side,side),motif,color);
+        }
         glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,tile.width(),tile.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,tile.constBits());
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
         m_patternTextureKey=key;
     }
-    const auto origin=mapTo(window(),QPoint());
+    const auto origin=photograph?QPoint((side-width())/2,(side-height())/2):mapTo(window(),QPoint());
     const QSize target=m_supersamplingActive?m_supersampleFbo->size():renderPixelSize();
     const auto paper=window()->property("appPatternPaper").value<QColor>();
     glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);glDisable(GL_BLEND);
@@ -46,6 +58,12 @@ void MoleculeView::drawPatternBackground() {
     m_patternProgram->setUniformValue("pixelScale",float(devicePixelRatioF()*(m_supersamplingActive?2:1)));
     m_patternProgram->setUniformValue("targetHeight",float(target.height()));
     m_patternProgram->setUniformValue("tileSize",float(side));
+    static QElapsedTimer glowClock;
+    if(!glowClock.isValid())glowClock.start();
+    // A soft glow builds into a short glint every 2.4 seconds.
+    const float phase=float(glowClock.elapsed()%2400)/2400.0f;
+    const float pulse=0.16f+0.84f*std::pow(0.5f+0.5f*std::cos(phase*6.2831853f),12.0f);
+    m_patternProgram->setUniformValue("eyeGlow",photograph?pulse:0.0f);
     m_patternProgram->setUniformValue("paper",QVector3D(paper.redF(),paper.greenF(),paper.blueF()));
     m_downsampleVao.bind();glDrawArrays(GL_TRIANGLES,0,3);m_downsampleVao.release();m_patternProgram->release();
     glBindTexture(GL_TEXTURE_2D,0);glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glEnable(GL_BLEND);
@@ -72,7 +90,7 @@ void MoleculeView::paintGL() {
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_TRUE);
     if (m_style.antiAliasing) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
-    const bool patterned=uiPattern::active(this) && !m_transparentCapture
+    const bool patterned=(window()->property("professorBackdrop").toBool() || uiPattern::active(this)) && !m_transparentCapture
         && !m_viewportOnlyCapture && m_captureSize.isEmpty();
     const QColor background = patterned ? window()->property("appPatternPaper").value<QColor>() : m_style.background;
     if (m_transparentCapture) glClearColor(0, 0, 0, 0);

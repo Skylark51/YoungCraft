@@ -47,9 +47,11 @@ public:
     void selectPrevious();
     void setCurrentTab(int index);
     QStringList tabTitles() const;
+    bool hasTabData(int index) const;
     void setTabBarVisible(bool visible);
 
 signals:
+    void dataChanged();
     void orbitalStyleChanged();
     void orbitalFileRequested(const QString &path);
     void currentTabChanged(int index);
@@ -90,6 +92,7 @@ private:
     QWidget *makeCoordinateTab();
     void fillFrameList();
     void fillFrequencyList();
+    void updateFrequencyPage(int first);
     void fillScanPlot();
     void fillIrcPlot();
     void fillTddft();
@@ -107,6 +110,11 @@ private:
     OrbitalStudyWidget *m_orbitalStudy = nullptr;
     QLabel *m_frameInfo = nullptr;
     QLabel *m_frequencyInfo = nullptr;
+    QLabel *m_frequencyPageLabel = nullptr;
+    QPushButton *m_nextFrequencyPage = nullptr;
+    QDialog *m_frequencyDetails = nullptr;
+    QTableWidget *m_frequencyDetailsTable = nullptr;
+    int m_frequencyPage = 0;
     QPushButton *m_copyFrequencyAnimation = nullptr;
     QSlider *m_frameSlider = nullptr;
     QDoubleSpinBox *m_amplitude = nullptr;

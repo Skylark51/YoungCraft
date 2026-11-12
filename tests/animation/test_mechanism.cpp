@@ -3,6 +3,7 @@
 #include "io/FileDispatcher.h"
 #include <QFile>
 #include <QImageReader>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QQuaternion>
@@ -70,12 +71,61 @@ private slots:
         const auto m=t.sample(1);QVERIFY(qAbs((m.atoms[0].position-m.atoms[1].position).length()-1.4f)<.01f);
         const int bond=m.bondIndex(0,2);QVERIFY(bond>=0);QVERIFY(qAbs(m.bonds[bond].displayOpacity-.5f)<.001f);QVERIFY(t.sample(2).bondIndex(0,2)<0);
     }
+    void photoCleavageFlashesOnlyMarkedBondAndAtoms() {
+        auto a=step(0),b=step(1);
+        b.molecule.removeBond(0,1);
+        MechanismTimeline timeline;
+        QVERIFY(timeline.build({a,b},raw()));
+        QCOMPARE(timeline.cleavableBonds(0),(QVector<QPair<int,int>>{{0,1}}));
+        QCOMPARE(timeline.sample(1).atoms[1].displayFlash,0.f);
+        a.presentation["photoCleavages"]=QJsonArray{QJsonArray{0,1},QJsonArray{0,2}};
+        QVERIFY(timeline.build({a,b},raw()));
+        const auto middle=timeline.sample(1);
+        QVERIFY(middle.atoms[0].displayFlash>0);
+        QVERIFY(middle.atoms[1].displayFlash>0);
+        QCOMPARE(middle.atoms[2].displayFlash,0.f);
+        QVERIFY(middle.bonds.at(middle.bondIndex(0,1)).displayFlash>0);
+        QCOMPARE(middle.bonds.at(middle.bondIndex(0,2)).displayFlash,0.f);
+        QCOMPARE(timeline.sample(2).atoms[1].displayFlash,0.f);
+        QCOMPARE(timeline.sample(2).bondIndex(0,1),-1);
+    }
     void projectRoundTripAndInvalidInput() {
         auto a=step(0),b=step(2);a.molecule.atoms[1].displayOpacity=.2f;b.mapping={0,1,2};b.reversed=true;
         const auto json=MechanismTimeline::saveProject({a,b},raw());QVector<MechanismStep> loaded;MechanismOptions o;QString error;
         QVERIFY2(MechanismTimeline::loadProject(json,loaded,o,&error),qPrintable(error));QCOMPARE(loaded.size(),2);QCOMPARE(loaded[1].mapping,b.mapping);QCOMPARE(loaded[0].molecule.atoms[1].displayOpacity,.2f);QVERIFY(!o.align);
         QVERIFY(!MechanismTimeline::loadProject("{}",loaded,o,&error));QCOMPARE(loaded.size(),2);
         a.molecule.atoms[0].position.setX(std::numeric_limits<float>::quiet_NaN());MechanismTimeline t;QVERIFY(!t.build({a},raw(),&error));
+    }
+    void segmentHoldSpeedAndRepeatedCleavage() {
+        auto a=step(0),b=step(0);
+        a.presentation["hold"]=.5;
+        a.presentation["photoCleavages"]=QJsonArray{QJsonArray{0,1,1}};
+        b.presentation["speed"]=2;
+        b.presentation["hold"]=.25;
+        b.frames={{{0,0,0},{4,0,0},{0,1.4f,0}},
+                  {{0,0,0},{1.4f,0,0},{0,1.4f,0}},
+                  {{0,0,0},{4,0,0},{0,1.4f,0}}};
+        MechanismTimeline timeline;
+        QVERIFY(timeline.build({a,b},raw()));
+        QCOMPARE(timeline.stageTime(0),0.);
+        QCOMPARE(timeline.stageTime(1),1.5);
+        QCOMPARE(timeline.duration(),1.75);
+        QCOMPARE(timeline.sample(.25).atoms[1].position,a.molecule.atoms[1].position);
+        QCOMPARE(timeline.sample(1.65).atoms[1].position,timeline.sample(1.5).atoms[1].position);
+        const auto events=timeline.cleavageTimes(0,0,1);
+        QCOMPARE(events.size(),2);
+        QCOMPARE(timeline.sample(events[0]).atoms[1].displayFlash,0.f);
+        QVERIFY(timeline.sample(events[1]).atoms[1].displayFlash>0);
+    }
+    void calculationEnergyTracksFrameOrder() {
+        CalculationData data;data.format="XYZ";data.molecule=step(0).molecule;
+        for(double energy:{-100.0,-99.9}) {
+            Frame frame;frame.metrics.energyHartree=energy;
+            for(const auto &atom:data.molecule.atoms)frame.coordinates.push_back(atom.position);
+            data.frames.push_back(frame);
+        }
+        const auto imported=MechanismStep::fromCalculation(data);
+        QCOMPARE(imported.presentation["sourceEnergiesHartree"].toArray(),(QJsonArray{-100.0,-99.9}));
     }
     void selectedSpectatorMovesAsRigidFragment() {
         auto a=step(0),b=step(1);MechanismTimeline t;QVERIFY(t.build({a,b},raw()));

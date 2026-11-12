@@ -55,8 +55,13 @@ void MainWindow::createMenus() {
     };
 
     QMenu *file = menuBar()->addMenu(QStringLiteral("파일"));
+    add(file, QStringLiteral("새 구조 그리기"), QKeySequence(QStringLiteral("Ctrl+N")), [this] { newDrawingDocument(); })
+        ->setObjectName(QStringLiteral("NewStructure"));
     add(file, QStringLiteral("새로 비우기"), {}, [this] { clearDocument(); });
-    add(file, QStringLiteral("열기"), QKeySequence(QStringLiteral("Ctrl+O")), [this] { openFile(); });
+    add(file, QStringLiteral("파일 열기"), QKeySequence(QStringLiteral("Ctrl+O")), [this] { openFile(); })
+        ->setObjectName(QStringLiteral("OpenStructureFile"));
+    add(file, QStringLiteral("프로젝트 · Reaction Pathway"), QKeySequence(QStringLiteral("Ctrl+Shift+P")),
+        [this] { openProjectLibrary(); })->setObjectName(QStringLiteral("ProjectLibraryAction"));
     m_recentMenu = file->addMenu(QStringLiteral("최근 파일 다시 열기"));
     const QStringList recent = QSettings().value(QStringLiteral("recentFiles")).toStringList();
     for (const QString &path : recent) {
@@ -76,26 +81,41 @@ void MainWindow::createMenus() {
     add(file, QStringLiteral("다음 문서 탭"), QKeySequence(QStringLiteral("Ctrl+Tab")), [this] {
         if (m_documentTabs->count()) m_documentTabs->setCurrentIndex((m_documentTabs->currentIndex() + 1) % m_documentTabs->count());
     });
-    add(file, QStringLiteral("다른 이름으로 저장"), QKeySequence(QStringLiteral("Ctrl+S")), [this] { saveImage(); });
+    add(file, QStringLiteral("저장… (그림 / XYZ)"), QKeySequence(QStringLiteral("Ctrl+S")), [this] { saveStructure(); })
+        ->setObjectName(QStringLiteral("SaveStructureImage"));
     add(file, QStringLiteral("여러 파일 저장"), {}, [this] { showToolMessage(QStringLiteral("여러 파일 저장"), QStringLiteral("현재 문서의 여러 객체 저장은 그림 내보내기 대화상자에서 순차적으로 지원할 예정입니다.")); });
     file->addSeparator();
     add(file, QStringLiteral("종료"), {}, [this] { close(); });
 
     QMenu *edit = menuBar()->addMenu(QStringLiteral("편집"));
-    auto *mechanism = add(edit, QStringLiteral("전체 메커니즘 애니메이션…"), {}, [this] { openMechanismAnimation(); });
-    mechanism->setObjectName(QStringLiteral("OpenMechanismAnimation"));
+    edit->setObjectName(QStringLiteral("EditMenu"));
     add(edit, QStringLiteral("실행 취소"), QKeySequence(QStringLiteral("Ctrl+Z")), [this] { undoDrawingEdit(); });
-    add(edit, QStringLiteral("다시 실행"), QKeySequence(QStringLiteral("Ctrl+Y")), [this] { redoDrawingEdit(); });
-    add(edit, QStringLiteral("다시 실행 (Ctrl+Shift+Z)"), QKeySequence(QStringLiteral("Ctrl+Shift+Z")), [this] { redoDrawingEdit(); });
-    createBuildMenu();
+    add(edit, QStringLiteral("다시 실행"), QKeySequence(QStringLiteral("Ctrl+Y")), [this] { redoDrawingEdit(); })->setShortcuts({QKeySequence(QStringLiteral("Ctrl+Y")), QKeySequence(QStringLiteral("Ctrl+Shift+Z"))});
     edit->addSeparator();
-    add(edit, QStringLiteral("새 구조 그리기"), {}, [this] { newDrawingDocument(); });
-    add(edit, QStringLiteral("원자 추가"), {}, [this] { if (!m_drawingMode) newDrawingDocument(m_view->molecule()); else setStatus(QStringLiteral("빈 곳을 클릭하여 원자를 추가하세요.")); });
-    add(edit, QStringLiteral("조각(fragment) 추가"), {}, [this] { openFragmentBrowser(); });
-    add(edit, QStringLiteral("금속–리간드–산소 조합..."), {}, [this] { buildLabComplex(); });
-    add(edit, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleSelectedBond(); });
+    add(edit, QStringLiteral("선택 조각 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
+    add(edit, QStringLiteral("분자 조각 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
+    add(edit, QStringLiteral("선택 삭제"), QKeySequence(QStringLiteral("Delete")), [this] { if(!isTextInputFocused())deleteSelection(); });
     edit->addSeparator();
-    add(edit, QStringLiteral("전체 선택"), QKeySequence::SelectAll, [this] {
+    auto *build = edit->addMenu(QStringLiteral("구조 생성"));
+    build->setObjectName(QStringLiteral("EditBuildMenu"));
+    auto *selection = edit->addMenu(QStringLiteral("원자 선택"));
+    selection->setObjectName(QStringLiteral("EditSelectionMenu"));
+    auto *fragments = edit->addMenu(QStringLiteral("조각 편집"));
+    fragments->setObjectName(QStringLiteral("EditFragmentsMenu"));
+    auto *coordinates = edit->addMenu(QStringLiteral("좌표·이동"));
+    coordinates->setObjectName(QStringLiteral("EditCoordinatesMenu"));
+    auto *bonds = edit->addMenu(QStringLiteral("결합 편집"));
+    bonds->setObjectName(QStringLiteral("EditBondsMenu"));
+    auto *capture = edit->addMenu(QStringLiteral("이미지·애니메이션"));
+    capture->setObjectName(QStringLiteral("EditCaptureMenu"));
+    auto *mechanism = add(capture, QStringLiteral("전체 메커니즘 애니메이션…"), {}, [this] { openMechanismAnimation(); });
+    mechanism->setObjectName(QStringLiteral("OpenMechanismAnimation"));
+    add(build, QStringLiteral("새 구조 그리기"), {}, [this] { newDrawingDocument(); });
+    add(build, QStringLiteral("원자 추가"), {}, [this] { if (!m_drawingMode) newDrawingDocument(m_view->molecule()); else setStatus(QStringLiteral("빈 곳을 클릭하여 원자를 추가하세요.")); });
+    add(build, QStringLiteral("조각(fragment) 추가"), {}, [this] { openFragmentBrowser(); });
+    add(build, QStringLiteral("금속–리간드–산소 조합..."), {}, [this] { buildLabComplex(); });
+    add(bonds, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleSelectedBond(); });
+    add(selection, QStringLiteral("전체 선택"), QKeySequence::SelectAll, [this] {
         if (isTextInputFocused() || !m_view) return;
         QSet<int> visible;
         const auto &molecule=m_view->molecule();
@@ -104,7 +124,7 @@ void MainWindow::createMenus() {
                 visible.insert(i);
         applyAtomSelection(visible);
     })->setObjectName(QStringLiteral("SelectAllVisibleAtoms"));
-    auto *flexible = edit->addMenu(QStringLiteral("유연한 선택"));
+    auto *flexible = selection->addMenu(QStringLiteral("유연한 선택"));
     for (const auto &entry : {qMakePair(QStringLiteral("수소만 선택"), 1), qMakePair(QStringLiteral("수소 이외 원자 선택"), -1)})
         add(flexible, entry.first, {}, [this, entry] { QSet<int> ids; const auto &atoms=m_view->molecule().atoms; for(int i=0;i<atoms.size();++i) if(entry.second==1 ? atoms[i].atomicNumber==1 : atoms[i].atomicNumber!=1) ids.insert(i); applyAtomSelection(ids); });
     add(flexible, QStringLiteral("원소로 선택..."), {}, [this] {
@@ -112,41 +132,43 @@ void MainWindow::createMenus() {
         if(elements.isEmpty())return;bool ok=false;auto element=QInputDialog::getItem(this,QStringLiteral("원소로 선택"),QStringLiteral("원소"),elements,0,false,&ok);if(!ok)return;
         QSet<int> ids;for(int i=0;i<m_view->molecule().atoms.size();++i)if(m_view->molecule().atoms[i].element==element)ids.insert(i);applyAtomSelection(ids);
     });
-    add(edit, QStringLiteral("선택 해제"), {}, [this] { applyAtomSelection({}); });
-    add(edit, QStringLiteral("선택 확장"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms())); });
-    add(edit, QStringLiteral("선택 반전"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(),selectedStructureAtoms())); });
-    add(edit, QStringLiteral("선택 원자 일괄 작업"), {}, [this] { changeSelectionElement(); });
+    add(selection, QStringLiteral("선택 해제"), {}, [this] { applyAtomSelection({}); });
+    add(selection, QStringLiteral("선택 확장"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms())); });
+    add(selection, QStringLiteral("선택 반전"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(),selectedStructureAtoms())); });
+    add(fragments, QStringLiteral("선택 원자 일괄 작업"), {}, [this] { changeSelectionElement(); });
+    add(fragments, QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가"), {}, [this] { setStatus(QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가")); });
+    add(fragments, QStringLiteral("선택 원자 중심에 더미 원자 추가"), {}, [this] { setStatus(QStringLiteral("더미 원자 추가")); });
+    add(fragments, QStringLiteral("선택 분자 조각 중첩"), {}, [this] { setStatus(QStringLiteral("선택 분자 조각 중첩")); });
+    add(fragments, QStringLiteral("두 그룹 결합"), {}, [this] { setStatus(QStringLiteral("두 그룹 결합")); });
+    add(selection, QStringLiteral("선택 원자에 결합된 원자 전체 선택"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms(),true)); });
+    add(coordinates, QStringLiteral("벡터/평면 관련 작업"), {}, [this] { setStatus(QStringLiteral("벡터/평면 관련 작업")); });
+    add(coordinates, QStringLiteral("원자 좌표 평행이동"), {}, [this] { manipulateSelection(); });
+    add(coordinates, QStringLiteral("원자 좌표에 작은 무작위 변위 추가"), {}, [this] { setStatus(QStringLiteral("무작위 변위 추가")); });
+    add(coordinates, QStringLiteral("원자 순서 빠른 재배열"), {}, [this] { setStatus(QStringLiteral("원자 순서 빠른 재배열")); });
+    add(bonds, QStringLiteral("결합 재계산"), {}, [this] { recountBonds(false); });
+    add(bonds, QStringLiteral("전체 초기화 후 결합 재계산"), {}, [this] { recountBonds(true); });
+    add(bonds, QStringLiteral("모든 결합 지우기"), {}, [this] { Molecule edited = m_view->molecule(); edited.bonds.clear(); commitEditedMolecule(edited, true); });
+    add(coordinates, QStringLiteral("구조 정리"), {}, [this] { m_view->bestView(); setStatus(QStringLiteral("구조 보기를 정리했습니다")); });
+    add(coordinates, QStringLiteral("점군 설정"), {}, [this] { setStatus(QStringLiteral("점군 설정")); });
+    add(coordinates, QStringLiteral("주축 설정"), {}, [this] { setStatus(QStringLiteral("주축 설정")); });
+    add(coordinates, QStringLiteral("원자 드래그"), QKeySequence(QStringLiteral("Ctrl+D")), [this] { setAtomDragMode(!m_dragAtoms); });
+    add(coordinates, QStringLiteral("드래그 방식"), {}, [this] { setStatus(QStringLiteral("드래그 방식: 화면 평면")); });
+    add(coordinates, QStringLiteral("선택 축을 따라 회전"), {}, [this] { setStatus(QStringLiteral("선택 축을 따라 회전")); });
+    add(capture, QStringLiteral("TS 애니메이션 복사"), QKeySequence(QStringLiteral("Ctrl+Shift+I")), [this] { copyAnimation(); });
+    add(capture, QStringLiteral("이미지 복사"), QKeySequence(QStringLiteral("Ctrl+I")), [this] { copyImage(); })
+        ->setObjectName(QStringLiteral("CopyStructureImage"));
+    add(capture, QStringLiteral("맞춤 캡처 (IRC · TS · IRC)"), QKeySequence(QStringLiteral("Ctrl+Alt+I")), [this] { openReactionCapture(); })
+        ->setObjectName(QStringLiteral("CustomStructureCapture"));
+    add(capture, QStringLiteral("열린 탭 비교 캡처…"), {}, [this] { openMultiCapture(); })
+        ->setObjectName(QStringLiteral("OpenMultiCapture"));
+    add(capture, QStringLiteral("안티앨리어싱 없이 현재 이미지 복사"), {}, [this] { copyImage(); });
+
+    edit->addSeparator();
     add(edit, QStringLiteral("기본 편집기 옵션"), {}, [this] { openStyleEditor(); });
-    add(edit, QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가"), {}, [this] { setStatus(QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가")); });
-    add(edit, QStringLiteral("선택 조각 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
-    add(edit, QStringLiteral("분자 조각 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
-    add(edit, QStringLiteral("선택 원자 중심에 더미 원자 추가"), {}, [this] { setStatus(QStringLiteral("더미 원자 추가")); });
-    add(edit, QStringLiteral("선택 분자 조각 중첩"), {}, [this] { setStatus(QStringLiteral("선택 분자 조각 중첩")); });
-    add(edit, QStringLiteral("두 그룹 결합"), {}, [this] { setStatus(QStringLiteral("두 그룹 결합")); });
-    add(edit, QStringLiteral("선택 원자에 결합된 원자 전체 선택"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms(),true)); });
-    add(edit, QStringLiteral("선택 삭제"), QKeySequence(QStringLiteral("Delete")), [this] { if(!isTextInputFocused())deleteSelection(); });
-    edit->addSeparator();
-    add(edit, QStringLiteral("벡터/평면 관련 작업"), {}, [this] { setStatus(QStringLiteral("벡터/평면 관련 작업")); });
-    add(edit, QStringLiteral("원자 좌표 평행이동"), {}, [this] { manipulateSelection(); });
-    add(edit, QStringLiteral("원자 좌표에 작은 무작위 변위 추가"), {}, [this] { setStatus(QStringLiteral("무작위 변위 추가")); });
-    add(edit, QStringLiteral("원자 순서 빠른 재배열"), {}, [this] { setStatus(QStringLiteral("원자 순서 빠른 재배열")); });
-    add(edit, QStringLiteral("결합 재계산"), {}, [this] { recountBonds(false); });
-    add(edit, QStringLiteral("전체 초기화 후 결합 재계산"), {}, [this] { recountBonds(true); });
-    add(edit, QStringLiteral("모든 결합 지우기"), {}, [this] { Molecule edited = m_view->molecule(); edited.bonds.clear(); commitEditedMolecule(edited, true); });
-    add(edit, QStringLiteral("구조 정리"), {}, [this] { m_view->bestView(); setStatus(QStringLiteral("구조 보기를 정리했습니다")); });
-    add(edit, QStringLiteral("점군 설정"), {}, [this] { setStatus(QStringLiteral("점군 설정")); });
-    add(edit, QStringLiteral("주축 설정"), {}, [this] { setStatus(QStringLiteral("주축 설정")); });
-    edit->addSeparator();
-    add(edit, QStringLiteral("원자 드래그"), QKeySequence(QStringLiteral("Ctrl+D")), [this] { setAtomDragMode(!m_dragAtoms); });
-    add(edit, QStringLiteral("드래그 방식"), {}, [this] { setStatus(QStringLiteral("드래그 방식: 화면 평면")); });
-    add(edit, QStringLiteral("선택 축을 따라 회전"), {}, [this] { setStatus(QStringLiteral("선택 축을 따라 회전")); });
-    add(edit, QStringLiteral("TS 애니메이션 복사"), QKeySequence(QStringLiteral("Ctrl+Shift+I")), [this] { copyAnimation(); });
-    add(edit, QStringLiteral("이미지 복사"), QKeySequence(QStringLiteral("Ctrl+I")), [this] { copyImage(); });
-    add(edit, QStringLiteral("맞춤 캡처 (IRC · TS · IRC)"), QKeySequence(QStringLiteral("Ctrl+Alt+I")), [this] { openReactionCapture(); });
-    add(edit, QStringLiteral("맞춤 캡처 — 열린 창·탭 다중 캡처"), QKeySequence(), [this] { openMultiCapture(); });
-    add(edit, QStringLiteral("안티앨리어싱 없이 현재 이미지 복사"), {}, [this] { copyImage(); });
+    createBuildMenu();
 
     QMenu *view = menuBar()->addMenu(QStringLiteral("보기"));
+    view->setObjectName(QStringLiteral("ViewMenu"));
     m_syncViewsAction = view->addAction(QStringLiteral("뷰 동기화"));
     m_syncViewsAction->setObjectName(QStringLiteral("SyncMatchingAtomViews"));
     m_syncViewsAction->setCheckable(true);
@@ -158,12 +180,15 @@ void MainWindow::createMenus() {
                           : QStringLiteral("뷰 동기화 꺼짐"));
     });
     view->addAction(m_explorerDock->toggleViewAction());
-    m_explorerDock->toggleViewAction()->setText(QStringLiteral("분석 패널 표시"));
+    m_explorerDock->toggleViewAction()->setText(QStringLiteral("왼쪽 · 계산 결과"));
+    view->addAction(m_structureDock->toggleViewAction());
+    m_structureDock->toggleViewAction()->setText(QStringLiteral("오른쪽 · 구조 도구"));
     add(view, QStringLiteral("기본 패널 배치 복원"), {}, [this] {
         addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
+        addDockWidget(Qt::RightDockWidgetArea, m_structureDock);
         m_explorerDock->show();
-        m_explorerDock->raise();
-        resizeDocks({m_explorerDock}, {320}, Qt::Horizontal);
+        m_structureDock->show();
+        resizeDocks({m_explorerDock, m_structureDock}, {280, 208}, Qt::Horizontal);
         setStatus(QStringLiteral("기본 패널 배치를 복원했습니다"));
     });
     view->addSeparator();
@@ -176,8 +201,10 @@ void MainWindow::createMenus() {
     perspective->setChecked(m_style.perspective);
     view->addSeparator();
     add(view, QStringLiteral("회전 중심 갱신"), QKeySequence(QStringLiteral("Num5")), [this] { m_view->updateRotationCenter(); });
-    add(view, QStringLiteral("최적 보기"), QKeySequence(QStringLiteral("Enter")), [this] { m_view->bestView(); });
-    add(view, QStringLiteral("중앙 정렬"), QKeySequence(QStringLiteral("Space")), [this] { m_view->centerOnMolecule(); });
+    add(view, QStringLiteral("베스트 뷰"), QKeySequence(QStringLiteral("Enter")), [this] { m_view->bestView(); })
+        ->setObjectName(QStringLiteral("BestStructureView"));
+    add(view, QStringLiteral("중앙 정렬"), QKeySequence(QStringLiteral("Space")), [this] { m_view->centerOnMolecule(); })
+        ->setObjectName(QStringLiteral("CenterStructureView"));
     add(view, QStringLiteral("카메라 위치 직접 지정"), {}, [this] { showToolMessage(QStringLiteral("카메라 위치 직접 지정"), QStringLiteral("마우스 드래그와 휠로 카메라를 조정할 수 있습니다.")); });
     add(view, QStringLiteral("카메라 위치 클립보드 저장"), {}, [this] { m_view->saveCameraToClipboard(); setStatus(QStringLiteral("카메라 위치를 클립보드에 저장했습니다")); });
     add(view, QStringLiteral("카메라 위치 클립보드 복원"), {}, [this] { m_view->restoreCameraFromClipboard(); });
@@ -229,7 +256,10 @@ void MainWindow::createMenus() {
     });
     add(hideAtoms, QStringLiteral("탄소에 결합된 수소 숨기기"), {}, [this] {
         setCarbonHydrogensVisible(false);
-    });
+    })->setObjectName(QStringLiteral("HideCarbonHydrogens"));
+    add(hideAtoms, QStringLiteral("수소 숨기기 초기화 (C–H)"), {}, [this] {
+        setCarbonHydrogensVisible(true);
+    })->setObjectName(QStringLiteral("RestoreCarbonHydrogens"));
     add(hideAtoms, QStringLiteral("더미 원자 숨기기"), {}, [this] {
         for (Atom &atom : m_data.molecule.atoms)
             if (atom.atomicNumber <= 0) atom.visible = false;
@@ -271,8 +301,10 @@ void MainWindow::createMenus() {
     });
 
     QMenu *tools = menuBar()->addMenu(QStringLiteral("도구"));
-    add(tools, QStringLiteral("빠른 양자화학 계산 (xTB)..."), {}, [this] { startXtbCalculation(); });
-    add(tools, QStringLiteral("구조 최적화..."), QKeySequence(QStringLiteral("Ctrl+Alt+O")), [this] { startMMOptimization(); });
+    add(tools, QStringLiteral("xTB 계산…"), {}, [this] { startXtbCalculation(); })
+        ->setObjectName(QStringLiteral("QMOptimizationAction"));
+    add(tools, QStringLiteral("MM 구조 최적화…"), QKeySequence(QStringLiteral("Ctrl+Alt+O")), [this] { startMMOptimization(); })
+        ->setObjectName(QStringLiteral("MMOptimizationAction"));
     add(tools, QStringLiteral("사용자 지정 기하학 파라미터(거리/각도/이면각) 적용"), {}, [this] { if(!m_geometryMode)toggleGeometryMode();else setStatus(QStringLiteral("구조 파라미터 편집: 원자를 순서대로 2–4개 선택하세요.")); });
     add(tools, QStringLiteral("데이터 탐색기"), {}, [this] { if (m_explorerDock) { m_explorerDock->show(); m_explorerDock->raise(); } });
     add(tools, QStringLiteral("Z-matrix 생성"), {}, [this] { showZMatrix(); })->setObjectName("BuildZMatrix");

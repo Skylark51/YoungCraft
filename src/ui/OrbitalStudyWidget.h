@@ -19,10 +19,16 @@ public:
     void setData(const CalculationData &data);
     void setView(MoleculeView *view);
     void startDefaultOrbital();
+    QSize minimumSizeHint() const override;
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+public:
 signals:
     void surfaceStyleChanged();
     void openRequested(const QString &path);
 private:
+    void updateResponsiveControls();
+    void expandTable();
     void generate(bool mep);
     void applyStyle();
     void showSurface(std::shared_ptr<const CubeGrid> surface, std::shared_ptr<const CubeGrid> potential);
@@ -32,8 +38,8 @@ private:
     CalculationData m_data;
     QPointer<MoleculeView> m_view;
     GaussianTools *m_runner;
-    QTableWidget *m_orbitals;
-    QTabWidget *m_tables;
+    QTableWidget *m_orbitals=nullptr;
+    QTabWidget *m_tables=nullptr;
     QComboBox *m_resolution, *m_density, *m_palette, *m_surfacePattern;
     QPushButton *m_plusButton, *m_minusButton;
     void syncPalette();

@@ -21,6 +21,7 @@ class QCloseEvent;
 class QDragEnterEvent;
 class QDropEvent;
 class QDockWidget;
+class QGridLayout;
 class QProcess;
 class QComboBox;
 class QPushButton;
@@ -29,6 +30,7 @@ class QStackedWidget;
 class QTabWidget;
 class QTimer;
 class QCheckBox;
+class QToolButton;
 
 class SmokeTest;
 
@@ -59,6 +61,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
@@ -84,6 +87,8 @@ private slots:
     void openMechanismAnimation();
     void openMultiCapture();
     void openProjectLibrary();
+    void saveStructure();
+    void saveXYZ();
     void saveImage();
     void exportAnimation();
     void copyAnimation();
@@ -167,7 +172,7 @@ private:
     void addDrawnAtom(const QVector3D &position, int bondFrom = -1);
     void commitEditedMolecule(const Molecule &molecule, bool topologyChanged, bool adjustHydrogens = true);
     DrawState drawState() const;
-    void setupEditorControls();
+    void setupEditorControls(QGridLayout *tools);
     void createBuildMenu();
     void ensureEditableDocument();
     void deleteSelection();
@@ -205,6 +210,11 @@ private:
     RenderStyle m_style;
     QAction *m_atomLabelsAction = nullptr;
     QAction *m_syncViewsAction = nullptr;
+    QMenu *m_analysisMenu = nullptr;
+    QWidget *m_analysisShortcuts = nullptr;
+    QTabWidget *m_structureTabs = nullptr;
+    QStackedWidget *m_drawPanels = nullptr;
+    QMenu *m_viewportEditMenu = nullptr;
     QMenu *m_atomFocusMenu = nullptr;
     QAction *m_atomFocusAllWindows = nullptr;
     QHash<int, CameraState> m_sharedCameras;
@@ -248,6 +258,7 @@ private:
     QAction *m_geometryAction = nullptr;
     QDockWidget *m_analysisDock = nullptr;
     QDockWidget *m_explorerDock = nullptr;
+    QDockWidget *m_structureDock = nullptr;
     QStackedWidget *m_workspace = nullptr;
     QWidget *m_moleculeWorkspace = nullptr;
     GeometryMeasureBar *m_geometryBar = nullptr;
