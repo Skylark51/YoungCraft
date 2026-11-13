@@ -13,6 +13,23 @@ constexpr double kHartreeToKcal = 627.509474;
 constexpr double kEvNm = 1239.841984;
 }
 
+QString AnalysisEngine::molecularFormula(const Molecule &molecule) {
+    QMap<QString,int> counts;
+    for(const auto &atom:molecule.atoms) {
+        const auto symbol=elementSymbol(atom.atomicNumber);
+        if(!symbol.isEmpty())++counts[symbol];
+    }
+    QString formula;
+    const auto append=[&](const QString &symbol) {
+        const int count=counts.take(symbol);
+        if(count>0)formula+=symbol+(count>1?QString::number(count):QString());
+    };
+    if(counts.contains(QStringLiteral("C"))){append(QStringLiteral("C"));append(QStringLiteral("H"));}
+    const auto remaining=counts.keys();
+    for(const auto &symbol:remaining)append(symbol);
+    return formula;
+}
+
 double AnalysisEngine::molecularMass(const Molecule &molecule) {
     double total = 0.0;
     for (const Atom &atom : molecule.atoms) total += atomicMass(atom.atomicNumber);

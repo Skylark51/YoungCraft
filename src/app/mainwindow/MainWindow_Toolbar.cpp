@@ -162,7 +162,6 @@ void MainWindow::createToolBar() {
     addCommonAction("QMOptimizationAction", QStringLiteral("xTB"), 22);
     toolbar->addSeparator();
     addCommonAction("CopyStructureImage", QStringLiteral("이미지 복사"), 4);
-    addCommonAction("CustomStructureCapture", QStringLiteral("맞춤 캡처"), 5);
 
     const auto addPopup = [this, toolbar](const QString &title, const QString &name, int iconId) {
         auto *action = new QAction(title, toolbar);
@@ -179,7 +178,9 @@ void MainWindow::createToolBar() {
     exportMenu->setToolTipsVisible(true);
     exportMenu->addAction(findChild<QAction *>(QStringLiteral("SaveStructureImage")));
     exportMenu->addAction(findChild<QAction *>(QStringLiteral("OpenMultiCapture")));
-    auto *ircCapture = exportMenu->addAction(QStringLiteral("IRC·TS 캡처…"), this, [this] { openReactionCapture(); });
+    auto *ircCapture=findChild<QAction *>(QStringLiteral("CustomStructureCapture"));
+    ircCapture->setText(QStringLiteral("IRC·TS 맞춤 캡처…"));
+    exportMenu->addAction(ircCapture);
     connect(exportMenu, &QMenu::aboutToShow, this, [this, ircCapture] {
         const auto paths = ReactionCapture::companionPaths(m_currentFile);
         QString reason;
@@ -197,7 +198,21 @@ void MainWindow::createToolBar() {
         ircCapture->setText(reason.isEmpty() ? QStringLiteral("IRC·TS 캡처…")
             : QStringLiteral("IRC·TS 캡처 · %1").arg(reason));
     });
-    exportMenu->addAction(QStringLiteral("메커니즘 영상…"), this, &MainWindow::openMechanismAnimation);
+    exportMenu->addAction(findChild<QAction *>("OpenMechanismAnimation"));
+    exportMenu->addAction(findChild<QAction *>("CopyTSAnimation"));
+    auto *captureMenu=findChild<QMenu *>("EditCaptureMenu");
+    for(auto *action:exportMenu->actions())captureMenu->removeAction(action);
+    auto *editMenu=findChild<QMenu *>("EditMenu");editMenu->removeAction(captureMenu->menuAction());
+    // Keep shortcuts active even when the duplicate menu path is removed.
+    for(auto *action:captureMenu->actions())addAction(action);
+    for(auto *action:exportMenu->actions())addAction(action);
+    addAction(findChild<QAction *>("CopyStructureImage"));
+    auto *orbitalMenu=findChild<QMenu *>("OrbitalToolsMenu");
+    orbitalMenu->menuAction()->setObjectName("ToolbarOrbitals");
+    orbitalMenu->menuAction()->setProperty("toolbarIconId",18);
+    toolbar->addAction(orbitalMenu->menuAction());
+    qobject_cast<QToolButton *>(toolbar->widgetForAction(orbitalMenu->menuAction()))->setPopupMode(QToolButton::InstantPopup);
+    addCommonAction("ApplicationSettingsAction",QStringLiteral("환경설정"),29);
 
     auto *viewMenu = findChild<QMenu *>(QStringLiteral("ViewMenu"));
     toolbar->addSeparator();
@@ -266,9 +281,7 @@ void MainWindow::createToolBar() {
     });
     output->setIconText(QStringLiteral("원문 보기"));
     toolbar->addAction(output);
-    auto *sourceButton = addButton(output, m_analysisShortcuts);
-    sourceButton->setObjectName(QStringLiteral("ResultSourceButton"));
-    analysisGrid->addWidget(sourceButton);
+
     for (auto *action : toolbar->actions()) {
         if (auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action))) {
             sizeSidebarButton(button);
@@ -567,6 +580,7 @@ void MainWindow::updatePanelActions() {
     m_structureTabs->findChild<QAction *>(QStringLiteral("DrawCurrentStructure"))->setEnabled(
         hasStructure || !m_drawingMode);
     m_drawPanels->setVisible(m_drawingMode);
+    if(auto *vdw=findChild<QAction *>("ShowVdwSpheres"))vdw->setChecked(m_view->style().showVdwSpheres);
 
     const bool bondCentric = m_view->bondCentricMode();
     m_viewportEditMenu->findChild<QAction *>(QStringLiteral("BondCentricTool"))->setChecked(bondCentric);
@@ -586,8 +600,6 @@ void MainWindow::updatePanelActions() {
         auto *button = m_analysisShortcuts->findChild<QToolButton *>(QStringLiteral("AnalysisShortcut%1").arg(index));
         placeShortcut(button, m_analysis->hasTabData(index));
     }
-    auto *sourceButton = m_analysisShortcuts->findChild<QToolButton *>(QStringLiteral("ResultSourceButton"));
-    placeShortcut(sourceButton, !m_data.filePath.isEmpty());
     m_analysisShortcuts->layout()->invalidate();
     m_analysisShortcuts->updateGeometry();
 }

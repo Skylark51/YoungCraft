@@ -183,6 +183,7 @@ private:
     void copyStructureFragment();
     void pasteStructureFragment();
     void extractStructureFragments();
+    void showMolecularInformation();
     void showZMatrix();
     void createGaussianInput();
     void openFragmentBrowser(bool labOnly = false);

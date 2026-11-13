@@ -68,6 +68,7 @@ void MainWindow::applyStyle(const RenderStyle &style) {
     m_style = style;
     m_view->setStyle(m_style);
     m_atomLabelsAction->setChecked(m_style.showLabels);
+    if(auto *vdw=findChild<QAction *>("ShowVdwSpheres"))vdw->setChecked(m_style.showVdwSpheres);
     StyleManager::save(m_style);
 }
 

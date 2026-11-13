@@ -146,7 +146,7 @@ void MoleculeView::paintGL() {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_shadowTexture);
 
-    if (m_style.displayMode != DisplayMode::SpaceFilling) {
+    if (!m_style.showVdwSpheres && m_style.displayMode != DisplayMode::SpaceFilling) {
         m_program->setUniformValue("uMaterialSpecular", 0.42f);
         m_program->setUniformValue("uMaterialShininess", 0.72f);
         for (const Bond &bond : m_molecule.bonds) {
@@ -192,7 +192,7 @@ void MoleculeView::paintGL() {
         if (atom.visible && atom.displayOpacity < 1.0f && (m_style.showHydrogen || atom.atomicNumber != 1))
             faded.push_back({QVector3D::dotProduct(atom.position, viewDirection), i, false});
     }
-    if (m_style.displayMode != DisplayMode::SpaceFilling) for (int i = 0; i < m_molecule.bonds.size(); ++i) {
+    if (!m_style.showVdwSpheres && m_style.displayMode != DisplayMode::SpaceFilling) for (int i = 0; i < m_molecule.bonds.size(); ++i) {
         const auto &bond = m_molecule.bonds[i];
         if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
         const auto &a = m_molecule.atoms[bond.first]; const auto &b = m_molecule.atoms[bond.second];

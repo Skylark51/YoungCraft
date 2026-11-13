@@ -51,7 +51,7 @@ void MoleculeView::renderShadowMap(const QVector3D &lightDirection) {
     glPolygonOffset(1.1f, 1.0f);
     m_depthProgram->bind();
     m_depthPass = true;
-    if (m_style.displayMode != DisplayMode::SpaceFilling) {
+    if (!m_style.showVdwSpheres && m_style.displayMode != DisplayMode::SpaceFilling) {
         // Share the visible geometry, including multiple, dashed and trimmed bonds.
         for (const Bond &bond : m_molecule.bonds) drawColoredBond(bond);
     }

@@ -1,5 +1,7 @@
 #include <QScreen>
 #include "compute/GaussianConnection.h"
+#include "analysis/AnalysisEngine.h"
+#include <QVector2D>
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
 #include "settings/AppPattern.h"
@@ -116,6 +118,9 @@ private slots:
     void atomFocusTransparentExport();
     void projectLibraryOpensOnDemand();
     void additionalInteractionRequests();
+    void toolbarCleanupAndMolecularInformation();
+    void vdwAndIsometricView();
+    void drawingBlankRightClickSelects();
     void directGeometryToolsAndFixedCore();
     void selectAllAndFragmentRotation();
     void optimizationGraphWindow();
@@ -214,6 +219,86 @@ private slots:
     void atomNumbersToolbarLabelsEveryAtom();
     void atomClicksMeasureDistanceAngleAndDihedral();
 };
+
+void SmokeTest::toolbarCleanupAndMolecularInformation() {
+    MainWindow w;w.show();auto *toolbar=w.findChild<QToolBar *>("MainToolBar");QVERIFY(toolbar);
+    auto *exports=w.findChild<QAction *>("ToolbarExport")->menu();
+    QVERIFY(exports->actions().contains(w.findChild<QAction *>("CustomStructureCapture")));
+    QVERIFY(exports->actions().contains(w.findChild<QAction *>("CopyTSAnimation")));
+    QVERIFY(!toolbar->widgetForAction(w.findChild<QAction *>("CustomStructureCapture")));
+    for(auto *top:w.menuBar()->actions())QVERIFY(top->text()!=QStringLiteral("Orbitals"));
+    for(auto *action:w.findChildren<QAction *>()) {
+        QVERIFY(action->text()!=QStringLiteral("안티앨리어싱 없이 현재 이미지 복사"));
+        QVERIFY(action->text()!=QStringLiteral("기본 편집기 옵션"));
+        QVERIFY(action->text()!=QStringLiteral("구조 정리"));
+    }
+    Molecule m;m.atoms={{1,8,"O",{}},{2,1,"H",{1,0,0}},{3,1,"H",{-1,0,0}}};
+    m.atoms[2].visible=false;w.newDrawingDocument(m);w.setDrawingMode(false);
+    QCOMPARE(AnalysisEngine::molecularFormula(m),QStringLiteral("H2O"));
+    Molecule organic;organic.atoms={{1,8,"O",{}},{2,6,"C",{}},{3,1,"H",{}},{4,6,"C",{}},{5,0,"X",{}}};
+    QCOMPARE(AnalysisEngine::molecularFormula(organic),QStringLiteral("C2HO"));
+    QVERIFY(qAbs(atomicMass(44)-101.07)<1e-6); // Ru was missing from the original mass table.
+    QVERIFY(qAbs(atomicMass(46)-106.42)<1e-6);
+    QVERIFY(qAbs(atomicMass(92)-238.03)<.01);
+    bool checked=false;
+    QTimer::singleShot(0,&w,[&] {
+        auto *dialog=w.findChild<QDialog *>("MolecularInformationDialog");
+        if(!dialog)return;
+        auto *formula=dialog->findChild<QLabel *>("MolecularFormula");auto *mass=dialog->findChild<QLabel *>("MolecularMass");
+        auto *buttons=dialog->findChild<QDialogButtonBox *>();
+        checked=formula&&formula->text()=="H2O"&&mass&&mass->text().contains(QString::number(AnalysisEngine::molecularMass(m),'f',4));
+        const auto preview=qEnvironmentVariable("YOUNGCRAFT_CLEANUP_PREVIEW");if(!preview.isEmpty())checked=checked&&dialog->grab().save(preview+"-mass.png");
+        if(buttons&&buttons->button(QDialogButtonBox::Ok))buttons->button(QDialogButtonBox::Ok)->click();else dialog->reject();
+    });
+    w.findChild<QAction *>("MolecularInformationAction")->trigger();QVERIFY(checked);
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_CLEANUP_PREVIEW");if(!preview.isEmpty())QVERIFY(w.grab().save(preview+"-toolbar.png"));
+}
+void SmokeTest::vdwAndIsometricView() {
+    MainWindow w;w.resize(1100,800);w.show();Molecule m;m.atoms={{1,6,"C",{-2,0,0}},{2,8,"O",{2,0,0}}};m.setBond(0,1,1);
+    w.newDrawingDocument(m);w.setDrawingMode(false);auto *view=w.m_view;
+    auto style=StyleManager::preset(QStringLiteral("Ball-and-Stick"));style.showVdwSpheres=false;w.applyStyle(style);view->bestView();
+    QTest::qWait(100);const auto before=view->image();const float original=view->atomVisualRadius(m.atoms[0]);
+    auto *vdw=w.findChild<QAction *>("ShowVdwSpheres");QVERIFY(vdw);vdw->trigger();
+    QVERIFY(view->style().showVdwSpheres);QVERIFY(view->atomVisualRadius(m.atoms[0])>original);
+    QVERIFY(qAbs(view->atomVisualRadius(m.atoms[0])-vanDerWaalsRadius(6))<1e-5);
+    QTest::qWait(100);QVERIFY(view->image()!=before);
+    const auto fitted=view->viewProjection();for(const auto &atom:m.atoms) {
+        const auto center=view->project(atom.position,fitted);
+        const auto edge=view->project(atom.position+QVector3D(view->atomVisualRadius(atom),0,0),fitted);
+        const float radius=qAbs(edge.x()-center.x());QVERIFY(center.x()-radius>=0);QVERIFY(center.x()+radius<=view->width());
+    }
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_CLEANUP_PREVIEW");if(!preview.isEmpty())QVERIFY(w.grab().save(preview+"-vdw.png"));
+    const int source=w.m_documentTabs->currentIndex();w.newDrawingDocument(m);style.showVdwSpheres=false;w.applyStyle(style);QVERIFY(!vdw->isChecked());
+    w.m_documentTabs->setCurrentIndex(source);QVERIFY(vdw->isChecked());vdw->trigger();
+    QVERIFY(!view->style().showVdwSpheres);QVERIFY(qAbs(view->atomVisualRadius(m.atoms[0])-original)<1e-5);QCOMPARE(view->molecule().bonds.size(),1);
+    w.findChild<QAction *>("IsometricView")->trigger();QVERIFY(!view->style().perspective);
+    const auto vp=view->viewProjection();const auto zero=view->project({},vp);
+    QVector<float> lengths;for(const auto &axis:{QVector3D(1,0,0),QVector3D(0,1,0),QVector3D(0,0,1)}) {
+        const auto end=view->project(axis,vp);lengths<<QVector2D(end.x()-zero.x(),end.y()-zero.y()).length();
+    }
+    QVERIFY(qAbs(lengths[0]-lengths[1])<.01f);QVERIFY(qAbs(lengths[1]-lengths[2])<.01f);
+}
+void SmokeTest::drawingBlankRightClickSelects() {
+    MainWindow w;w.resize(1100,800);w.show();Molecule m;m.atoms={{1,6,"C",{}},{2,8,"O",{1.3f,0,0}}};m.setBond(0,1,1);
+    w.newDrawingDocument(m);auto *view=w.m_view;view->bestView();QTest::qWait(100);
+    auto *arm=w.m_drawBar->findChild<QPushButton *>("ArmDrawingTool");QVERIFY(arm);
+    view->setDrawingElement(6);view->setChainDrawing(true);view->setDrawingAnchorAt(m.atoms[0].position);
+    QTest::mouseClick(view,Qt::RightButton,Qt::NoModifier,QPoint(10,10));
+    QVERIFY(!view->drawingArmed());QVERIFY(!arm->isChecked());QCOMPARE(view->cursor().shape(),Qt::ArrowCursor);QVERIFY(!view->hasGhostBond());
+    const auto carbon=view->project(m.atoms[0].position,view->viewProjection());
+    QTest::mouseClick(view,Qt::LeftButton,Qt::NoModifier,QPoint(qRound(carbon.x()),qRound(carbon.y())));
+    QVERIFY(view->selection().atoms.contains(0));QCOMPARE(view->molecule().atoms.size(),2);
+    QTest::mouseClick(view,Qt::LeftButton,Qt::NoModifier,QPoint(12,12));QCOMPARE(view->molecule().atoms.size(),2);
+    view->setProperty("pendingCenter",26);view->setProperty("pendingFragment","not-a-real-template");view->setTemplatePreview(0);
+    QTest::mouseClick(view,Qt::RightButton,Qt::NoModifier,QPoint(10,10));
+    QVERIFY(!view->drawingArmed());QVERIFY(!view->m_insertPreview);QCOMPARE(view->property("pendingCenter").toInt(),0);QVERIFY(view->property("pendingFragment").toString().isEmpty());
+    auto *quick=w.m_drawBar->findChild<QPushButton *>("QuickElement_C");QVERIFY(quick);quick->click();QVERIFY(view->drawingArmed());
+    const auto rotation=view->cameraState().rotation;
+    QTest::mousePress(view,Qt::RightButton,Qt::NoModifier,QPoint(10,10));
+    QMouseEvent move(QEvent::MouseMove,QPointF(60,50),QPointF(view->mapToGlobal(QPoint(60,50))),Qt::NoButton,Qt::RightButton,Qt::NoModifier);QApplication::sendEvent(view,&move);
+    QTest::mouseRelease(view,Qt::RightButton,Qt::NoModifier,QPoint(60,50));
+    QVERIFY(view->drawingArmed());QVERIFY(view->cameraState().rotation!=rotation);
+}
 
 void SmokeTest::additionalInteractionRequests(){
     MainWindow w;w.resize(1580,960);w.show();w.newDrawingDocument();
@@ -1408,7 +1493,7 @@ void SmokeTest::topPanelToolbarFollowsDocuments() {
     QCOMPARE(w.findChildren<QToolBar *>().size(), 1);
     QCOMPARE(toolbar->toolButtonStyle(), Qt::ToolButtonIconOnly);
     const auto commonActions = {"NewStructure", "OpenStructureFile", "MMOptimizationAction",
-                                "QMOptimizationAction", "CopyStructureImage", "CustomStructureCapture",
+                                "QMOptimizationAction", "CopyStructureImage", "ToolbarOrbitals", "ApplicationSettingsAction",
                                 "ToolbarExport", "ToggleResultsSidebar", "ToggleStructureSidebar", "ToggleOutputSource"};
     for (const auto *name : commonActions) {
         auto *action = w.findChild<QAction *>(name);
@@ -1446,8 +1531,9 @@ void SmokeTest::topPanelToolbarFollowsDocuments() {
     auto *frequency = w.findChild<QToolButton *>("AnalysisShortcut1");
     auto *opt = w.findChild<QToolButton *>("AnalysisShortcut0");
     QVERIFY(frequency && opt && opt->isVisible() && !frequency->isVisible());
-    auto *source = w.findChild<QToolButton *>("ResultSourceButton");
-    QVERIFY(source && !source->isVisible());
+    auto *source = qobject_cast<QToolButton *>(toolbar->widgetForAction(w.findChild<QAction *>("ToggleOutputSource")));
+    QVERIFY(source && source->isVisible());
+    QVERIFY(!w.findChild<QToolButton *>("ResultSourceButton"));
     w.m_data.route = QStringLiteral("# opt freq");
     w.m_analysis->setData(w.m_data);
     QVERIFY(frequency->isVisible());

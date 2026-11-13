@@ -60,6 +60,22 @@ void MoleculeView::bestView() {
     emit cameraChanged();
 }
 
+void MoleculeView::isometricView() {
+    bestView();
+    m_style.perspective=false;
+    m_rotation=QQuaternion::fromDirection(QVector3D(1,1,1).normalized(),QVector3D(0,1,0)).conjugated();
+    const float aspect=height()>0?qMax(.2f,float(width())/height()):1.0f;
+    float extent=.5f;
+    const auto include=[&](const QVector3D &position,float padding) {
+        const auto local=m_rotation.rotatedVector(position-m_target);
+        extent=qMax(extent,qMax(qAbs(local.y())+padding,(qAbs(local.x())+padding)/aspect));
+    };
+    for(const auto &atom:m_molecule.atoms)if(atom.visible&&(m_style.showHydrogen||atom.atomicNumber!=1))include(atom.position,atomVisualRadius(atom));
+    for(const auto &mesh:{m_positiveSurface,m_negativeSurface})if(mesh)for(const auto &point:mesh->positions)include(point,0);
+    m_orthoScale=qMax(.75f,extent*1.12f);
+    update();if(m_previewOverlay)m_previewOverlay->update();emit cameraChanged();
+}
+
 void MoleculeView::updateRotationCenter(bool selectedOnly) {
     if (selectedOnly && m_selectedAtom >= 0 && m_selectedAtom < m_molecule.atoms.size()) {
         m_target = m_molecule.atoms[m_selectedAtom].position;
