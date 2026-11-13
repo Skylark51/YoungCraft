@@ -24,6 +24,20 @@ QColor selectionNeon(const QColor &background) {
     const double luminance=(0.2126*background.red()+0.7152*background.green()+0.0722*background.blue())/255.0;
     return luminance>=0.55?QColor(4,90,255):QColor(35,245,213);
 }
+double vectorLuminance(const QColor &color) {
+    auto linear=[](double c){return c<=0.04045?c/12.92:std::pow((c+0.055)/1.055,2.4);};
+    return 0.2126*linear(color.redF())+0.7152*linear(color.greenF())+0.0722*linear(color.blueF());
+}
+QColor visibleVectorColor(const QColor &configured,const QColor &background) {
+    const double bg=vectorLuminance(background);
+    // Include alpha: a pale or translucent custom color can disappear on white.
+    const double alpha=configured.alphaF();
+    const QColor composite=QColor::fromRgbF(configured.redF()*alpha+background.redF()*(1-alpha),
+        configured.greenF()*alpha+background.greenF()*(1-alpha),configured.blueF()*alpha+background.blueF()*(1-alpha));
+    const double fg=vectorLuminance(composite);
+    if((qMax(bg,fg)+0.05)/(qMin(bg,fg)+0.05)>=4.5)return configured;
+    return bg>0.18?QColor(15,65,170):QColor(85,225,255);
+}
 }
 
 QVector3D MoleculeView::project(const QVector3D &position, const QMatrix4x4 &vp) const {
@@ -152,8 +166,11 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
     if (m_frequencyDisplacements.isEmpty()) return;
     QPainter painter; beginOverlayPainter(painter);
     painter.setRenderHint(QPainter::Antialiasing, m_style.antiAliasing);
-    QPen pen(m_style.vectorColor, m_style.vectorWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter.setPen(pen);
+    const QColor background=m_transparentCapture?QColor(Qt::white):m_style.background;
+    const QColor color=visibleVectorColor(m_style.vectorColor,background);
+    const QColor outline=vectorLuminance(color)<0.35?QColor(Qt::white):QColor(18,24,32);
+    const QPen pen(color,m_style.vectorWidth,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin);
+    const QPen halo(outline,m_style.vectorWidth+2.5,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin);
     const int count = qMin(m_molecule.atoms.size(), m_frequencyDisplacements.size());
     for (int i = 0; i < count; ++i) {
         const auto &atom = m_molecule.atoms[i];
@@ -168,12 +185,15 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
         const QVector3D end = project(end3, vp);
         const QLineF line(QPointF(start.x(), start.y()), QPointF(end.x(), end.y()));
         if (line.length() < 2.0) continue;
-        painter.drawLine(line);
         const double angle = std::atan2(-line.dy(), line.dx());
         const double arrow = qBound(4.0, double(m_style.vectorWidth * 3.5f), 14.0);
         const QPointF tip = line.p2();
-        painter.drawLine(tip, tip - QPointF(std::cos(angle + 0.55) * arrow, -std::sin(angle + 0.55) * arrow));
-        painter.drawLine(tip, tip - QPointF(std::cos(angle - 0.55) * arrow, -std::sin(angle - 0.55) * arrow));
+        QPainterPath path;path.moveTo(line.p1());path.lineTo(tip);
+        path.moveTo(tip-QPointF(std::cos(angle+0.55)*arrow,-std::sin(angle+0.55)*arrow));
+        path.lineTo(tip);path.lineTo(tip-QPointF(std::cos(angle-0.55)*arrow,-std::sin(angle-0.55)*arrow));
+        // The halo also separates arrows from atoms/bonds and supports transparent exports.
+        painter.setPen(halo);painter.drawPath(path);
+        painter.setPen(pen);painter.drawPath(path);
     }
 }
 
