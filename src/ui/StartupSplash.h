@@ -10,6 +10,7 @@
 #include <QSplashScreen>
 #include <QTimer>
 #include <functional>
+#include <utility>
 
 namespace youngcraft {
 class StartupSplash final : public QSplashScreen {
@@ -20,24 +21,43 @@ public:
         setAttribute(Qt::WA_QuitOnClose,false);
     }
     void finishWhenReady(QWidget *mainWindow, std::function<void()> onReady = {}) {
-        const QPointer<QWidget> ready(mainWindow);
-        // Include the fade in the one-second splash interval.
-        QTimer::singleShot(splashDurationMs-fadeDurationMs,Qt::PreciseTimer,this,[this,ready,onReady]{
-            if(!ready || !isVisible()){hide();return;}
+        readyWindow=mainWindow;
+        readyCallback=std::move(onReady);
+        finishRequested=true;
+        scheduleFinish();
+    }
+protected:
+    void mousePressEvent(QMouseEvent *) override {} // Preserve the startup interval on click.
+    void paintEvent(QPaintEvent *event) override {
+        QSplashScreen::paintEvent(event);
+        // Start the interval only after the logo has actually been painted.
+        if(!firstPaint.isValid())firstPaint.start();
+        scheduleFinish();
+    }
+private:
+    static constexpr int splashDurationMs=500;
+    static constexpr int fadeDurationMs=100;
+    QElapsedTimer firstPaint;
+    QPointer<QWidget> readyWindow;
+    std::function<void()> readyCallback;
+    bool finishRequested=false;
+    bool finishScheduled=false;
+    void scheduleFinish() {
+        if(!finishRequested || finishScheduled || !firstPaint.isValid())return;
+        finishScheduled=true;
+        // Workspace construction counts toward the interval; preserve a visible fade.
+        const int waitMs=int(qMax<qint64>(0,splashDurationMs-fadeDurationMs-firstPaint.elapsed()));
+        QTimer::singleShot(waitMs,Qt::PreciseTimer,this,[this]{
+            if(!readyWindow || !isVisible()){hide();return;}
             auto *fade=new QPropertyAnimation(this,"windowOpacity",this);
             fade->setDuration(fadeDurationMs);fade->setStartValue(1.0);fade->setEndValue(0.0);
-            connect(fade,&QPropertyAnimation::finished,this,[this,ready,onReady]{
-                if(ready){ready->show();finish(ready);if(onReady)onReady();}
+            connect(fade,&QPropertyAnimation::finished,this,[this]{
+                if(readyWindow){readyWindow->show();finish(readyWindow);if(readyCallback)readyCallback();}
                 else hide();
             });
             fade->start(QAbstractAnimation::DeleteWhenStopped);
         });
     }
-protected:
-    void mousePressEvent(QMouseEvent *) override {} // Preserve the startup interval on click.
-private:
-    static constexpr int splashDurationMs=1000;
-    static constexpr int fadeDurationMs=180;
     static QPixmap artwork() {
         const char *papers[]={"#edf4fa","#eef4ee","#f2eef8","#f6f1e7","#f8eef0","#faf0e8"};
         const char *inks[]={"#446781","#4d6c5b","#6d5b85","#79634c","#865e6d","#865f49"};
