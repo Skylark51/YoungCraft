@@ -16,7 +16,7 @@ namespace youngcraft {
 void MainWindow::replaceLigandTemplate() {
     const Molecule source=m_view->molecule();
     QDialog dialog(this);dialog.setObjectName("LigandReplacementDialog");
-    dialog.setWindowTitle(QStringLiteral("리간드 인식 / 템플릿 교체"));dialog.resize(1040,720);
+    dialog.setWindowTitle(QStringLiteral("리간드 자동 인식/교체"));dialog.resize(1040,720);
     QVBoxLayout layout(&dialog);QFormLayout form;
     QLabel note(QStringLiteral("교체할 리간드를 확인하세요. 금속·기질·산소 조각 등 나머지 원자와 결합은 그대로 보존합니다.\n"
         "왼쪽: 교체 대상(주황색) / 보존 원자(청록색). 오른쪽: 교체 결과. 결과는 새 편집 탭에 생성합니다."));

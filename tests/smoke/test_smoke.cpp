@@ -2039,9 +2039,13 @@ void SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() {
     for (QAction *action : window.findChildren<QAction *>()) {
         if (action->text() == QStringLiteral("새 구조 그리기")) newDrawing = action;
         if (action->text() == QStringLiteral("실행 취소")) undo = action;
-        if (action->text() == QStringLiteral("다시 실행")) redo = action;
+        if (action->text().section('\t',0,0) == QStringLiteral("다시 실행")) redo = action;
     }
     QVERIFY(newDrawing); QVERIFY(undo); QVERIFY(redo);
+    QVERIFY(window.findChild<QMenu *>("EditBuildMenu")->actions().contains(newDrawing));
+    QCOMPARE(newDrawing->shortcut(),QKeySequence(QStringLiteral("Ctrl+N")));
+    QCOMPARE(redo->shortcuts().size(),2);
+    for(const auto &key:redo->shortcuts())QVERIFY(redo->text().section('\t',1).contains(key.toString(QKeySequence::NativeText)));
     const auto menuReview=qEnvironmentVariable("YOUNGCRAFT_EDIT_MENU_REVIEW");
     if(!menuReview.isEmpty()) {
         QDir().mkpath(menuReview);
@@ -2050,6 +2054,9 @@ void SmokeTest::autoHydrogenFollowsDrawingEditsAndUndo() {
         QVERIFY(edit->height()<600);
         QVERIFY(edit->grab().save(menuReview+"/edit-menu.png"));
         edit->hide();
+        auto *build=window.findChild<QMenu *>("StructureBuildMenu");QVERIFY(build);
+        build->popup(window.mapToGlobal(QPoint(30,40)));QTest::qWait(60);
+        QVERIFY(build->grab().save(menuReview+"/build-menu.png"));build->hide();
     }
     newDrawing->trigger();
     auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("DocumentTabs"));
@@ -3696,7 +3703,7 @@ void SmokeTest::labLigandBrowserBuildsSelectedMetal(){
         auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget());QVERIFY(dialog);
         auto close=qScopeGuard([&]{if(dialog->isVisible())dialog->reject();});
         auto *category=dialog->findChild<QComboBox *>("FragmentCategory");QVERIFY(category);
-        QCOMPARE(category->currentData().toString(),QString("lab-ligand"));QVERIFY(category->currentText().startsWith("Lab Ligands"));
+        QCOMPARE(category->currentData().toString(),QString("lab-ligand"));QCOMPARE(category->currentText(),QStringLiteral("Ligands for BIOCC"));
         auto *list=dialog->findChild<QListWidget *>("FragmentList");QVERIFY(list);QVERIFY(list->count()>=5);
         auto matches=list->findItems("MDAP",Qt::MatchExactly);QCOMPARE(matches.size(),1);list->setCurrentItem(matches.first());
         auto *mode=dialog->findChild<QComboBox *>("FragmentInsertionMode");QVERIFY(mode);QCOMPARE(mode->currentData().toInt(),1);

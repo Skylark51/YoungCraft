@@ -20,7 +20,7 @@ namespace youngcraft {
 void MainWindow::arrangeScanApproach() {
     const auto ids=m_geometrySelection;
     if(ids.size()!=2) { setStatus(QStringLiteral("접근시킬 반응 원자 두 개를 순서대로 클릭하세요."),8000); return; }
-    QDialog dialog(this); dialog.setWindowTitle(QStringLiteral("Scan 접근 배치"));
+    QDialog dialog(this); dialog.setWindowTitle(QStringLiteral("Scan용 구조 조정"));
     QFormLayout form(&dialog);
     QLabel note(QStringLiteral("원자 %1 → %2\n각 조각의 내부 구조를 유지하며 반응 자리가 마주 보게 회전·이동합니다.\n축 주위 회전을 탐색하여 비결합 접촉을 줄입니다. 전체 구조 최적화는 별도로 실행하세요.")
         .arg(ids[0]+1).arg(ids[1]+1)); note.setWordWrap(true); form.addRow(&note);
