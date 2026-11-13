@@ -225,6 +225,12 @@ void MoleculeView::setVibrationVectorScaleFactor(double factor) {
     if(m_previewOverlay)m_previewOverlay->update();
 }
 
+void MoleculeView::setVibrationVectorLengthFactor(double factor) {
+    m_vibrationVectorLengthFactor=qBound(0.1,factor,20.0);
+    update();
+    if(m_previewOverlay)m_previewOverlay->update();
+}
+
 void MoleculeView::setBonds(const QVector<Bond> &bonds) {
     m_molecule.bonds = bonds;
     update();
