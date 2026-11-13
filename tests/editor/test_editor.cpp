@@ -1,6 +1,7 @@
 #include "io/GaussianParser.h"
 #include "model/MoleculeEditController.h"
 #include "model/FragmentLibrary.h"
+#include "model/LigandReplacement.h"
 #include "model/GeometryEditor.h"
 #include "model/LabComplexBuilder.h"
 #include <QTemporaryDir>
@@ -11,6 +12,8 @@ using namespace youngcraft;
 class EditorTest : public QObject {
     Q_OBJECT
 private slots:
+    void ligandReplacementPreservesCore();
+    void ligandReplacementRejectsUnsafeEdits();
     void drawingTransactions();
     void chargedHydrogens();
     void snappingAndAutomatic();
@@ -236,6 +239,70 @@ void EditorTest::optimizedManganesePeroxoReferences(){
         ++count;
     }
     QCOMPARE(count,7);
+}
+
+
+void EditorTest::ligandReplacementPreservesCore(){
+    const auto library=FragmentLibrary::load();int tested=0;
+    for(const auto &ligand:library)if(ligand.category=="lab-ligand"){
+        const Fragment *adduct=nullptr;for(const auto &f:library)if(f.category=="lab-adduct"){adduct=&f;break;}
+        QVERIFY(adduct);Molecule source;QString error;
+        QVERIFY(LabComplexBuilder::assemble(ligand,*adduct,26,3,1,6,source,&error));
+        // Rotate and translate the entire complex to catch reference-frame mistakes.
+        const auto rotation=QQuaternion::fromEulerAngles(37,81,-26);
+        for(auto &a:source.atoms)a.position=rotation.rotatedVector(a.position)+QVector3D(7,-3,11);
+        const auto candidates=LigandReplacement::recognize(source,0,library);
+        const LigandCandidate *chosen=nullptr;
+        for(const auto &c:candidates)if(c.atoms.size()==ligand.atoms.size()-1){chosen=&c;break;}
+        QVERIFY(chosen);QVERIFY(chosen->name.contains(ligand.name));
+        QSet<int> core;for(int i=0;i<source.atoms.size();++i)if(!chosen->atoms.contains(i))core.insert(i);
+        // Replace with the same geometry: donor directions must survive rotation.
+        Molecule result;QVERIFY2(LigandReplacement::replace(source,*chosen,ligand,core,result,&error),qPrintable(error));
+        QCOMPARE(result.charge,source.charge);QCOMPARE(result.multiplicity,source.multiplicity);
+        QVector<int> mapping(source.atoms.size(),-1);int next=0;
+        for(int i=0;i<source.atoms.size();++i)if(core.contains(i)){
+            mapping[i]=next;QCOMPARE(result.atoms[next].position,source.atoms[i].position);
+            QCOMPARE(result.atoms[next].atomicNumber,source.atoms[i].atomicNumber);++next;
+        }
+        for(const auto &b:source.bonds)if(core.contains(b.first)&&core.contains(b.second)){
+            int bi=result.bondIndex(mapping[b.first],mapping[b.second]);QVERIFY(bi>=0);
+            const auto &actual=result.bonds[bi];QCOMPARE(actual.order,b.order);QCOMPARE(actual.coordination,b.coordination);QCOMPARE(actual.manual,b.manual);QCOMPARE(actual.style,b.style);
+        }
+        for(int donor:chosen->donors){float nearest=1000;
+            for(const auto &b:result.bonds)if(b.first==0||b.second==0){int other=b.first==0?b.second:b.first;if(other>=next)nearest=qMin(nearest,(result.atoms[other].position-source.atoms[donor].position).length());}
+            QVERIFY2(nearest<0.002f,qPrintable(QString("donor alignment error %1 for %2").arg(nearest).arg(ligand.name)));
+        }
+        // All compatible template pairs must retain the exact same core.
+        for(const auto &target:library)if(target.category=="lab-ligand"&&target.attachments.size()==chosen->donors.size()){
+            QVERIFY2(LigandReplacement::replace(source,*chosen,target,core,result,&error),qPrintable(error));
+            int k=0;for(int i=0;i<source.atoms.size();++i)if(core.contains(i))QCOMPARE(result.atoms[k++].position,source.atoms[i].position);
+            QVERIFY(MoleculeEditController::validate(result));++tested;
+        }
+    }
+    QVERIFY(tested>=25);
+}
+void EditorTest::ligandReplacementRejectsUnsafeEdits(){
+    Molecule source;source.atoms={{1,7,"N",{2,0,0}},{2,6,"C",{3.4f,0,0}},{3,26,"Fe",{}},{4,8,"O",{0,2,0}}};
+    source.setBond(0,1,1);source.setBond(2,0,1,true);source.setBond(2,3,1,true);
+    source.charge=2;source.multiplicity=5;
+    Fragment f;f.name="test";f.ligand=true;f.atoms={{1,0,"X",{}},{2,7,"N",{2,0,0}},{3,6,"C",{3.4f,0,0}}};f.dummyAtoms={0};f.attachments={1};f.bonds={{0,1,1},{1,2,1}};
+    auto candidates=LigandReplacement::recognize(source,2);QCOMPARE(candidates.size(),2);
+    auto c=candidates[0];QVERIFY(c.atoms.contains(0));Molecule result;QString error;
+    QVERIFY(LigandReplacement::replace(source,c,f,{2,3},result,&error));
+    QCOMPARE(result.atoms[0].atomicNumber,26);QCOMPARE(result.atoms[1].position,source.atoms[3].position);
+    QCOMPARE(result.charge,2);QCOMPARE(result.multiplicity,5);
+    result.title="untouched";
+    QVERIFY(!LigandReplacement::replace(source,c,f,{0},result,&error));QCOMPARE(result.title,QString("untouched"));
+    source.atoms[1].optimizationFixed=true;
+    QVERIFY(!LigandReplacement::replace(source,c,f,{},result,&error));source.atoms[1].optimizationFixed=false;
+    auto forged=c;forged.atoms.remove(1);QVERIFY(!LigandReplacement::replace(source,forged,f,{},result,&error));
+    auto bad=f;bad.attachments={1,2};QVERIFY(!LigandReplacement::replace(source,c,bad,{},result,&error));
+    bad=f;bad.ligand=false;QVERIFY(!LigandReplacement::replace(source,c,bad,{},result,&error));
+    source.hapticContacts<<HapticContact{2,{0,1},"eta"};
+    QVERIFY(!LigandReplacement::replace(source,c,f,{},result,&error));source.hapticContacts.clear();
+    source.atoms<<Atom{5,27,"Co",{5,0,0}};source.setBond(1,4,1,true);
+    QVERIFY(!LigandReplacement::replace(source,c,f,{},result,&error));
+    QCOMPARE(result.title,QString("untouched"));
 }
 
 QTEST_APPLESS_MAIN(EditorTest)

@@ -151,6 +151,9 @@ void MainWindow::createBuildMenu(){
     auto *menu=menuBar()->addMenu("구조 만들기");auto add=[&](const QString&text,auto fn){auto*a=menu->addAction(text);connect(a,&QAction::triggered,this,fn);};
     add("배위 중심 삽입...",[this]{insertCoordinationDialog();});add("리간드 / 작용기 삽입...",[this]{openFragmentBrowser();});
     add("Lab Ligands · 연구용 리간드...",[this]{openFragmentBrowser(true);});
+    auto *replaceLigand=menu->addAction(QStringLiteral("리간드 인식 / 템플릿 교체..."));
+    replaceLigand->setObjectName("ReplaceLigandTemplate");
+    connect(replaceLigand,&QAction::triggered,this,&MainWindow::replaceLigandTemplate);
     add("리간드 템플릿 저장...",[this]{saveLigandTemplate();});
     add("금속–리간드–산소 조합...",[this]{buildLabComplex();});
     add("Scan 접근 배치...",[this]{arrangeScanApproach();});menu->addSeparator();

@@ -46,6 +46,7 @@
 #include "model/GeometryEditor.h"
 #include "model/StructureTools.h"
 #include "model/LabComplexBuilder.h"
+#include "model/LigandReplacement.h"
 #include <QDir>
 #include <QListWidget>
 #include <QSignalBlocker>
@@ -108,6 +109,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void ligandReplacementWorkflow();
     void orbitalCacheAndDetachedWindow();
     void reactionCoordinatePresentationWorkflow();
     void hydrogenRemovalActions();
@@ -3770,6 +3772,50 @@ void SmokeTest::pastedXYZWorkflow() {
     if(!capture.isEmpty()){auto *tabs=window.m_analysis->findChild<QTabWidget *>();tabs->setCurrentIndex(tabs->count()-1);QTest::qWait(200);QVERIFY(window.grab().save(capture+".xyz.png"));}
 }
 #include "reaction_capture_workflow.inc"
+
+void SmokeTest::ligandReplacementWorkflow(){
+    const auto library=FragmentLibrary::load();const Fragment *ligand=nullptr,*adduct=nullptr;
+    for(const auto &f:library){if(f.category=="lab-ligand"&&!ligand)ligand=&f;if(f.category=="lab-adduct"&&!adduct)adduct=&f;}
+    QVERIFY(ligand);QVERIFY(adduct);Molecule source;QString error;
+    QVERIFY(LabComplexBuilder::assemble(*ligand,*adduct,26,3,1,6,source,&error));
+    MainWindow window;window.newDrawingDocument(source);window.setDrawingMode(false);
+    auto *action=window.findChild<QAction *>("ReplaceLigandTemplate");QVERIFY(action);
+    const int initialTabs=window.m_documentTabs->count();
+    // Cancel must leave the original tab and molecule untouched.
+    QTimer::singleShot(0,&window,[&]{auto *d=window.findChild<QDialog *>("LigandReplacementDialog");QVERIFY(d);d->reject();});
+    action->trigger();QCOMPARE(window.m_documentTabs->count(),initialTabs);QCOMPARE(window.m_view->molecule().atoms.size(),source.atoms.size());
+    Molecule expected;QSet<int> removed;
+    QTimer::singleShot(0,&window,[&]{
+        auto *d=window.findChild<QDialog *>("LigandReplacementDialog");QVERIFY(d);
+        auto *candidate=d->findChild<QComboBox *>("ReplacementCandidate");auto *templates=d->findChild<QComboBox *>("ReplacementTemplate");
+        auto *apply=d->findChild<QPushButton *>("ApplyLigandReplacement");QVERIFY(candidate);QVERIFY(templates);QVERIFY(apply);
+        const auto candidates=LigandReplacement::recognize(source,0,library);
+        QVERIFY(candidate->currentIndex()>=0);const auto c=candidates[candidate->currentIndex()];removed=c.atoms;
+        int target=-1;for(int i=0;i<templates->count();++i){const auto &f=library[templates->itemData(i).toInt()];if(f.category=="lab-ligand"&&f.name!=ligand->name&&f.attachments.size()==c.donors.size()){target=i;break;}}
+        QVERIFY(target>=0);templates->setCurrentIndex(target);QVERIFY(apply->isEnabled());
+        QVERIFY(LigandReplacement::replace(source,c,library[templates->currentData().toInt()],{},expected,&error));
+        const QString capture=qEnvironmentVariable("YOUNGCRAFT_LIGAND_PREVIEW");
+        if(!capture.isEmpty()){QTest::qWait(150);QVERIFY(d->grab().save(capture));}
+        auto *spin=d->findChild<QSpinBox *>("ReplacementMultiplicity");QVERIFY(spin);spin->setValue(7);
+        apply->click();
+    });
+    action->trigger();QCOMPARE(window.m_documentTabs->count(),initialTabs+1);
+    QCOMPARE(window.m_view->molecule().atoms.size(),expected.atoms.size());QCOMPARE(window.m_view->molecule().multiplicity,7);
+    for(int i=0;i<expected.atoms.size();++i)QCOMPARE(window.m_view->molecule().atoms[i].position,expected.atoms[i].position);
+    window.m_documentTabs->setCurrentIndex(initialTabs-1);
+    QCOMPARE(window.m_view->molecule().atoms.size(),source.atoms.size());
+    for(int i=0;i<source.atoms.size();++i)QCOMPARE(window.m_view->molecule().atoms[i].position,source.atoms[i].position);
+    // Selected reaction atoms are protected by default.
+    window.m_view->selection().atoms={*removed.begin()};
+    QTimer::singleShot(0,&window,[&]{auto *d=window.findChild<QDialog *>("LigandReplacementDialog");QVERIFY(d);
+        auto *candidate=d->findChild<QComboBox *>("ReplacementCandidate");
+        const auto candidates=LigandReplacement::recognize(source,0,library);
+        for(int i=0;i<candidates.size();++i)if(candidates[i].atoms==removed)candidate->setCurrentIndex(i);
+        QVERIFY(!d->findChild<QPushButton *>("ApplyLigandReplacement")->isEnabled());d->reject();
+    });
+    action->trigger();QCOMPARE(window.m_documentTabs->count(),initialTabs+1);
+}
+
 void SmokeTest::orbitalCacheAndDetachedWindow() {
     MainWindow owner; owner.resize(1200,800); owner.show();
     auto *open=owner.m_analysis->findChild<QPushButton*>("OpenOrbitalWindow"); QVERIFY(open);
