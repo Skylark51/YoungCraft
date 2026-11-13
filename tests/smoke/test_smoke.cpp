@@ -2328,9 +2328,22 @@ void SmokeTest::startupSplashShowsAndCloses() {
     QWidget ready;QElapsedTimer elapsed;elapsed.start();bool completed=false;
     splash.finishWhenReady(&ready,[&]{completed=true;});
     QTest::mouseClick(&splash,Qt::LeftButton);
-    QTest::qWait(650);QVERIFY(splash.isVisible());QVERIFY(!ready.isVisible());QVERIFY(!completed);
-    QTRY_VERIFY_WITH_TIMEOUT(!splash.isVisible(),1200);QVERIFY(ready.isVisible());QVERIFY(completed);QVERIFY(elapsed.elapsed()>=950);QVERIFY(elapsed.elapsed()<1700);
+    QTest::qWait(250);QVERIFY(splash.isVisible());QVERIFY(!ready.isVisible());QVERIFY(!completed);
+    QTRY_VERIFY_WITH_TIMEOUT(!splash.isVisible(),1200);QVERIFY(ready.isVisible());QVERIFY(completed);QVERIFY(elapsed.elapsed()>=480);QVERIFY(elapsed.elapsed()<1000);
     qInfo()<<"Splash-to-workspace elapsed milliseconds:"<<elapsed.elapsed();
+    // Readiness before show must not consume the logo's visible interval.
+    StartupSplash delayed;QWidget delayedReady;bool delayedCompleted=false;
+    delayed.finishWhenReady(&delayedReady,[&]{delayedCompleted=true;});
+    QTest::qWait(550);QVERIFY(!delayedReady.isVisible());QVERIFY(!delayedCompleted);
+    QElapsedTimer delayedElapsed;delayedElapsed.start();delayed.show();
+    QTest::qWait(250);QVERIFY(delayed.isVisible());QVERIFY(!delayedReady.isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(delayedCompleted,1000);QVERIFY(delayedElapsed.elapsed()>=480);
+    // Time spent preparing the workspace after painting is not added again.
+    StartupSplash prepared;prepared.show();QTest::qWait(300);
+    QWidget preparedReady;QElapsedTimer remaining;remaining.start();
+    prepared.finishWhenReady(&preparedReady);
+    QTRY_VERIFY_WITH_TIMEOUT(preparedReady.isVisible(),700);
+    QVERIFY(remaining.elapsed()<450);
     StartupSplash closedEarly;closedEarly.show();auto *temporary=new QWidget;temporary->show();closedEarly.finishWhenReady(temporary);delete temporary;
     QTRY_VERIFY_WITH_TIMEOUT(!closedEarly.isVisible(),4500);
 }
