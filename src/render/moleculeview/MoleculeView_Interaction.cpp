@@ -222,7 +222,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
     bool add=event->modifiers()&Qt::ShiftModifier,toggle=event->modifiers()&Qt::ControlModifier;
     if(event->button()==Qt::RightButton&&!m_dragging&&atom<0&&bond<0){
         m_selection.clear();setSelectedAtom(-1);setGeometrySelection({});emit atomPicked(-1);
-        if(m_drawingMode)endDrawingChain();
+        if(m_drawingMode)setDrawingArmed(false);
     }
     else if(m_centricDrag&&m_dragging){auto b=m_molecule.bonds[m_activeBond];emit bondManipulated(b.first,b.second,m_centricKind,m_centricValue,event->modifiers()&Qt::AltModifier);}
     else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){auto a=m_molecule.atoms[i];if(!a.visible||(!m_style.showHydrogen&&a.atomicNumber==1))continue;auto p=project(a.position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}}

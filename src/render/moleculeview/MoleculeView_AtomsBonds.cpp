@@ -35,7 +35,9 @@ QColor MoleculeView::atomRenderColor(const Atom &atom) const {
 
 float MoleculeView::atomVisualRadius(const Atom &atom) const {
     float radius = m_style.atomScale;
-    if (m_style.displayMode == DisplayMode::SpaceFilling) {
+    if (m_style.showVdwSpheres) {
+        radius = float(vanDerWaalsRadius(atom.atomicNumber));
+    } else if (m_style.displayMode == DisplayMode::SpaceFilling) {
         radius = float(vanDerWaalsRadius(atom.atomicNumber)) * m_style.spaceFillingScale;
     } else if (m_style.displayMode != DisplayMode::Stick) {
         const float covalent = float(covalentRadius(atom.atomicNumber));

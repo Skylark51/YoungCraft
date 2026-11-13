@@ -148,23 +148,20 @@ void MainWindow::createMenus() {
     add(bonds, QStringLiteral("결합 재계산"), {}, [this] { recountBonds(false); });
     add(bonds, QStringLiteral("전체 초기화 후 결합 재계산"), {}, [this] { recountBonds(true); });
     add(bonds, QStringLiteral("모든 결합 지우기"), {}, [this] { Molecule edited = m_view->molecule(); edited.bonds.clear(); commitEditedMolecule(edited, true); });
-    add(coordinates, QStringLiteral("구조 정리"), {}, [this] { m_view->bestView(); setStatus(QStringLiteral("구조 보기를 정리했습니다")); });
     add(coordinates, QStringLiteral("점군 설정"), {}, [this] { setStatus(QStringLiteral("점군 설정")); });
     add(coordinates, QStringLiteral("주축 설정"), {}, [this] { setStatus(QStringLiteral("주축 설정")); });
     add(coordinates, QStringLiteral("원자 드래그"), QKeySequence(QStringLiteral("Ctrl+D")), [this] { setAtomDragMode(!m_dragAtoms); });
     add(coordinates, QStringLiteral("드래그 방식"), {}, [this] { setStatus(QStringLiteral("드래그 방식: 화면 평면")); });
     add(coordinates, QStringLiteral("선택 축을 따라 회전"), {}, [this] { setStatus(QStringLiteral("선택 축을 따라 회전")); });
-    add(capture, QStringLiteral("TS 애니메이션 복사"), QKeySequence(QStringLiteral("Ctrl+Shift+I")), [this] { copyAnimation(); });
+    add(capture, QStringLiteral("TS 애니메이션 복사"), QKeySequence(QStringLiteral("Ctrl+Shift+I")), [this] { copyAnimation(); })->setObjectName("CopyTSAnimation");
     add(capture, QStringLiteral("이미지 복사"), QKeySequence(QStringLiteral("Ctrl+I")), [this] { copyImage(); })
         ->setObjectName(QStringLiteral("CopyStructureImage"));
     add(capture, QStringLiteral("맞춤 캡처 (IRC · TS · IRC)"), QKeySequence(QStringLiteral("Ctrl+Alt+I")), [this] { openReactionCapture(); })
         ->setObjectName(QStringLiteral("CustomStructureCapture"));
     add(capture, QStringLiteral("열린 탭 비교 캡처…"), {}, [this] { openMultiCapture(); })
         ->setObjectName(QStringLiteral("OpenMultiCapture"));
-    add(capture, QStringLiteral("안티앨리어싱 없이 현재 이미지 복사"), {}, [this] { copyImage(); });
 
     edit->addSeparator();
-    add(edit, QStringLiteral("기본 편집기 옵션"), {}, [this] { openStyleEditor(); });
     createBuildMenu();
 
     QMenu *view = menuBar()->addMenu(QStringLiteral("보기"));
@@ -195,9 +192,11 @@ void MainWindow::createMenus() {
     auto *projectionGroup = new QActionGroup(this);
     projectionGroup->setExclusive(true);
     auto *orthographic = add(view, QStringLiteral("직교 보기"), {}, [this] { setPerspective(false); });
-    auto *isometric = add(view, QStringLiteral("등각 보기"), {}, [this] { setPerspective(false); m_view->bestView(); });
+    auto *isometric = add(view, QStringLiteral("등각 보기"), {}, [this] { setPerspective(false); m_view->isometricView(); });
     auto *perspective = add(view, QStringLiteral("원근 보기"), {}, [this] { setPerspective(true); });
     for (QAction *action : {orthographic, isometric, perspective}) { action->setCheckable(true); projectionGroup->addAction(action); }
+    isometric->setObjectName("IsometricView");
+    isometric->setToolTip(QStringLiteral("X·Y·Z 세 축이 같은 길이로 보이는 대각선 시점"));
     perspective->setChecked(m_style.perspective);
     view->addSeparator();
     add(view, QStringLiteral("회전 중심 갱신"), QKeySequence(QStringLiteral("Num5")), [this] { m_view->updateRotationCenter(); });
@@ -231,7 +230,7 @@ void MainWindow::createMenus() {
     });
     auto *propertyLabels = add(labels, QStringLiteral("전하/스핀 밀도 표시"), {}, [this] { m_style.showProperties = !m_style.showProperties; applyStyle(m_style); }); propertyLabels->setCheckable(true); propertyLabels->setChecked(m_style.showProperties);
     m_geometryAction=add(view, QStringLiteral("구조 파라미터(거리/각/이면각) 표시"), {}, [this] { toggleGeometryMode(); });m_geometryAction->setCheckable(true);
-    auto *vdw = add(view, QStringLiteral("반데르발스 구 표시"), {}, [this] { m_style.showVdwSpheres = !m_style.showVdwSpheres; applyStyle(m_style); }); vdw->setCheckable(true); vdw->setChecked(m_style.showVdwSpheres);
+    auto *vdw = add(view, QStringLiteral("반데르발스 구 표시"), {}, [this] { m_style.showVdwSpheres = !m_style.showVdwSpheres; applyStyle(m_style); if(m_style.showVdwSpheres)m_view->bestView(); }); vdw->setObjectName("ShowVdwSpheres"); vdw->setToolTip(QStringLiteral("원소별 반데르발스 반지름으로 공간 채움 표시 · 다시 누르면 기존 스타일 복원")); vdw->setCheckable(true); vdw->setChecked(m_style.showVdwSpheres);
     add(view, QStringLiteral("현재 caption/object를 복제하여 다중 객체 그림 제작"), {}, [this] { setStatus(QStringLiteral("다중 객체 그림 제작")); });
     add(view, QStringLiteral("벡터/등가면을 고정/복제하여 다중 객체 그림 제작"), {}, [this] { setStatus(QStringLiteral("벡터/등가면 객체 복제")); });
     m_atomFocusMenu = view->addMenu(QStringLiteral("선택 원자 강조"));
@@ -306,7 +305,6 @@ void MainWindow::createMenus() {
     add(tools, QStringLiteral("MM 구조 최적화…"), QKeySequence(QStringLiteral("Ctrl+Alt+O")), [this] { startMMOptimization(); })
         ->setObjectName(QStringLiteral("MMOptimizationAction"));
     add(tools, QStringLiteral("사용자 지정 기하학 파라미터(거리/각도/이면각) 적용"), {}, [this] { if(!m_geometryMode)toggleGeometryMode();else setStatus(QStringLiteral("구조 파라미터 편집: 원자를 순서대로 2–4개 선택하세요.")); });
-    add(tools, QStringLiteral("데이터 탐색기"), {}, [this] { if (m_explorerDock) { m_explorerDock->show(); m_explorerDock->raise(); } });
     add(tools, QStringLiteral("Z-matrix 생성"), {}, [this] { showZMatrix(); })->setObjectName("BuildZMatrix");
     add(tools, QStringLiteral("GED 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("GED 도구 기본 골격")); });
     add(tools, QStringLiteral("결정학 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("결정학 도구 기본 골격")); });
@@ -314,11 +312,10 @@ void MainWindow::createMenus() {
     add(tools, QStringLiteral("데이터 요약"), {}, [this] { showToolMessage(QStringLiteral("데이터 요약"), AnalysisEngine::summary(m_data)); });
     add(tools, QStringLiteral("계산 입력파일 구역 생성"), {}, [this] { createGaussianInput(); });
     add(tools, QStringLiteral("분자 조각 추출기"), {}, [this] { extractStructureFragments(); });
-    add(tools, QStringLiteral("오비탈"), {}, [this] { m_explorerDock->show(); m_analysis->setCurrentTab(6); setStatus(QStringLiteral("오비탈 목록을 Context Sidebar에 표시합니다")); });
     tools->addSeparator();
     add(tools, QStringLiteral("구조 비교"), {}, [this] { setStatus(QStringLiteral("구조 비교")); });
     add(tools, QStringLiteral("구조 결합"), {}, [this] { setStatus(QStringLiteral("구조 결합")); });
-    add(tools, QStringLiteral("분자량 계산"), {}, [this] { setStatus(QStringLiteral("분자량: %1 Da").arg(AnalysisEngine::molecularMass(m_data.molecule), 0, 'f', 4)); });
+    add(tools, QStringLiteral("분자량 계산"), {}, [this] { showMolecularInformation(); })->setObjectName("MolecularInformationAction");
     add(tools, QStringLiteral("관성모멘트 계산"), {}, [this] { const QVector3D i = AnalysisEngine::principalMomentApproximation(m_data.molecule); setStatus(QStringLiteral("관성모멘트 근사: %1 / %2 / %3").arg(i.x(), 0, 'f', 3).arg(i.y(), 0, 'f', 3).arg(i.z(), 0, 'f', 3)); });
     add(tools, QStringLiteral("충돌 직경 계산"), {}, [this] { setStatus(QStringLiteral("충돌 직경 근사: %1 Å").arg(AnalysisEngine::collisionDiameter(m_data.molecule), 0, 'f', 3)); });
     add(tools, QStringLiteral("분자 면적 계산"), {}, [this] { setStatus(QStringLiteral("분자 면적 근사: %1 Å²").arg(AnalysisEngine::molecularAreaApproximation(m_data.molecule), 0, 'f', 3)); });
@@ -330,14 +327,13 @@ void MainWindow::createMenus() {
     tools->addSeparator();
     add(tools, QStringLiteral("간단 유틸리티"), {}, [this] { setStatus(QStringLiteral("간단 유틸리티")); });
     add(tools, QStringLiteral("스크립트"), {}, [this] { setStatus(QStringLiteral("스크립트")); });
-    add(tools, QStringLiteral("지원/도움말"), {}, [this] { showToolMessage(QStringLiteral("지원/도움말"), QStringLiteral("Youngcraft: Gaussian 결과를 빠르게 탐색하는 경량 분자 뷰어\n단축키: Ctrl+O 열기, Ctrl+I 이미지 복사, Enter 최적 보기, P 재생")); });
     add(tools, QStringLiteral("잘못 인식된 결합 수정 도구"), {}, [this] { setStatus(QStringLiteral("결합 cutoff는 표시 스타일/환경설정에서 조정할 수 있습니다")); });
     add(tools, QStringLiteral("파일 연결 설정"), {}, [this] { setStatus(QStringLiteral("Windows 파일 연결 설정은 휴대용 배포 정책상 직접 변경하지 않습니다")); });
     add(tools, QStringLiteral("사용자 그래프 유틸리티"), {}, [this] { setStatus(QStringLiteral("사용자 그래프 유틸리티")); });
     add(tools, QStringLiteral("작업 기록/보관"), {}, [this] { setStatus(QStringLiteral("작업 기록/보관")); });
-    add(tools, QStringLiteral("환경설정"), {}, [this] { openStyleEditor(); });
 
-    auto *orbitals = menuBar()->addMenu(QStringLiteral("Orbitals"));
+    auto *orbitals = new QMenu(QStringLiteral("Orbitals"), this);
+    orbitals->setObjectName("OrbitalToolsMenu");
     orbitals->addAction(QStringLiteral("FMO / MEP / NBO / Wiberg"), this, [this] {
         m_analysis->setCurrentTab(6); m_explorerDock->show(); m_explorerDock->raise();
     });
@@ -346,7 +342,11 @@ void MainWindow::createMenus() {
             QStringLiteral("Checkpoint / cube (*.chk *.fchk *.fch *.cube *.cub);;Gaussian output (*.out *.log)"));
         if (!path.isEmpty()) openFile(path);
     });
+    auto *settingsAction=new QAction(QStringLiteral("환경설정"),this);
+    settingsAction->setObjectName("ApplicationSettingsAction");
+    connect(settingsAction,&QAction::triggered,this,&MainWindow::openStyleEditor);
     QMenu *help = menuBar()->addMenu(QStringLiteral("도움말"));
+    add(help,QStringLiteral("사용 방법 · 단축키"),{},[this]{showToolMessage(QStringLiteral("사용 방법 · 단축키"),QStringLiteral("Ctrl+O: 열기\nCtrl+I: 이미지 복사\nEnter: 베스트 뷰\nP: 재생\n그리기 공백 우클릭: 선택 모드\n우클릭 드래그: 회전"));});
     add(help, QStringLiteral("Youngcraft 정보"), {}, [this] { showToolMessage(QStringLiteral("Youngcraft 정보"), QStringLiteral("Made by Youngseob Lee, Since 2026, only for JBNU and BIOCC")); });
 }
 

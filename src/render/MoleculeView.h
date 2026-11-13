@@ -59,7 +59,7 @@ public:
         if(m_drawingMode!=enabled)setDrawingArmed(false);
         m_drawingMode = enabled;
         if (!enabled) endDrawingChain();
-        setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+        setCursor(enabled && m_drawingArmed ? Qt::CrossCursor : Qt::ArrowCursor);
         if (m_previewOverlay) m_previewOverlay->update();
     }
     void setAtomDragMode(bool enabled) { m_atomDragMode = enabled; if(!enabled)m_transformMode=0; }
@@ -67,7 +67,12 @@ public:
     void setTransformMode(int mode) { m_transformMode=mode; }
     int transformMode() const { return m_transformMode; }
     bool drawingArmed() const { return m_drawingArmed; }
-    void setDrawingArmed(bool armed) { m_drawingArmed=armed; if(!armed)endDrawingChain(); emit drawingToolChanged(armed); }
+    void setDrawingArmed(bool armed) {
+        m_drawingArmed=armed;
+        if(!armed){endDrawingChain();clearInsertionPreview();setProperty("pendingFragment",QString());setProperty("pendingCenter",0);}
+        setCursor(armed?Qt::CrossCursor:Qt::ArrowCursor);
+        emit drawingToolChanged(armed);
+    }
     void setDrawingElement(int atomicNumber) { setDrawingArmed(true); m_drawAtomicNumber = atomicNumber; if (m_previewOverlay) m_previewOverlay->update(); }
     SelectionModel &selection() { return m_selection; }
     const SelectionModel &selection() const { return m_selection; }
@@ -85,6 +90,7 @@ public:
     void rebuildBonds(double cutoffScale, bool includeHydrogen, bool includeMetalCoordination);
     void centerOnMolecule();
     void bestView();
+    void isometricView();
     void updateRotationCenter(bool selectedOnly = false);
     void setSelectedAtom(int index);
     int selectedAtom() const { return m_selectedAtom; }

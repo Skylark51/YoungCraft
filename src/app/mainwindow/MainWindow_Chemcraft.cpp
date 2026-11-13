@@ -1,4 +1,6 @@
 #include "app/MainWindow.h"
+#include "analysis/AnalysisEngine.h"
+#include <algorithm>
 #include "model/StructureTools.h"
 #include "render/MoleculeView.h"
 #include "animation/AnimationController.h"
@@ -112,6 +114,27 @@ void MainWindow::extractStructureFragments() {
     for(int i=0;i<fragments.size();++i){newDrawingDocument(fragments[i]);setDrawingMode(false);m_documentTabs->setTabText(m_documentTabs->currentIndex(),QStringLiteral("추출 조각 %1").arg(i+1));}
     setStatus(QStringLiteral("%1개 조각을 새 탭으로 추출했습니다.").arg(fragments.size()));
 }
+void MainWindow::showMolecularInformation() {
+    const auto &molecule=m_view->molecule();
+    const auto formula=AnalysisEngine::molecularFormula(molecule);
+    QDialog dialog(this);dialog.setObjectName("MolecularInformationDialog");
+    dialog.setWindowTitle(QStringLiteral("화학식 · 분자량"));
+    QVBoxLayout layout(&dialog);QFormLayout form;
+    QLabel formulaLabel(formula.isEmpty()?QStringLiteral("—"):formula);
+    formulaLabel.setWordWrap(true);formulaLabel.setObjectName("MolecularFormula");formulaLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
+    const bool knownMass=std::all_of(molecule.atoms.cbegin(),molecule.atoms.cend(),[](const Atom &atom){return atom.atomicNumber==0||atomicMass(atom.atomicNumber)>0;});
+    QLabel massLabel(knownMass&&!formula.isEmpty()?QStringLiteral("%1 g/mol").arg(AnalysisEngine::molecularMass(molecule),0,'f',4):QStringLiteral("—"));
+    massLabel.setObjectName("MolecularMass");massLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
+    form.addRow(QStringLiteral("전체 화학식"),&formulaLabel);form.addRow(QStringLiteral("전체 분자량"),&massLabel);
+    layout.addLayout(&form);
+    QLabel note(formula.isEmpty()?QStringLiteral("분자 구조를 먼저 여세요."):!knownMass?QStringLiteral("표준 원자량이 없는 원소는 동위원소 질량 지정이 필요합니다."):QStringLiteral("숨긴 원자를 포함한 전체 구조 기준"));
+    note.setWordWrap(true);
+    layout.addWidget(&note);
+    QDialogButtonBox buttons(QDialogButtonBox::Ok);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));
+    layout.addWidget(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+    dialog.exec();
+}
+
 void MainWindow::showZMatrix() {
     QString error;const auto text=StructureTools::zMatrix(m_view->molecule(),&error);
     if(text.isEmpty()){setStatus(error.isEmpty()?QStringLiteral("분자 구조를 먼저 여세요."):error,10000);return;}

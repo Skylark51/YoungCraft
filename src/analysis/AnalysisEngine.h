@@ -15,6 +15,7 @@ enum class SpectrumLineShape {
 
 class AnalysisEngine {
 public:
+    static QString molecularFormula(const Molecule &molecule);
     static double molecularMass(const Molecule &molecule);
     static QVector3D principalMomentApproximation(const Molecule &molecule);
     static double collisionDiameter(const Molecule &molecule);
