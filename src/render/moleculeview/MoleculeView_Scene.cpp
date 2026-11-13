@@ -220,10 +220,10 @@ void MoleculeView::paintGL() {
     // Resolve the 3D scene before QPainter draws annotations in logical pixels.
     if (m_supersamplingActive) resolveSupersampling();
     if (m_cellVisible) drawCrystalCell(vp);
-    if (m_style.showVibrationVectors) drawVibrationVectors(vp);
     // Screen-space annotations must remain visible over every rendered atom.
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    if (m_style.showVibrationVectors) drawVibrationVectors(vp);
     drawLabels(vp);
     drawGeometryMeasurements(vp);
     if (m_potentialGrid && m_style.showPositiveSurface) {

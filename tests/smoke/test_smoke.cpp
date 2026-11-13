@@ -109,6 +109,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void vibrationVectorContrast();
     void ligandReplacementWorkflow();
     void orbitalCacheAndDetachedWindow();
     void reactionCoordinatePresentationWorkflow();
@@ -3772,6 +3773,40 @@ void SmokeTest::pastedXYZWorkflow() {
     if(!capture.isEmpty()){auto *tabs=window.m_analysis->findChild<QTabWidget *>();tabs->setCurrentIndex(tabs->count()-1);QTest::qWait(200);QVERIFY(window.grab().save(capture+".xyz.png"));}
 }
 #include "reaction_capture_workflow.inc"
+
+
+void SmokeTest::vibrationVectorContrast(){
+    MoleculeView view;view.resize(560,420);view.show();QTRY_VERIFY(view.isValid());
+    Molecule molecule;molecule.atoms={{1,6,"C",{-1,0,0}},{2,8,"O",{1,0,0}}};
+    molecule.setBond(0,1,1);view.setMolecule(molecule);view.m_rotation=QQuaternion();
+    FrequencyMode mode;mode.displacement={{0,0.9f,0},{0,-0.9f,0}};view.setFrequencyMode(&mode);
+    QImage montage(1120,840,QImage::Format_ARGB32);montage.fill(Qt::white);
+    for(int theme=0;theme<2;++theme)for(int scaled=0;scaled<2;++scaled){
+        auto style=StyleManager::preset("Youngcraft Studio");style.background=theme?QColor(18,24,32):QColor(Qt::white);
+        style.vectorColor=style.background;style.showAxes=false;style.showLabels=false;style.shadows=false;
+        style.showVibrationVectors=false;view.setStyle(style);view.setVibrationVectorScaleFactor(scaled?0.5:1.0);
+        const auto baseline=view.imageAtSize({560,420});
+        style.showVibrationVectors=true;view.setStyle(style);const auto rendered=view.imageAtSize({560,420});
+        int colored=0,changed=0;
+        for(int y=0;y<rendered.height();++y)for(int x=0;x<rendered.width();++x){
+            const auto c=rendered.pixelColor(x,y);
+            if(theme?(c.green()>150&&c.blue()>180&&c.red()<130):(c.blue()>110&&c.red()<70&&c.green()<110))++colored;
+            if(c!=baseline.pixelColor(x,y))++changed;
+        }
+        QVERIFY2(colored>40,qPrintable(QString("theme=%1 scaled=%2 colored=%3").arg(theme).arg(scaled).arg(colored)));
+        QVERIFY(changed>100);
+        QPainter painter(&montage);painter.drawImage(scaled*560,theme*420,rendered);
+    }
+    auto style=view.m_style;style.background=Qt::white;style.vectorColor=QColor(135,15,35);view.setStyle(style);
+    auto rendered=view.imageAtSize({560,420});int red=0;
+    for(int y=0;y<rendered.height();++y)for(int x=0;x<rendered.width();++x){auto c=rendered.pixelColor(x,y);if(c.red()>100&&c.red()<170&&c.green()<45&&c.blue()<65)++red;}
+    QVERIFY(red>40); // A sufficiently contrasting user color is preserved.
+    style.background=Qt::black;style.vectorColor=QColor(255,255,255,5);view.setStyle(style);
+    rendered=view.imageAtSize({560,420},true);int blue=0;
+    for(int y=0;y<rendered.height();++y)for(int x=0;x<rendered.width();++x){auto c=rendered.pixelColor(x,y);if(c.alpha()>200&&c.blue()>110&&c.red()<70&&c.green()<110)++blue;}
+    QVERIFY(blue>40); // Transparent exports remain visible when pasted on white.
+    const auto path=qEnvironmentVariable("YOUNGCRAFT_VECTOR_PREVIEW");if(!path.isEmpty())QVERIFY(montage.save(path));
+}
 
 void SmokeTest::ligandReplacementWorkflow(){
     const auto library=FragmentLibrary::load();const Fragment *ligand=nullptr,*adduct=nullptr;
