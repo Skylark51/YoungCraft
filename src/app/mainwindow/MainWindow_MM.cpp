@@ -220,7 +220,8 @@ void MainWindow::startMMOptimization() {
     form->addRow(constraints);
     form->addRow(m_mmBar);
     auto *run=new QPushButton(QStringLiteral("MM 최적화 시작"),panel);run->setObjectName("MMStart");
-    makeSidebarIconButton(run,QStyle::SP_MediaPlay);form->addRow(run);
+    makeSidebarIconButton(run,QStyle::SP_MediaPlay);
+    auto *runRow=new QHBoxLayout;runRow->addStretch();runRow->addWidget(run);form->addRow(runRow);
     connect(run,&QPushButton::clicked,panel,[this,source,snapshot,field,steps,retainBonds,constraints]{
         if(!source || source!=m_view){setStatus(QStringLiteral("현재 molecule에서 MM 패널을 다시 여세요."));return;}
         const auto &current=source->molecule();
