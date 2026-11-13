@@ -16,6 +16,7 @@ add_library(youngcraft_app OBJECT
     mainwindow/MainWindow_Geometry.cpp
     mainwindow/MainWindow_LabComplex.cpp
     mainwindow/MainWindow_FragmentBrowser.cpp
+    mainwindow/MainWindow_LigandReplacement.cpp
     mainwindow/MainWindow_Editor.cpp
     ParseWorker.cpp
     ${PROJECT_SOURCE_DIR}/resources/youngcraft.qrc

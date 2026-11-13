@@ -2,6 +2,7 @@ add_library(youngcraft_model STATIC
     StructureTools.cpp
     MoleculeEditController.cpp
     FragmentLibrary.cpp
+    LigandReplacement.cpp
     Molecule.cpp
     GeometryEditor.cpp
 )

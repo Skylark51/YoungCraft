@@ -187,6 +187,7 @@ private:
     void showZMatrix();
     void createGaussianInput();
     void openFragmentBrowser(bool labOnly = false);
+    void replaceLigandTemplate();
     void insertCoordinationDialog();
     bool consumeInsertion(int target, const QVector3D &position, const QVector3D &direction = {1,0,0});
     void undoDrawingEdit();
