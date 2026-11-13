@@ -12,7 +12,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QGridLayout>
+#include "ui/SidebarFlowLayout.h"
 #include <QRegularExpression>
 
 namespace youngcraft {
@@ -32,14 +32,14 @@ public:
         table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         table->setMinimumWidth(0);table->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
         table->setMinimumHeight(100); table->setMaximumHeight(160); layout->addWidget(table);
-        auto *buttons = new QGridLayout; layout->addLayout(buttons);
-        const int columns=compactButtons?2:4;
+        auto *buttons = new SidebarFlowLayout; layout->addLayout(buttons);
+        buttons->setObjectName("ConstraintActions");
         auto *add = new QPushButton(QStringLiteral("추가 / 선택 원자 가져오기")); add->setObjectName("AddConstraint");
         auto *remove = new QPushButton(QStringLiteral("선택 행 삭제")); remove->setObjectName("RemoveConstraint");
-        buttons->addWidget(add,0,0); buttons->addWidget(remove,0,1);
+        buttons->addWidget(add); buttons->addWidget(remove);
         auto *freeze = new QPushButton(QStringLiteral("선택 원자 고정")); freeze->setObjectName("FreezeSelectedAtoms");
         auto *all = new QPushButton(QStringLiteral("현재 전체 고정")); all->setObjectName("FreezeAllAtoms");
-        buttons->addWidget(freeze,2/columns,2%columns); buttons->addWidget(all,3/columns,3%columns);
+        buttons->addWidget(freeze); buttons->addWidget(all);
         auto appendFixed = [this](const QVector<int> &ids) {
             QVector<GeometryConstraint> entries; QString error;
             read(entries,&error);

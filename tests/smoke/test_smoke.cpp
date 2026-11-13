@@ -1919,7 +1919,12 @@ void SmokeTest::xtbCompactColumns(){
             dialog->resize(size);QTest::qWait(35);QCOMPARE(dialog->size(),size);
             QVERIFY(left->mapTo(dialog,QPoint(left->width(),0)).x()<=right->mapTo(dialog,QPoint()).x());
             QCOMPARE(left->horizontalScrollBar()->maximum(),0);QCOMPARE(right->horizontalScrollBar()->maximum(),0);
-            QCOMPARE(add->y(),remove->y());QCOMPARE(freeze->y(),all->y());QCOMPARE(add->x(),freeze->x());QVERIFY(freeze->y()>add->y());
+            auto *actions=editor->findChild<QLayout *>("ConstraintActions");QVERIFY(actions);
+            const auto origin=actions->geometry().topLeft();
+            const int columns=qMax(1,(actions->geometry().width()+4)/36);
+            const QList<QPushButton *> buttons{add,remove,freeze,all};
+            for(int i=0;i<buttons.size();++i)
+                QCOMPARE(buttons[i]->pos(),origin+QPoint((i%columns)*36,(i/columns)*36));
             int y=-1;
             for(const char *name:{"XtbStart","XtbCancel","XtbOutput","XtbApply","XtbOpen","XtbSave"}){
                 auto *button=dialog->findChild<QPushButton*>(name);QVERIFY(button);const auto position=button->mapTo(dialog,QPoint());
@@ -3477,6 +3482,21 @@ void SmokeTest::sidebarIconFlowLayout(){
     };
     for(int width:{32,68,104,176,320})verify(width);
     controls[2]->hide();verify(104);controls[2]->show();verify(320);host.hide();
+
+    // Constraint actions stay contiguous and wrap in order in narrow panels.
+    for(bool compact:{false,true}) {
+        ConstraintEditor editor(Molecule{},QVector<int>{},nullptr,compact);
+        editor.show();
+        for(int width:{104,188,284,360}) {
+            editor.resize(width,320);QTest::qWait(20);
+            auto *actions=editor.findChild<QLayout *>("ConstraintActions");QVERIFY(actions);
+            const auto origin=actions->geometry().topLeft();
+            const int columns=qMax(1,(actions->geometry().width()+4)/36);
+            for(int i=0;i<4;++i) {
+                QCOMPARE(actions->itemAt(i)->geometry(),QRect(origin+QPoint((i%columns)*36,(i/columns)*36),QSize(32,32)));
+            }
+        }
+    }
 
     const auto oldOrg=QCoreApplication::organizationName(),oldApp=QCoreApplication::applicationName();
     QCoreApplication::setOrganizationName("YoungcraftTest");QCoreApplication::setApplicationName("SidebarIconFlow");QSettings().clear();
