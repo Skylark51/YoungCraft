@@ -114,8 +114,8 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     outer->addWidget(scroll);
     auto *content=new QWidget;
     auto *layout=new QVBoxLayout(content);
-    auto *help=new QLabel(QStringLiteral("반응 경로 파일을 순서대로 넣으세요. 공통 원자를 따라 부드럽게 움직이고 이탈 조각은 위로 이동합니다.\n"
-        "IRC·다중 XYZ의 경로 프레임을 사용할 수 있습니다. 원자 수·순서가 달라지는 구간은 ‘원자 대응’에서 확인하세요. 구조 사이 보간은 분자동역학 계산이 아닙니다."));
+    auto *help=new QLabel(QStringLiteral("반응 경로 파일을 순서대로 넣으세요. 공통 원자를 따라 부드럽게 움직이고 이탈 fragment은 위로 이동합니다.\n"
+        "IRC·다중 XYZ의 경로 프레임을 사용할 수 있습니다. 원자 수·순서가 달라지는 구간은 ‘원자 대응’에서 확인하세요. 구조 사이 보간은 molecule동역학 계산이 아닙니다."));
     help->setWordWrap(true);layout->addWidget(help);
     auto *splitter=new QSplitter;layout->addWidget(splitter,1);
     m_controls=new QWidget;auto *left=new QVBoxLayout(m_controls);left->setContentsMargins(0,0,0,0);splitter->addWidget(m_controls);
@@ -153,8 +153,8 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     m_path=new QCheckBox(QStringLiteral("추가할 파일의 IRC·다중 XYZ 경로 사용"));m_path->setChecked(true);left->addWidget(m_path);
     m_align=new QCheckBox(QStringLiteral("공통 원자로 단계 간 회전·위치 정렬"));m_align->setChecked(true);left->addWidget(m_align);
     m_preserve=new QCheckBox(QStringLiteral("변하지 않는 결합 길이 유지"));m_preserve->setChecked(true);left->addWidget(m_preserve);
-    m_keep=new QCheckBox(QStringLiteral("이탈 조각을 위에 반투명하게 남기기"));m_keep->setChecked(true);left->addWidget(m_keep);
-    auto *liftRow=new QHBoxLayout;left->addLayout(liftRow);liftRow->addWidget(new QLabel(QStringLiteral("조각 이동 높이")));
+    m_keep=new QCheckBox(QStringLiteral("이탈 fragment을 위에 반투명하게 남기기"));m_keep->setChecked(true);left->addWidget(m_keep);
+    auto *liftRow=new QHBoxLayout;left->addLayout(liftRow);liftRow->addWidget(new QLabel(QStringLiteral("fragment 이동 높이")));
     m_lift=new QDoubleSpinBox;m_lift->setRange(0,30);m_lift->setValue(6);m_lift->setSuffix(QStringLiteral(" Å"));liftRow->addWidget(m_lift);
     for(auto *box:{m_align,m_preserve,m_keep})connect(box,&QCheckBox::toggled,this,[this]{rebuild();});
     connect(m_lift,&QDoubleSpinBox::valueChanged,this,[this]{rebuild();});
@@ -341,14 +341,14 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     connect(fit,&QPushButton::clicked,this,[this]{if(!m_valid)return;play(false);fitTimeline();seek(m_time);});
     connect(playerFit,&QPushButton::clicked,fit,&QPushButton::click);
     auto *fragments=new QHBoxLayout;rightLayout->addLayout(fragments);
-    auto *park=new QPushButton(QStringLiteral("선택 조각 위로 이동")),*unpark=new QPushButton(QStringLiteral("조각 이동 복원"));fragments->addWidget(park);fragments->addWidget(unpark);fragments->addWidget(m_hideHydrogen);
+    auto *park=new QPushButton(QStringLiteral("선택 fragment 위로 이동")),*unpark=new QPushButton(QStringLiteral("fragment 이동 복원"));fragments->addWidget(park);fragments->addWidget(unpark);fragments->addWidget(m_hideHydrogen);
     auto *hydrogens=new QHBoxLayout;rightLayout->addLayout(hydrogens);
     auto *keepH=new QPushButton(QStringLiteral("선택 수소만 표시"));hydrogens->addWidget(keepH);
     auto *restoreH=new QPushButton(QStringLiteral("수소 전체 표시"));hydrogens->addWidget(restoreH);
     connect(keepH,&QPushButton::clicked,this,[this]{keepSelectedHydrogens(m_view);});
     connect(restoreH,&QPushButton::clicked,this,restoreHydrogens);
-    park->setToolTip(QStringLiteral("OTf 등 이동할 조각의 모든 원자를 선택하세요. 현재 시점부터 1.2초 동안 위로 움직이고 반투명해집니다."));
-    connect(park,&QPushButton::clicked,this,[this]{if(!m_valid||m_exporting)return;const auto selected=m_view->selection().atoms;if(selected.isEmpty()){m_status->setText(QStringLiteral("먼저 이동할 조각 전체의 원자를 선택하세요."));return;}play(false);m_parked=selected;m_parkStart=m_time;m_timeline.park(m_parked,m_parkStart);seek(m_time);m_status->setText(QStringLiteral("선택 조각은 현재 시점부터 위로 이동합니다. ‘전체 경로 맞춤’으로 이동 영역까지 볼 수 있습니다."));});
+    park->setToolTip(QStringLiteral("OTf 등 이동할 fragment의 모든 원자를 선택하세요. 현재 시점부터 1.2초 동안 위로 움직이고 반투명해집니다."));
+    connect(park,&QPushButton::clicked,this,[this]{if(!m_valid||m_exporting)return;const auto selected=m_view->selection().atoms;if(selected.isEmpty()){m_status->setText(QStringLiteral("먼저 이동할 fragment 전체의 원자를 선택하세요."));return;}play(false);m_parked=selected;m_parkStart=m_time;m_timeline.park(m_parked,m_parkStart);seek(m_time);m_status->setText(QStringLiteral("선택 fragment은 현재 시점부터 위로 이동합니다. ‘전체 경로 맞춤’으로 이동 영역까지 볼 수 있습니다."));});
     connect(unpark,&QPushButton::clicked,this,[this]{m_parked.clear();m_timeline.park({},0);seek(m_time);});
     auto *exportSettings=new QHBoxLayout;rightLayout->addLayout(exportSettings);
     m_resolution=new QComboBox;for(int width:{640,960,1280,1920})m_resolution->addItem(QStringLiteral("%1 × %2").arg(width).arg(width*9/16),width);m_resolution->setCurrentIndex(1);exportSettings->addWidget(m_resolution);

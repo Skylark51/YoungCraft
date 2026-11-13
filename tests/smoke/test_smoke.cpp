@@ -1,3 +1,4 @@
+#include <QTextBrowser>
 #include <QScreen>
 #include "compute/GaussianConnection.h"
 #include "analysis/AnalysisEngine.h"
@@ -110,6 +111,10 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void unlimitedSelectionAndHoverElements();
+    void sidebarOptimizationFixedSelection();
+    void bilingualCategorizedHelp();
+    void periodicTableGrouping();
     void vibrationVectorLengthControl();
     void vibrationVectorContrast();
     void ligandReplacementWorkflow();
@@ -578,8 +583,8 @@ void SmokeTest::chargedMMFormalChargesReachWorker() {
     for(int i=1;i<5;++i)m.setBond(0,i,1);
     w.newDrawingDocument(m);w.setDrawingMode(false);
     QTimer::singleShot(10,&w,[&]{
-        auto *options=qobject_cast<QDialog *>(QApplication::activeModalWidget());QVERIFY(options);
-        options->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+        auto *options=w.findChild<QWidget *>("MMOptimizationPanel");QVERIFY(options);
+        options->findChild<QPushButton *>("MMStart")->click();
     });
     w.startMMOptimization();
     QTRY_VERIFY_WITH_TIMEOUT(w.m_mmState==MainWindow::MMState::Finished || w.m_mmState==MainWindow::MMState::Failed,10000);
@@ -600,10 +605,10 @@ void SmokeTest::chargedMMFallbackPreservesConstraints() {
     w.newDrawingDocument(m);w.setDrawingMode(false);
     const QVector<GeometryConstraint> entries={{"fixed",{0},0},{"distance",{0,1},1.1},{"angle",{1,0,2},105},{"dihedral",{1,0,2,3},-80}};
     QTimer::singleShot(10,&w,[&]{
-        auto *options=qobject_cast<QDialog *>(QApplication::activeModalWidget());QVERIFY(options);
+        auto *options=w.findChild<QWidget *>("MMOptimizationPanel");QVERIFY(options);
         auto *editor=options->findChild<QWidget *>("ConstraintEditor");QVERIFY(editor);
         static_cast<ConstraintEditor *>(editor)->setEntries(entries);
-        options->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+        options->findChild<QPushButton *>("MMStart")->click();
     });
     w.startMMOptimization();
     QTRY_VERIFY_WITH_TIMEOUT(w.findChild<XtbDialog *>(),10000);
@@ -1845,8 +1850,9 @@ void SmokeTest::atomClicksMeasureDistanceAngleAndDihedral() {
     QCOMPARE(window.m_measurementReadout, readout);
     QVERIFY(readout->text().contains(QStringLiteral("거리 2.00 Å")));
     click(4);
-    QCOMPARE(window.m_geometrySelection, QVector<int>({4}));
-    QVERIFY(!readout->text().contains(QStringLiteral("거리 ")));
+    QCOMPARE(window.m_geometrySelection, QVector<int>({0,1,2,3,4}));
+    QCOMPARE(view->selection().atoms.size(),5);
+    QVERIFY(readout->text().contains(QStringLiteral("거리 ")));
     QTest::mouseClick(view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
     QVERIFY(window.m_geometrySelection.isEmpty());
     click(0); click(1);
@@ -1865,8 +1871,8 @@ void SmokeTest::mmChunkRegression() {
     Molecule molecule; molecule.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{2,0,0}}}; molecule.setBond(0,1,1);
     window.newDrawingDocument(molecule);
     QTimer::singleShot(10, &window, [&] {
-        auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget()); QVERIFY(dialog);
-        dialog->findChild<QSpinBox *>()->setValue(120); dialog->accept();
+        auto *dialog=window.findChild<QWidget *>("MMOptimizationPanel"); QVERIFY(dialog);
+        dialog->findChild<QSpinBox *>("MMMaximumSteps")->setValue(120); dialog->findChild<QPushButton *>("MMStart")->click();
     });
     window.startMMOptimization();
     QTRY_VERIFY_WITH_TIMEOUT(window.m_mmStep >= 48, 5000);
@@ -1886,7 +1892,7 @@ void SmokeTest::mmChunkRegression() {
 void SmokeTest::mmPauseResumeStopConverge() {
     qputenv("YOUNGCRAFT_MM_TEST_WORKER", QDir(QCoreApplication::applicationDirPath()).filePath("mock_mm_worker.exe").toUtf8());
     MainWindow window; window.show(); Molecule m;m.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{2,0,0}}};m.setBond(0,1,1);window.newDrawingDocument(m);
-    auto begin=[&]{QTimer::singleShot(10,&window,[&]{auto *d=qobject_cast<QDialog *>(QApplication::activeModalWidget());QVERIFY(d);d->findChild<QSpinBox *>()->setValue(120);d->accept();});window.startMMOptimization();};
+    auto begin=[&]{window.startMMOptimization();auto *d=window.findChild<QWidget *>("MMOptimizationPanel");QVERIFY(d);d->findChild<QSpinBox *>("MMMaximumSteps")->setValue(120);d->findChild<QPushButton *>("MMStart")->click();};
     bool paused=false;
     connect(window.m_mmProgress,&QProgressBar::valueChanged,&window,[&](int step){if(step==48&&!paused){paused=true;window.m_mmPauseButton->click();}});
     begin();QTRY_VERIFY_WITH_TIMEOUT(paused,3000);QCOMPARE(window.m_mmState,MainWindow::MMState::Paused);QTest::qWait(200);QCOMPARE(window.m_mmStep,48);
@@ -2020,6 +2026,7 @@ void SmokeTest::mmStopTerminatesWorker() {
     });
     acceptDialog.start(10);
     optimize->trigger();
+    window.findChild<QPushButton *>("MMStart")->click();
     acceptDialog.stop();
     auto *stop = tabs->currentWidget()->findChild<QPushButton *>(QStringLiteral("MMStopButton"));
     QVERIFY(stop);
@@ -2271,6 +2278,7 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
     });
     acceptDialog.start(10);
     optimizeAction->trigger();
+    window.findChild<QPushButton *>("MMStart")->click();
     acceptDialog.stop();
     QPushButton *pause = nullptr;
     for (QPushButton *candidate : window.findChildren<QPushButton *>(QStringLiteral("MMPauseButton")))
@@ -2316,6 +2324,7 @@ void SmokeTest::geometryEditsFromOrdinarySelection() {
     QVERIFY(!w.m_geometryMode);
     QVERIFY(!w.m_geometryBar->isVisible());
     w.handleGeometryPick(0);w.handleGeometryPick(1);
+    w.m_moleculeWorkspace->findChild<QPushButton *>("EditAtomMeasurement")->click();
     QVERIFY(w.m_geometryBar->isVisible());
     auto apply=[&](const QString &kind,double value){
         w.m_geometryBar->findChild<QDoubleSpinBox *>("Geometry"+kind+"Value")->setValue(value);
@@ -2393,6 +2402,7 @@ void SmokeTest::geometryEditInputAndInvalidSelection() {
     molecule.atoms={{1,6,"C",{0,0,0}},{2,8,"O",{1,0,0}},{3,6,"C",{2,0,0}},{4,7,"N",{3,0,0}}};
     w.newDrawingDocument(molecule);w.setDrawingMode(false);
     for(int i=0;i<4;++i)w.handleGeometryPick(i);
+    w.m_moleculeWorkspace->findChild<QPushButton *>("EditAtomMeasurement")->click();
     QVERIFY(!w.m_geometryBar->findChild<QDoubleSpinBox *>("GeometryDihedralValue")->isEnabled());
     auto *value=w.m_geometryBar->findChild<QDoubleSpinBox *>("GeometryDistanceValue");
     value->setFocus();value->setValue(1.5);
@@ -4568,6 +4578,126 @@ void SmokeTest::suppliedMechanismPreview() {
         QVERIFY2(dialog->exportAnimation(preview+".gif","gif",640,25),qPrintable(dialog->m_status->text()));
     }
     dialog->close();
+}
+
+
+void SmokeTest::unlimitedSelectionAndHoverElements() {
+    MainWindow w;w.resize(1380,900);w.show();
+    Molecule m;for(int i=0;i<7;++i)m.atoms<<Atom{i+1,6,"C",{float(i*1.5),float(i%2),0}};
+    w.newDrawingDocument(m);w.setDrawingMode(false);auto *view=w.m_view;view->bestView();QTest::qWait(100);
+    auto screen=[&](int i){auto p=view->project(view->molecule().atoms[i].position,view->viewProjection());return QPoint(qRound(p.x()),qRound(p.y()));};
+    const int height=view->height();
+    for(int i=0;i<7;++i)QTest::mouseClick(view,Qt::LeftButton,Qt::NoModifier,screen(i));
+    QCOMPARE(w.m_geometrySelection.size(),7);QCOMPARE(view->selection().atoms.size(),7);QCOMPARE(view->height(),height);
+    QVERIFY(!w.m_geometryBar->isVisible());
+    QTest::mouseClick(view,Qt::LeftButton,Qt::NoModifier,screen(2));
+    QCOMPARE(w.m_geometrySelection,QVector<int>({0,1,3,4,5,6}));QVERIFY(!view->selection().atoms.contains(2));
+    // Tiny hand movement remains a click, not a drag.
+    const auto pos=screen(2);QTest::mousePress(view,Qt::LeftButton,Qt::NoModifier,pos);
+    QMouseEvent move(QEvent::MouseMove,QPointF(pos+QPoint(2,1)),QPointF(view->mapToGlobal(pos+QPoint(2,1))),Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&move);QTest::mouseRelease(view,Qt::LeftButton,Qt::NoModifier,pos+QPoint(2,1));
+    QCOMPARE(view->selection().atoms.size(),7);
+    w.setDrawingMode(true);view->setDrawingArmed(false);
+    const auto target=screen(0);
+    QMouseEvent hover(QEvent::MouseMove,QPointF(target),QPointF(view->mapToGlobal(target)),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&hover);QCOMPARE(view->hoveredAtom(),0);
+    QTest::keyClick(&w,Qt::Key_N);QCOMPARE(view->molecule().atoms[0].atomicNumber,7);
+    QTest::keyClick(&w,Qt::Key_C);QCOMPARE(view->molecule().atoms[0].atomicNumber,6);
+    QTest::keyClick(&w,Qt::Key_C);QCOMPARE(view->molecule().atoms[0].atomicNumber,17);
+    QCOMPARE(view->molecule().atoms.size(),7);
+    w.undoDrawingEdit();QCOMPARE(view->molecule().atoms[0].atomicNumber,6);
+    // Text inputs keep ordinary typing semantics.
+    auto *input=new QLineEdit(&w);input->show();input->setFocus();QTest::keyClick(input,Qt::Key_O);
+    QCOMPARE(input->text(),QString("o"));QCOMPARE(view->molecule().atoms[0].atomicNumber,6);delete input;
+}
+void SmokeTest::sidebarOptimizationFixedSelection() {
+    MainWindow w;w.resize(1380,900);w.show();
+    Molecule water;water.atoms={{1,8,"O",{2,3,1}},{2,1,"H",{3.2f,3,1}},{3,1,"H",{1.7f,4.1f,1}}};water.setBond(0,1,1);water.setBond(0,2,1);
+    w.newDrawingDocument(water);w.setDrawingMode(false);w.startMMOptimization();
+    QVERIFY(!QApplication::activeModalWidget());auto *panel=w.findChild<QWidget *>("MMOptimizationPanel");QVERIFY(panel);QVERIFY(w.m_structureDock->isVisible());
+    QVERIFY(!w.m_moleculeWorkspace->isAncestorOf(w.m_mmBar));
+    // Change selection *after* opening options: the editor must use the live set.
+    QTest::qWait(30);auto *view=w.m_view;
+    auto screen=[view](int i){auto p=view->project(view->molecule().atoms[i].position,view->viewProjection());return QPoint(qRound(p.x()),qRound(p.y()));};
+    const QPoint first=screen(0),second=screen(1);
+    const QPoint start(qMin(first.x(),second.x())-35,qMin(first.y(),second.y())-35);
+    const QPoint end(qMax(first.x(),second.x())+35,qMax(first.y(),second.y())+35);
+    QTest::mousePress(view,Qt::LeftButton,Qt::NoModifier,start);
+    QMouseEvent drag(QEvent::MouseMove,QPointF(end),QPointF(view->mapToGlobal(end)),Qt::NoButton,Qt::LeftButton,Qt::NoModifier);
+    QApplication::sendEvent(view,&drag);QTest::mouseRelease(view,Qt::LeftButton,Qt::NoModifier,end);
+    QCOMPARE(view->selection().atoms,QSet<int>({0,1}));
+    auto *editor=static_cast<ConstraintEditor *>(panel->findChild<QWidget *>("ConstraintEditor"));
+    editor->findChild<QPushButton *>("FreezeSelectedAtoms")->click();QVector<GeometryConstraint> entries;QString error;
+    QVERIFY2(editor->read(entries,&error),qPrintable(error));QCOMPARE(entries.size(),2);
+    panel->findChild<QPushButton *>("MMStart")->click();
+    QTRY_VERIFY_WITH_TIMEOUT(w.m_mmState==MainWindow::MMState::Finished || w.m_mmState==MainWindow::MMState::Failed,30000);
+    QVERIFY2(w.m_mmState==MainWindow::MMState::Finished,qPrintable(w.m_mmLabel->text()));
+    for(int i:{0,1})QVERIFY((w.m_view->molecule().atoms[i].position-water.atoms[i].position).length()<1e-5);
+    QVERIFY((w.m_view->molecule().atoms[2].position-water.atoms[2].position).length()>0.01);
+    const auto preview=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_PREVIEW");if(!preview.isEmpty())QVERIFY(w.grab().save(preview+"-mm.png"));
+    for(int method:{0,2}) {
+        w.newDrawingDocument(water);w.setDrawingMode(false);w.startXtbCalculation(method);
+        auto *qm=w.findChild<XtbDialog *>();QVERIFY(qm);QVERIFY(!qm->isWindow());QVERIFY(w.m_structureDock->isAncestorOf(qm));
+        w.applyAtomSelection({0,1});auto *constraints=static_cast<ConstraintEditor *>(qm->findChild<QWidget *>("ConstraintEditor"));
+        constraints->findChild<QPushButton *>("FreezeSelectedAtoms")->click();
+        QVERIFY(constraints->read(entries,&error));QCOMPARE(entries.size(),2);
+        qm->findChild<QPushButton *>("XtbStart")->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!qm->calculationActive(),45000);
+        QVERIFY2(qm->findChild<QPushButton *>("XtbApply")->isEnabled(),qPrintable(qm->findChild<QLabel *>("XtbStatus")->text()));
+        for(int i:{0,1})QVERIFY((w.m_view->molecule().atoms[i].position-water.atoms[i].position).length()<1e-5);
+        QVERIFY((w.m_view->molecule().atoms[2].position-water.atoms[2].position).length()>0.01);
+        if(!preview.isEmpty())QVERIFY(w.grab().save(preview+QString("-qm%1.png").arg(method)));
+        qm->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    }
+    // Metal-containing MM takes GFN-FF directly, retaining a frozen atom.
+    Molecule salt;salt.atoms={{1,11,"Na",{0,0,0}},{2,17,"Cl",{3.2f,0,0}}};salt.atoms[0].formalCharge=1;salt.atoms[1].formalCharge=-1;salt.setBond(0,1,1,true);
+    w.newDrawingDocument(salt);w.setDrawingMode(false);w.startMMOptimization();panel=w.findChild<QWidget *>("MMOptimizationPanel");
+    w.applyAtomSelection({0});editor=static_cast<ConstraintEditor *>(panel->findChild<QWidget *>("ConstraintEditor"));editor->findChild<QPushButton *>("FreezeSelectedAtoms")->click();
+    panel->findChild<QPushButton *>("MMStart")->click();auto *metal=w.findChild<XtbDialog *>();QVERIFY(metal);
+    QCOMPARE(metal->findChild<QComboBox *>("XtbMethod")->currentData().toInt(),0);
+    QTRY_VERIFY_WITH_TIMEOUT(metal->findChild<QLabel *>("XtbStatus")->text()!=QStringLiteral("계산 준비"),3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!metal->calculationActive(),45000);
+    QVERIFY2(metal->findChild<QPushButton *>("XtbApply")->isEnabled(),qPrintable(metal->findChild<QLabel *>("XtbStatus")->text()));
+    QVERIFY2(!metal->findChild<QLabel *>("XtbStatus")->text().contains(QStringLiteral("失敗")),qPrintable(metal->findChild<QLabel *>("XtbStatus")->text()));
+    QVERIFY((w.m_view->molecule().atoms[0].position-salt.atoms[0].position).length()<1e-5);
+    metal->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    // Switching documents cannot start an old options panel on a new molecule.
+    w.startMMOptimization();auto *oldPanel=w.findChild<QWidget *>("MMOptimizationPanel");w.newDrawingDocument(water);
+    oldPanel->findChild<QPushButton *>("MMStart")->click();QVERIFY(!w.m_mmProcess);
+}
+void SmokeTest::bilingualCategorizedHelp() {
+    MainWindow w;w.resize(1280,850);w.show();auto *toolbar=w.findChild<QToolBar *>("MainToolBar");
+    auto *action=w.findChild<QAction *>("YoungcraftHelpAction");QVERIFY(action);QVERIFY(toolbar->actions().contains(action));
+    QCOMPARE(action->shortcut(),QKeySequence::HelpContents);action->trigger();
+    auto *help=w.findChild<QDialog *>("YoungcraftHelp");QVERIFY(help);
+    auto *language=help->findChild<QComboBox *>("HelpLanguage");auto *tree=help->findChild<QTreeWidget *>("HelpCategories");auto *content=help->findChild<QTextBrowser *>("HelpContent");
+    QVERIFY(language);QVERIFY(tree);QVERIFY(content);QCOMPARE(tree->topLevelItemCount(),11);
+    language->setCurrentIndex(0);tree->setCurrentItem(tree->topLevelItem(0));
+    QVERIFY(content->toPlainText().contains(QStringLiteral("할 수 있습니다.")));QVERIFY(content->toPlainText().contains("(Ctrl+N)"));
+    language->setCurrentIndex(1);QVERIFY(content->toPlainText().contains("New molecule (Ctrl+N)"));QVERIFY(content->toPlainText().contains("You can"));
+    auto *search=help->findChild<QLineEdit *>("HelpSearch");search->setText("GFN-FF");
+    QVERIFY(!tree->topLevelItem(5)->isHidden());QVERIFY(tree->topLevelItem(0)->isHidden());
+    search->clear();language->setCurrentIndex(0);tree->setCurrentItem(tree->topLevelItem(5));
+    const auto path=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_PREVIEW");if(!path.isEmpty())QVERIFY(help->grab().save(path+"-help-ko.png"));
+    language->setCurrentIndex(1);if(!path.isEmpty())QVERIFY(help->grab().save(path+"-help-en.png"));
+    action->trigger();QCOMPARE(w.findChildren<QDialog *>("YoungcraftHelp").size(),1);
+    help->close();
+}
+
+void SmokeTest::periodicTableGrouping() {
+    MainWindow w;w.show();w.newDrawingDocument();
+    bool inspected=false;
+    QTimer::singleShot(0,&w,[&]{
+        auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget());QVERIFY(dialog);
+        auto find=[dialog](const QString &symbol){for(auto *button:dialog->findChildren<QPushButton *>())if(button->text()==symbol)return button;return static_cast<QPushButton *>(nullptr);};
+        auto *tin=find("Sn"),*silicon=find("Si"),*carbon=find("C"),*chlorine=find("Cl");
+        inspected=tin && silicon && carbon && chlorine;
+        if(inspected)inspected=tin->styleSheet().contains("#d7e8fa") && silicon->styleSheet().contains("#eadcf5") && carbon->styleSheet().contains("#d9efdf") && dialog->width()<1000;
+        const auto path=qEnvironmentVariable("YOUNGCRAFT_SIDEBAR_PREVIEW");if(!path.isEmpty())inspected=inspected && dialog->grab().save(path+"-periodic.png");
+        if(chlorine)chlorine->click();else dialog->reject();
+    });
+    w.m_drawBar->findChild<QPushButton *>("DrawPeriodicTable")->click();
+    QVERIFY(inspected);QCOMPARE(w.m_drawElement->currentText(),QString("Cl"));
 }
 
 int main(int argc, char **argv) {

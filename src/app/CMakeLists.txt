@@ -13,6 +13,7 @@ add_library(youngcraft_app OBJECT
     mainwindow/MainWindow_ProjectLibrary.cpp
     mainwindow/MainWindow_Bonds.cpp
     mainwindow/MainWindow_Window.cpp
+    mainwindow/MainWindow_Help.cpp
     mainwindow/MainWindow_Geometry.cpp
     mainwindow/MainWindow_LabComplex.cpp
     mainwindow/MainWindow_FragmentBrowser.cpp

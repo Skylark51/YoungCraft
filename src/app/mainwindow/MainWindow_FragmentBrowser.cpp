@@ -25,8 +25,8 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
     QComboBox category;category.setObjectName("FragmentCategory");
     category.addItem(QStringLiteral("All Templates"),QString());
     category.addItem(QStringLiteral("Ligands for BIOCC"),"lab-ligand");
-    category.addItem(QStringLiteral("Lab Oxygen · 산소 배위 조각"),"lab-adduct");
-    category.addItem(QStringLiteral("Lab Solvents · MeCN / H₂O 보조 리간드"),"lab-coligand");
+    category.addItem(QStringLiteral("Lab Oxygen · 산소 배위 fragment"),"lab-adduct");
+    category.addItem(QStringLiteral("Lab Solvents · MeCN / H₂O 보조 ligand"),"lab-coligand");
     QStringList categories;
     for(const auto &f:library)if(f.category!="lab-ligand"&&f.category!="lab-adduct"&&f.category!="lab-coligand"&&!categories.contains(f.category))categories<<f.category;
     categories.sort();for(const auto &c:categories)category.addItem(c,c);
@@ -37,7 +37,7 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
     QLabel description;description.setWordWrap(true);outer.addWidget(&description);
     QFormLayout form;
     QComboBox mode;mode.setObjectName("FragmentInsertionMode");
-    mode.addItem(QStringLiteral("리간드 / 조각만 배치 또는 기존 금속에 연결"),0);
+    mode.addItem(QStringLiteral("ligand / fragment만 배치 또는 기존 금속에 연결"),0);
     mode.addItem(QStringLiteral("선택한 금속과 배위한 구조를 새 탭에 생성"),1);
     QComboBox metal;metal.setObjectName("FragmentMetal");
     for(int z=1;z<=118;++z)if(isMetal(z))metal.addItem(elementSymbol(z),z);
@@ -50,7 +50,7 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
     form.addRow(QStringLiteral("금속 형식 전하"),&oxidation);form.addRow(QStringLiteral("구조 총전하"),&charge);
     form.addRow(QStringLiteral("Multiplicity (계산 입력용)"),&multiplicity);outer.addLayout(&form);
     QLabel note(QStringLiteral("금속과 함께 생성하면 주개 원자의 배위 결합을 자동 연결합니다.\n"
-        "저장된 리간드 모양과 기준 배위 거리를 사용하는 시작 구조입니다. 전하와 spin은 계산에 맞게 지정하세요."));
+        "저장된 ligand 모양과 기준 배위 거리를 사용하는 시작 구조입니다. 전하와 spin은 계산에 맞게 지정하세요."));
     note.setWordWrap(true);outer.addWidget(&note);
     QDialogButtonBox buttons(QDialogButtonBox::Cancel);
     buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));
@@ -75,8 +75,8 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
                          :FragmentLibrary::insert(molecule,*f,-1,{},f->direction,&error);
         preview.setMolecule(molecule);
         const QString group=f->category=="lab-ligand"?"Lab Ligands":f->category=="lab-adduct"?"Lab Oxygen":f->category;
-        description.setText(ok?f->name+" · "+group+QStringLiteral(" · 주개 %1개 · 리간드 전하 %2").arg(f->attachments.size()).arg(f->totalCharge):error);
-        insert->setEnabled(ok);insert->setText(withMetal?QStringLiteral("금속–리간드 구조 생성"):QStringLiteral("삽입 / 연결"));
+        description.setText(ok?f->name+" · "+group+QStringLiteral(" · 주개 %1개 · ligand 전하 %2").arg(f->attachments.size()).arg(f->totalCharge):error);
+        insert->setEnabled(ok);insert->setText(withMetal?QStringLiteral("금속–ligand 구조 생성"):QStringLiteral("삽입 / 연결"));
     };
     auto updateCharge=[&]{if(const auto *f=selected())charge.setValue(oxidation.value()+f->totalCharge);};
     auto filter=[&]{
@@ -109,6 +109,6 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
     }
     setDrawingMode(true);m_view->endDrawingChain();m_view->setProperty("pendingCenter",0);
     m_view->setProperty("pendingFragment",fragment.resource);m_view->setFragmentPreview(fragment);
-    setStatus(QStringLiteral("빈 곳: 조각 배치 · 기존 금속/배위 자리: 연결 · Esc: 취소"),0);
+    setStatus(QStringLiteral("빈 곳: fragment 배치 · 기존 금속/배위 자리: 연결 · Esc: 취소"),0);
 }
 }

@@ -1,4 +1,6 @@
 #include "ui/XtbDialog.h"
+#include "ui/SidebarButton.h"
+#include "ui/SidebarFlowLayout.h"
 #include "ui/ConstraintEditor.h"
 #include "ui/PlotWidget.h"
 #include <QComboBox>
@@ -58,7 +60,7 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     auto updateMethod=[this,notice]{const bool ff=method->currentData().toInt()==0;
         multiplicity->setEnabled(!ff);solvation->setEnabled(!ff);
         if(ff){solvation->setCurrentIndex(0);solvent->setEnabled(false);}
-        notice->setText(ff?QStringLiteral("GFN-FF 분자역학으로 초기 구조를 정리합니다. 스핀 상태와 반응성은 계산하지 않습니다.\n금속–리간드 결합과 O–O 결합은 계산 후 확인하고 DFT 시작 구조로 사용하세요."):
+        notice->setText(ff?QStringLiteral("GFN-FF MM으로 초기 구조를 정리합니다. 스핀 상태와 반응성은 계산하지 않습니다.\n금속–ligand 결합과 O–O 결합은 계산 후 확인하고 DFT 시작 구조로 사용하세요."):
             QStringLiteral("빠른 구조 relaxation / DFT 시작 구조용 반경험적 방법입니다. 스핀 상태 상대 에너지에는 제한이 있습니다."));};
     connect(method,&QComboBox::currentIndexChanged,this,updateMethod);
     method->setCurrentIndex(method->findData(initialMethod));updateMethod();
@@ -88,6 +90,41 @@ XtbDialog::XtbDialog(const Molecule &m,const QString &path,QWidget *parent,int i
     refreshPlot();
     if(automatic)QTimer::singleShot(0,this,&XtbDialog::startCalculation);
 }
+void XtbDialog::setSelectionProvider(std::function<QVector<int>()> provider) { constraints->setSelectionProvider(std::move(provider)); }
+void XtbDialog::embedInSidebar() {
+    setWindowFlags(Qt::Widget);setMinimumSize(0,0);setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+    auto *columns=findChild<QSplitter *>("XtbColumns");columns->setOrientation(Qt::Vertical);
+    if(auto *form=qobject_cast<QFormLayout *>(settings->layout())){
+        form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+        if(auto *label=qobject_cast<QLabel *>(form->labelForField(multiplicity)))label->setText("Multiplicity");
+        if(auto *label=qobject_cast<QLabel *>(form->labelForField(solvation)))label->setText("Solvation");
+        if(auto *label=qobject_cast<QLabel *>(form->labelForField(level)))label->setText("Opt level");
+    }
+    multiplicity->setToolTip("UHF = multiplicity − 1");
+    preserveFramework->setToolTip(preserveFramework->text());preserveFramework->setText(QStringLiteral("배위 골격 거리 유지"));
+    preserveBonds->setToolTip(preserveBonds->text());preserveBonds->setText(QStringLiteral("초기 결합 거리 유지"));
+    for(auto *label:findChildren<QLabel *>(QString(),Qt::FindDirectChildrenOnly))label->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+    for(auto *box:findChildren<QComboBox *>()){box->setMinimumWidth(0);box->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);box->setMinimumContentsLength(6);}
+    for(auto *scroll:columns->findChildren<QScrollArea *>(QString(),Qt::FindDirectChildrenOnly))scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    for(auto *scroll:columns->findChildren<QScrollArea *>(QString(),Qt::FindDirectChildrenOnly))scroll->setMinimumWidth(0);
+    for(auto *button:findChildren<QPushButton *>()) {
+        const auto name=button->objectName();
+        if(name=="XtbStart")makeSidebarIconButton(button,QStyle::SP_MediaPlay);
+        else if(name=="XtbCancel")makeSidebarIconButton(button,QStyle::SP_MediaStop);
+        else if(name=="XtbApply")makeSidebarIconButton(button,QStyle::SP_DialogApplyButton);
+        else if(name=="XtbOpen")makeSidebarIconButton(button,QStyle::SP_DirOpenIcon);
+        else if(name=="XtbSave")makeSidebarIconButton(button,QStyle::SP_DialogSaveButton);
+        else if(name=="XtbOutput")makeSidebarIconButton(button,QStyle::SP_FileDialogDetailedView);
+    }
+    auto *root=qobject_cast<QVBoxLayout *>(layout());
+    auto *buttons=root->takeAt(root->count()-1);
+    auto *flow=new SidebarFlowLayout;flow->setSpacing(4);
+    if(buttons && buttons->layout()){
+        while(auto *item=buttons->layout()->takeAt(0)){if(item->widget())flow->addWidget(item->widget());delete item;}
+        delete buttons;
+    }
+    root->addLayout(flow);columns->setSizes({340,320});
+}
 void XtbDialog::setBondRetention(bool enabled) {
     preserveBonds->setChecked(enabled);preserveFramework->setChecked(enabled);
 }
@@ -96,6 +133,7 @@ void XtbDialog::configureOptimization(const QVector<GeometryConstraint> &entries
     // Keep the user-visible framework/bond retention defaults across MM fallback.
 }
 void XtbDialog::startCalculation() {
+    if(inputValidator && !inputValidator())return;
     QVector<GeometryConstraint> entries; QString error;
     if(!constraints->read(entries,&error)){QMessageBox::warning(this,"Constraint",error);return;}
     emit restorePreview();applied=false;series.clear();refreshPlot();

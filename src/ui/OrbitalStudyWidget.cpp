@@ -205,7 +205,7 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
         if(!m_surface) {m_status->setText(QStringLiteral("전자밀도 cube 파일을 먼저 여세요."));return;}
         const auto f=QFileDialog::getOpenFileName(this,QStringLiteral("Potential cube"),{},"Cube (*.cube *.cub)");if(f.isEmpty())return;
         auto potential=std::make_shared<CubeGrid>(CubeParser::parse(f));if(!potential->valid){m_status->setText(potential->error);return;}
-        if(potential->molecule.atoms.size()!=m_surface->molecule.atoms.size()){m_status->setText(QStringLiteral("두 cube의 분자가 다릅니다."));return;}
+        if(potential->molecule.atoms.size()!=m_surface->molecule.atoms.size()){m_status->setText(QStringLiteral("두 cube의 molecule가 다릅니다."));return;}
         for(int i=0;i<potential->molecule.atoms.size();++i)if(potential->molecule.atoms[i].atomicNumber!=m_surface->molecule.atoms[i].atomicNumber||(potential->molecule.atoms[i].position-m_surface->molecule.atoms[i].position).length()>0.001f){m_status->setText(QStringLiteral("두 cube의 원자/좌표가 일치하지 않습니다."));return;}
         for(int x:{0,m_surface->nx-1})for(int y:{0,m_surface->ny-1})for(int z:{0,m_surface->nz-1})if(!std::isfinite(potential->sample(m_surface->origin+x*m_surface->axisX+y*m_surface->axisY+z*m_surface->axisZ))){m_status->setText(QStringLiteral("Potential 격자가 density 격자 전체를 포함해야 합니다."));return;}
         showSurface(m_surface,potential);

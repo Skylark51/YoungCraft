@@ -24,7 +24,7 @@ void MainWindow::buildLabComplex() {
     QLabel note(QStringLiteral("금속 + 저장된 ligand + 산소 fragment로 편집 가능한 시작 구조를 만듭니다.\n"
                               "End-on (η¹) / Side-on (η²)은 금속–산소 연결 방식입니다.\n"
                               "MeCN/H₂O를 고르면 빈 배위 방향에 실제 배위결합으로 연결합니다.\n"
-                              "산소 조각의 전하·결합 차수는 시작 모델이며 전자 상태를 확정하지 않습니다."));
+                              "산소 fragment의 전하·결합 차수는 시작 모델이며 전자 상태를 확정하지 않습니다."));
     note.setWordWrap(true);form.addRow(&note);
     QComboBox metal,ligand,adduct,coligand;
     coligand.setObjectName("LabColigand");coligand.addItem(QStringLiteral("없음"),-1);
@@ -54,7 +54,7 @@ void MainWindow::buildLabComplex() {
     spin.setValue(6);updateCharge();
     form.addRow(QStringLiteral("금속"),&metal);form.addRow(QStringLiteral("Ligand"),&ligand);
     form.addRow(QStringLiteral("산소 fragment"),&adduct);form.addRow(QStringLiteral("금속 산화수 (형식 전하)"),&oxidation);
-    form.addRow(QStringLiteral("보조 리간드 (빈 배위 방향)"),&coligand);
+    form.addRow(QStringLiteral("보조 ligand (빈 배위 방향)"),&coligand);
     form.addRow(QStringLiteral("착물 총전하"),&charge);
     form.addRow(QStringLiteral("후속 양자계산용 multiplicity"),&spin);
     QLabel spinNote(QStringLiteral("Multiplicity는 초기 메타데이터입니다. GFN-FF MM은 스핀을 계산하지 않습니다."));

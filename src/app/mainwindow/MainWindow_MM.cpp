@@ -1,5 +1,6 @@
 #include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
+#include "compute/OptimizationInput.h"
 
 #include "animation/AnimationController.h"
 #include "render/MoleculeView.h"
@@ -32,6 +33,10 @@
 #include <QStandardPaths>
 #include <QTabWidget>
 #include <QTimer>
+#include <QPointer>
+#include <QScrollArea>
+#include <QTabBar>
+#include <algorithm>
 
 #include <cmath>
 
@@ -189,34 +194,55 @@ void MainWindow::addDrawnAtom(const QVector3D &position, int bondFrom) {
 void MainWindow::startMMOptimization() {
     if (auto *xtb = findChild<XtbDialog *>(); xtb && xtb->calculationActive()) { setStatus(QStringLiteral("xTB 계산을 완료하거나 중단한 뒤 MM 최적화를 시작하세요.")); return; }
     if (m_view->molecule().atoms.isEmpty()) { setStatus(QStringLiteral("최적화할 구조를 먼저 그리거나 여세요.")); return; }
-    QDialog dialog(this);
-    dialog.setWindowTitle(QStringLiteral("구조 최적화 옵션"));
-    QFormLayout form(&dialog);
-    QComboBox field(&dialog);
-    field.addItems({QStringLiteral("Auto"), QStringLiteral("MMFF94"),
-                    QStringLiteral("MMFF94s"), QStringLiteral("UFF")});
-    QSpinBox steps(&dialog);
-    steps.setRange(1, 100000); steps.setValue(500);
-    QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));
-    form.addRow(QStringLiteral("힘장"), &field);
-    form.addRow(QStringLiteral("최대 반복 횟수"), &steps);
-    auto *backendHint=new QLabel(QStringLiteral("MMFF/UFF로 처리할 수 없는 구조는 GFN-FF로 자동 계산합니다."),&dialog);
-    backendHint->setWordWrap(true);form.addRow(backendHint);
-    QCheckBox retainBonds(QStringLiteral("초기 결합 길이 유지 (조화 restraint · 구조 정리)"),&dialog);
-    retainBonds.setObjectName("MMPreserveBonds");
-    bool hasMetal=false;for(const auto &atom:m_view->molecule().atoms)hasMetal=hasMetal||isMetal(atom.atomicNumber);
-    retainBonds.setChecked(hasMetal);form.addRow(&retainBonds);
-    ConstraintEditor constraints(m_view->molecule(),m_view->geometrySelection(),&dialog);
-    form.addRow(&constraints);
-    form.addRow(&buttons);
-    QVector<GeometryConstraint> entries;
-    connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&]{
-        QString error; if(!constraints.read(entries,&error)){QMessageBox::warning(&dialog,"Constraint",error);return;}
-        dialog.accept();
+    // A document owns its progress controls; detach them before replacing options.
+    m_mmBar->hide();m_mmBar->setParent(m_moleculeWorkspace);
+    if(auto *existing=findChild<QWidget *>("MMOptimizationPanel")) {
+        const int tab=m_structureTabs->indexOf(existing->parentWidget()->parentWidget());
+        if(tab>=0)m_structureTabs->removeTab(tab);
+        delete existing->parentWidget()->parentWidget();
+    }
+    auto *scroll=new QScrollArea(m_structureTabs);scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);
+    auto *panel=new QWidget;panel->setObjectName("MMOptimizationPanel");scroll->setWidget(panel);
+    auto *form=new QFormLayout(panel);form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    auto *field=new QComboBox(panel);field->setObjectName("MMForceField");
+    field->addItems({"Auto","MMFF94","MMFF94s","UFF","GFN-FF"});
+    auto *steps=new QSpinBox(panel);steps->setObjectName("MMMaximumSteps");steps->setRange(1,100000);steps->setValue(500);
+    form->addRow(QStringLiteral("힘장"),field);form->addRow(QStringLiteral("최대 반복"),steps);
+    auto *hint=new QLabel(QStringLiteral("금속·배위 구조: Auto에서 GFN-FF 사용. 드래그로 선택 후 자물쇠 버튼으로 고정하세요."),panel);
+    hint->setWordWrap(true);form->addRow(hint);
+    auto *retainBonds=new QCheckBox(QStringLiteral("초기 결합 거리 유지"),panel);retainBonds->setObjectName("MMPreserveBonds");
+    bool hasMetal=false;for(const auto &atom:m_view->molecule().atoms)hasMetal|=isMetal(atom.atomicNumber);
+    retainBonds->setChecked(hasMetal);form->addRow(retainBonds);
+    const QPointer<MoleculeView> source=m_view;
+    const Molecule snapshot=source->molecule();
+    auto *constraints=new ConstraintEditor(snapshot,source->geometrySelection(),panel,true);
+    constraints->setSelectionProvider([source]{QVector<int> ids;if(source){ids=source->selection().atoms.values().toVector();std::sort(ids.begin(),ids.end());}return ids;});
+    form->addRow(constraints);
+    form->addRow(m_mmBar);
+    auto *run=new QPushButton(QStringLiteral("MM 최적화 시작"),panel);run->setObjectName("MMStart");
+    makeSidebarIconButton(run,QStyle::SP_MediaPlay);form->addRow(run);
+    connect(run,&QPushButton::clicked,panel,[this,source,snapshot,field,steps,retainBonds,constraints]{
+        if(!source || source!=m_view){setStatus(QStringLiteral("현재 molecule에서 MM 패널을 다시 여세요."));return;}
+        const auto &current=source->molecule();
+        const bool changed=!sameOptimizationInput(current,snapshot);
+        if(changed){setStatus(QStringLiteral("구조가 변경되었습니다. MM 패널을 다시 열어 설정하세요."));return;}
+        QVector<GeometryConstraint> entries;QString error;
+        if(!constraints->read(entries,&error)){setStatus(error,8000);return;}
+        runMMOptimization(field->currentText(),steps->value(),retainBonds->isChecked(),entries);
     });
-    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    if (dialog.exec() != QDialog::Accepted) return;
+    const int tab=m_structureTabs->addTab(scroll,style()->standardIcon(QStyle::SP_BrowserReload),{});
+    m_structureTabs->setTabToolTip(tab,QStringLiteral("MM 최적화"));m_structureTabs->tabBar()->setAccessibleTabName(tab,QStringLiteral("MM 최적화"));
+    m_structureTabs->setCurrentIndex(tab);m_structureDock->show();m_structureDock->raise();resizeDocks({m_structureDock},{320},Qt::Horizontal);
+}
 
+void MainWindow::runMMOptimization(const QString &field, int steps, bool retainBonds, const QVector<GeometryConstraint> &entries) {
+    if(auto *xtb=findChild<XtbDialog *>();xtb && xtb->calculationActive()){setStatus(QStringLiteral("진행 중인 QM 계산을 먼저 중단하세요."));return;}
+    bool hasMetal=false;for(const auto &atom:m_view->molecule().atoms)hasMetal|=isMetal(atom.atomicNumber);
+    if(field=="GFN-FF" || (field=="Auto" && hasMetal)){
+        startXtbCalculation(0,true,entries,steps);
+        if(auto *xtb=findChild<XtbDialog *>())xtb->setBondRetention(retainBonds);
+        return;
+    }
     const QDir applicationDir(QCoreApplication::applicationDirPath());
     const QString bundled = applicationDir.filePath(QStringLiteral("mm_runtime/YoungcraftMM.exe"));
     const QString projectBuildWorker = applicationDir.filePath(
@@ -234,7 +260,7 @@ void MainWindow::startMMOptimization() {
         const QString script = applicationDir.filePath(QStringLiteral("tools/mm_optimize.py"));
         if (program.isEmpty() || !QFileInfo::exists(script)) {
             QMessageBox::warning(this, QStringLiteral("구조 최적화"),
-                QStringLiteral("분자역학 실행 프로그램을 찾지 못했습니다. 휴대용 배포본에는 mm_runtime/YoungcraftMM.exe가 필요합니다."));
+                QStringLiteral("MM 실행 프로그램을 찾지 못했습니다. 휴대용 배포본에는 mm_runtime/YoungcraftMM.exe가 필요합니다."));
             return;
         }
         arguments = {QStringLiteral("-u"), script};
@@ -255,7 +281,7 @@ void MainWindow::startMMOptimization() {
     m_animation->stop();
     m_view->setFrequencyMode(nullptr);
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
-    m_mmMaximum = steps.value();
+    m_mmMaximum = steps;
     m_mmStep = 0;
     m_mmField.clear();
     m_mmState = MMState::Starting;
@@ -274,13 +300,13 @@ void MainWindow::startMMOptimization() {
     setSidebarButtonIcon(m_mmPauseButton, QStyle::SP_MediaPause, QStringLiteral("일시정지"));
     setSidebarButtonIcon(m_mmStopButton, QStyle::SP_MediaStop, QStringLiteral("중단"));
     m_mmRestoreButton->setEnabled(true);
-    m_mmLabel->setText(QStringLiteral("%1 초기화 중...").arg(field.currentText()));
+    m_mmLabel->setText(QStringLiteral("%1 초기화 중...").arg(field));
     m_mmBar->show();
 
     QJsonObject input;
     input.insert(QStringLiteral("constraints"), constraintsJson(entries));
-    input.insert(QStringLiteral("preserve_bond_lengths"),retainBonds.isChecked());
-    input.insert(QStringLiteral("field"), field.currentText());
+    input.insert(QStringLiteral("preserve_bond_lengths"),retainBonds);
+    input.insert(QStringLiteral("field"), field);
     input.insert(QStringLiteral("charge"), molecule.charge);
     input.insert(QStringLiteral("max_iterations"), m_mmMaximum);
     input.insert(QStringLiteral("chunk"), 8);

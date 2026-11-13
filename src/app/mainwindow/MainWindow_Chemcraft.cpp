@@ -57,9 +57,11 @@ QSet<int> MainWindow::selectedStructureAtoms() const {
     return ids;
 }
 void MainWindow::applyAtomSelection(const QSet<int> &ids) {
+    const auto selection=ids;
     clearGeometrySelection(); m_view->selection().clear();
     m_view->setSelectedAtom(-1);
-    m_view->selection().atoms = StructureTools::selection(m_view->molecule(),ids);
+    m_view->selection().atoms = StructureTools::selection(m_view->molecule(),selection);
+    emit m_view->atomSelectionChanged();
     m_view->update();
     setStatus(QStringLiteral("원자 %1개 선택 · Shift: 추가 · Ctrl: 선택 반전 · 빈 곳 드래그: 영역 선택").arg(m_view->selection().atoms.size()));
 }
@@ -75,7 +77,7 @@ void MainWindow::copyStructureFragment() {
 void MainWindow::pasteStructureFragment() {
     if (isTextInputFocused()) { if(auto *line=qobject_cast<QLineEdit *>(QApplication::focusWidget()))line->paste();else if(auto *plain=qobject_cast<QPlainTextEdit *>(QApplication::focusWidget()))plain->paste();else if(auto *rich=qobject_cast<QTextEdit *>(QApplication::focusWidget()))rich->paste();return; }
     const auto *mime = QApplication::clipboard()->mimeData();
-    if (!mime || !mime->hasFormat(fragmentMime)) { setStatus(QStringLiteral("클립보드에 Youngcraft 분자 조각이 없습니다. 선택 조각을 먼저 복사하세요.")); return; }
+    if (!mime || !mime->hasFormat(fragmentMime)) { setStatus(QStringLiteral("클립보드에 Youngcraft molecule fragment이 없습니다. 선택 fragment을 먼저 복사하세요.")); return; }
     Molecule fragment; QString error;
     if (!StructureTools::decode(mime->data(fragmentMime),fragment,&error)) { setStatus(error); return; }
     m_animation->stop(); m_view->setFrequencyMode(nullptr);
@@ -97,37 +99,37 @@ void MainWindow::pasteStructureFragment() {
 }
 void MainWindow::extractStructureFragments() {
     const auto molecule=m_view->molecule();
-    if(molecule.isEmpty()){setStatus(QStringLiteral("분자 구조를 먼저 여세요."));return;}
+    if(molecule.isEmpty()){setStatus(QStringLiteral("molecule 구조를 먼저 여세요."));return;}
     const auto groups=StructureTools::components(molecule);
-    QDialog dialog(this);dialog.setObjectName("FragmentExtractor");dialog.setWindowTitle(QStringLiteral("분자 조각 추출기"));dialog.resize(580,420);QVBoxLayout layout(&dialog);
-    QLabel help(QStringLiteral("현재 결합 그래프로 분리된 조각입니다. 추출할 조각을 선택하세요.\n부분 조각의 총전하는 형식 전하 합을 사용하며 스핀 다중도는 후속 계산에서 확인하세요."));help.setWordWrap(true);layout.addWidget(&help);
+    QDialog dialog(this);dialog.setObjectName("FragmentExtractor");dialog.setWindowTitle(QStringLiteral("molecule fragment 추출기"));dialog.resize(580,420);QVBoxLayout layout(&dialog);
+    QLabel help(QStringLiteral("현재 결합 그래프로 분리된 fragment입니다. 추출할 fragment을 선택하세요.\n부분 fragment의 총전하는 형식 전하 합을 사용하며 스핀 다중도는 후속 계산에서 확인하세요."));help.setWordWrap(true);layout.addWidget(&help);
     QListWidget list;list.setObjectName("ExtractFragmentList");list.setSelectionMode(QAbstractItemView::ExtendedSelection);
     QVector<QSet<int>> choices;
     const auto selected=selectedStructureAtoms();
     if(!selected.isEmpty()){choices<<selected;list.addItem(QStringLiteral("현재 선택 영역 — 원자 %1개").arg(selected.size()));}
-    for(int i=0;i<groups.size();++i){choices<<groups[i];list.addItem(QStringLiteral("분리 조각 %1 — 원자 %2개").arg(i+1).arg(groups[i].size()));}
+    for(int i=0;i<groups.size();++i){choices<<groups[i];list.addItem(QStringLiteral("분리 fragment %1 — 원자 %2개").arg(i+1).arg(groups[i].size()));}
     layout.addWidget(&list);if(selected.isEmpty())list.selectAll();else{list.setCurrentRow(0);list.item(0)->setSelected(true);}
     QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("새 탭으로 추출"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));layout.addWidget(&buttons);
     connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     if(dialog.exec()!=QDialog::Accepted)return;
     QVector<Molecule> fragments;for(auto *item:list.selectedItems())fragments<<StructureTools::fragment(molecule,choices[list.row(item)]);
-    for(int i=0;i<fragments.size();++i){newDrawingDocument(fragments[i]);setDrawingMode(false);m_documentTabs->setTabText(m_documentTabs->currentIndex(),QStringLiteral("추출 조각 %1").arg(i+1));}
-    setStatus(QStringLiteral("%1개 조각을 새 탭으로 추출했습니다.").arg(fragments.size()));
+    for(int i=0;i<fragments.size();++i){newDrawingDocument(fragments[i]);setDrawingMode(false);m_documentTabs->setTabText(m_documentTabs->currentIndex(),QStringLiteral("추출 fragment %1").arg(i+1));}
+    setStatus(QStringLiteral("%1개 fragment을 새 탭으로 추출했습니다.").arg(fragments.size()));
 }
 void MainWindow::showMolecularInformation() {
     const auto &molecule=m_view->molecule();
     const auto formula=AnalysisEngine::molecularFormula(molecule);
     QDialog dialog(this);dialog.setObjectName("MolecularInformationDialog");
-    dialog.setWindowTitle(QStringLiteral("화학식 · 분자량"));
+    dialog.setWindowTitle(QStringLiteral("화학식 · molecular mass"));
     QVBoxLayout layout(&dialog);QFormLayout form;
     QLabel formulaLabel(formula.isEmpty()?QStringLiteral("—"):formula);
     formulaLabel.setWordWrap(true);formulaLabel.setObjectName("MolecularFormula");formulaLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
     const bool knownMass=std::all_of(molecule.atoms.cbegin(),molecule.atoms.cend(),[](const Atom &atom){return atom.atomicNumber==0||atomicMass(atom.atomicNumber)>0;});
     QLabel massLabel(knownMass&&!formula.isEmpty()?QStringLiteral("%1 g/mol").arg(AnalysisEngine::molecularMass(molecule),0,'f',4):QStringLiteral("—"));
     massLabel.setObjectName("MolecularMass");massLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
-    form.addRow(QStringLiteral("전체 화학식"),&formulaLabel);form.addRow(QStringLiteral("전체 분자량"),&massLabel);
+    form.addRow(QStringLiteral("전체 화학식"),&formulaLabel);form.addRow(QStringLiteral("전체 molecular mass"),&massLabel);
     layout.addLayout(&form);
-    QLabel note(formula.isEmpty()?QStringLiteral("분자 구조를 먼저 여세요."):!knownMass?QStringLiteral("표준 원자량이 없는 원소는 동위원소 질량 지정이 필요합니다."):QStringLiteral("숨긴 원자를 포함한 전체 구조 기준"));
+    QLabel note(formula.isEmpty()?QStringLiteral("molecule 구조를 먼저 여세요."):!knownMass?QStringLiteral("표준 원자량이 없는 원소는 동위원소 질량 지정이 필요합니다."):QStringLiteral("숨긴 원자를 포함한 전체 구조 기준"));
     note.setWordWrap(true);
     layout.addWidget(&note);
     QDialogButtonBox buttons(QDialogButtonBox::Ok);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));
@@ -137,11 +139,11 @@ void MainWindow::showMolecularInformation() {
 
 void MainWindow::showZMatrix() {
     QString error;const auto text=StructureTools::zMatrix(m_view->molecule(),&error);
-    if(text.isEmpty()){setStatus(error.isEmpty()?QStringLiteral("분자 구조를 먼저 여세요."):error,10000);return;}
+    if(text.isEmpty()){setStatus(error.isEmpty()?QStringLiteral("molecule 구조를 먼저 여세요."):error,10000);return;}
     textDialog(this,QStringLiteral("Z-matrix · 거리 Å / 각도 °"),text,QStringLiteral("Z-matrix (*.zmat);;텍스트 (*.txt)"));
 }
 void MainWindow::createGaussianInput() {
-    const auto molecule=m_view->molecule();if(molecule.isEmpty()){setStatus(QStringLiteral("분자 구조를 먼저 여세요."));return;}
+    const auto molecule=m_view->molecule();if(molecule.isEmpty()){setStatus(QStringLiteral("molecule 구조를 먼저 여세요."));return;}
     QDialog dialog(this);dialog.setObjectName("GaussianInputDialog");dialog.setWindowTitle(QStringLiteral("Gaussian 입력파일 생성"));dialog.resize(760,640);QVBoxLayout layout(&dialog);QFormLayout form;
     QLineEdit route(m_data.route.isEmpty()?QStringLiteral("#p B3LYP/6-31G(d) opt"):m_data.route.simplified());route.setObjectName("GaussianRoute");
     QSpinBox charge,multiplicity;charge.setObjectName("GaussianCharge");multiplicity.setObjectName("GaussianMultiplicity");charge.setRange(-1000,1000);charge.setValue(molecule.charge);multiplicity.setRange(1,1000);multiplicity.setValue(molecule.multiplicity);

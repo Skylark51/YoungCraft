@@ -83,6 +83,7 @@ std::shared_ptr<MainWindow::DocumentSession> MainWindow::captureDocument() {
 void MainWindow::saveDocumentState() {
     if (!m_activeDocument) return;
     stopMMOptimization();
+    if(m_mmBar && m_mmBar->parentWidget()!=m_moleculeWorkspace){m_mmBar->hide();m_mmBar->setParent(m_moleculeWorkspace);}
     auto &d = *m_activeDocument;
     d.data = m_data; d.frame = m_currentFrame; d.frequency = m_currentFrequency;
     m_style = m_view->style();
@@ -130,7 +131,7 @@ void MainWindow::bindDocument(const std::shared_ptr<DocumentSession> &document) 
     for (QAction *action : findChildren<QAction *>()) {
         const auto &text = action->text();
         if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
-        else if (text == QStringLiteral("분자 중심으로 축 이동")) action->setChecked(m_style.centerAxes);
+        else if (text == QStringLiteral("molecule 중심으로 축 이동")) action->setChecked(m_style.centerAxes);
         else if (text == QStringLiteral("수소 표시")) action->setChecked(m_style.showHydrogen);
         else if (action == m_atomLabelsAction) action->setChecked(m_style.showLabels);
         else if (text == QStringLiteral("전하/스핀 밀도 표시")) action->setChecked(m_style.showProperties);

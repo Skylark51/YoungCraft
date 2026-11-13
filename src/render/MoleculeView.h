@@ -119,6 +119,10 @@ signals:
     void groupRotated(const QQuaternion &rotation, const QVector3D &center);
     void bondManipulated(int first, int second, int kind, double value, bool opposite);
     void atomPicked(int index);
+    void atomSelectionChanged();
+public:
+    int hoveredAtom() const { return m_hoverAtom; }
+signals:
     void canvasClicked(const QVector3D &position);
     void bondDrawn(int first, int second, const QVector3D &position);
     void bondStrokeDrawn(const QVector3D &start, const QVector3D &end);

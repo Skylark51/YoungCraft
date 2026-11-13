@@ -48,7 +48,7 @@ public:
         }
         if(coligand) {
             if(coligand->dummyAtoms.size()!=1 || coligand->attachments.size()!=1) {
-                if(error)*error=QStringLiteral("보조 리간드는 기준 금속 1개와 주개 원자 1개가 필요합니다.");
+                if(error)*error=QStringLiteral("보조 ligand는 기준 금속 1개와 주개 원자 1개가 필요합니다.");
                 return false;
             }
             // Find an open coordination direction from the existing donor vectors.
@@ -78,7 +78,7 @@ public:
                 if(!overlap){m=std::move(trial);placed=true;break;}
             }
             if(!placed) {
-                if(error)*error=QStringLiteral("보조 리간드를 놓을 공간이 없습니다. 다른 조합을 선택하세요.");
+                if(error)*error=QStringLiteral("보조 ligand를 놓을 공간이 없습니다. 다른 조합을 선택하세요.");
                 return false;
             }
         }

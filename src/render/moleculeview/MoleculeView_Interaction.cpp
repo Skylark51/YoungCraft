@@ -162,7 +162,7 @@ void MoleculeView::mousePressEvent(QMouseEvent *event) {
             m_centricStart=m_centricKind==0?GeometryEditor::distance(m_molecule,a,c):m_centricKind==1&&oa>=0?GeometryEditor::angleDegrees(m_molecule,oa,a,c):m_centricKind==2&&oa>=0&&oc>=0?GeometryEditor::dihedralDegrees(m_molecule,oa,a,c,oc):kNaN;
             m_centricDrag=std::isfinite(m_centricStart)&&!sa.contains(c);m_centricValue=m_centricStart;
             m_centricRejected=!m_centricDrag;
-            if(m_centricRejected)m_centricText=sa.contains(c)?"고리 결합: 분자 조각을 안전하게 분리할 수 없습니다.":"각도 / 비틀림 조절에는 인접 원자가 필요합니다.";
+            if(m_centricRejected)m_centricText=sa.contains(c)?"고리 결합: molecule fragment을 안전하게 분리할 수 없습니다.":"각도 / 비틀림 조절에는 인접 원자가 필요합니다.";
             m_centricAtoms=MoleculeEditController::side(m_molecule,c,a,c);m_centricProbe={};
             // Only four probe atoms are passed through the existing geometry functions.
             // The molecular graph and coordinates remain untouched throughout preview.
@@ -199,7 +199,7 @@ void MoleculeView::mouseMoveEvent(QMouseEvent *event) {
     }
     else if(m_dragButton==Qt::MiddleButton||((event->buttons()&Qt::RightButton)&&(event->modifiers()&Qt::ControlModifier)))panBy(delta);
     else if((event->buttons()&Qt::RightButton)&&!m_centricRejected)rotateBy(delta);
-    if((event->buttons()&Qt::LeftButton)&&(event->pos()-m_pressMouse).manhattanLength()>3&&!m_centricDrag){
+    if((event->buttons()&Qt::LeftButton)&&(event->pos()-m_pressMouse).manhattanLength()>QApplication::startDragDistance()&&!m_centricDrag){
         if(m_drawingMode&&m_drawingArmed&&(m_drawStartAtom>=0||m_drawFromCanvas)&&!m_insertPreview&&!(event->modifiers()&(Qt::ControlModifier|Qt::ShiftModifier)))updateDrawingPreview(event->pos(),event->modifiers());
         else if(m_groupDrag){
             if(m_transformMode==1||m_transformMode==2||m_transformMode==4){
@@ -214,7 +214,7 @@ void MoleculeView::mouseMoveEvent(QMouseEvent *event) {
         }
         else if(pickAtom(m_pressMouse)<0&&!m_insertPreview)m_rectangle=true;
     }
-    m_lastMouse=event->pos();m_dragging=(event->pos()-m_pressMouse).manhattanLength()>3;
+    m_lastMouse=event->pos();m_dragging=(event->pos()-m_pressMouse).manhattanLength()>QApplication::startDragDistance();
     if(m_previewOverlay)m_previewOverlay->update();
 }
 void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
@@ -225,7 +225,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
         if(m_drawingMode)setDrawingArmed(false);
     }
     else if(m_centricDrag&&m_dragging){auto b=m_molecule.bonds[m_activeBond];emit bondManipulated(b.first,b.second,m_centricKind,m_centricValue,event->modifiers()&Qt::AltModifier);}
-    else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){auto a=m_molecule.atoms[i];if(!a.visible||(!m_style.showHydrogen&&a.atomicNumber==1))continue;auto p=project(a.position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}}
+    else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){auto a=m_molecule.atoms[i];if(!a.visible||(!m_style.showHydrogen&&a.atomicNumber==1))continue;auto p=project(a.position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}emit atomSelectionChanged();}
     else if(m_groupDrag&&m_dragging){if(m_transformMode==1||m_transformMode==2||m_transformMode==4)emit groupRotated(m_groupRotation,m_groupCenter);else emit groupMoved(m_groupTranslation);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::RightButton&&!m_dragging){if(m_chainDrawing&&m_chainAtom>=0)endDrawingChain();else emit deleteRequested(atom,bond);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::LeftButton&&!add&&!toggle){
@@ -240,7 +240,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
         else if(!m_dragging){if(atom>=0){setSelectedAtom(atom);emit atomEditRequested(atom);if(m_selectedAtom>=0)emit atomPicked(m_selectedAtom);}else if(bond>=0&&!m_insertPreview)emit bondEditRequested(bond);else emit canvasClicked(pointOnDrawingPlane(event->pos(),m_target));}
     }else if(event->button()==Qt::LeftButton&&!m_dragging){
         if(m_bondCentric&&bond>=0){m_activeBond=bond;m_centricText="끝점 드래그: 각도 · 오른쪽: 길이 · Ctrl: 비틀림";}
-        else{m_selection.click(atom,add,toggle);if(bond>=0){if(toggle&&m_selection.bonds.contains(bond))m_selection.bonds.remove(bond);else m_selection.bonds.insert(bond);}setSelectedAtom(atom);emit atomPicked(atom);}
+        else{m_selection.click(atom,add || atom>=0,toggle || (atom>=0 && m_selection.atoms.contains(atom)));if(bond>=0){if(toggle&&m_selection.bonds.contains(bond))m_selection.bonds.remove(bond);else m_selection.bonds.insert(bond);}setSelectedAtom(atom);emit atomPicked(atom);}
     }
     m_groupTranslation={};m_dragButton=Qt::NoButton;m_ghostActive=false;m_drawStartAtom=-1;m_drawFromCanvas=false;m_dragAtom=-1;m_groupDrag=false;m_rectangle=false;m_centricDrag=false;m_centricRejected=false;
     update();if(m_previewOverlay)m_previewOverlay->update();
@@ -248,7 +248,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
 }
 void MoleculeView::mouseDoubleClickEvent(QMouseEvent *event) {
     if(event->button()!=Qt::LeftButton)return;int atom=pickAtom(event->pos());
-    if(atom>=0){m_selection.connected(m_molecule,atom);m_selectedAtom=atom;m_target=m_molecule.atoms[atom].position;update();if(m_previewOverlay)m_previewOverlay->update();emit atomPicked(atom);emit cameraChanged();}
+    if(atom>=0){m_selection.connected(m_molecule,atom);m_selectedAtom=atom;update();if(m_previewOverlay)m_previewOverlay->update();emit atomSelectionChanged();}
 }
 
 void MoleculeView::wheelEvent(QWheelEvent *event) {

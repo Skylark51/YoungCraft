@@ -131,7 +131,7 @@ bool MechanismTimeline::build(const QVector<MechanismStep> &steps,const Mechanis
     auto fail=[&](const QString &message){if(error)*error=message;return false;};
     if(steps.isEmpty()||steps.size()>300)return fail(QStringLiteral("1–300개의 반응 단계를 넣어주세요."));
     MechanismTimeline built;built.m_options=options;
-    if(!std::isfinite(options.lift)||options.lift<0||options.lift>100)return fail(QStringLiteral("조각 이동 거리는 0–100 Å입니다."));
+    if(!std::isfinite(options.lift)||options.lift<0||options.lift>100)return fail(QStringLiteral("fragment 이동 거리는 0–100 Å입니다."));
     QVector<QVector<QVector<QVector3D>>> allFrames;
     QVector<QVector3D> reference;QVector<bool> present;
     qsizetype nodeCount=1;

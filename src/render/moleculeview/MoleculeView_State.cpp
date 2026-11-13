@@ -3,6 +3,7 @@
 #include "render/IsosurfaceBuilder.h"
 
 #include <QApplication>
+#include <QVariantAnimation>
 #include <QClipboard>
 #include <QLineF>
 #include <QMetaObject>
@@ -60,6 +61,7 @@ void MoleculeView::setEditedMolecule(const Molecule &molecule) {
     const bool wasEmpty = m_molecule.atoms.isEmpty();
     m_molecule = molecule;
     recalculateBounds();
+    if(m_hoverAtom>=0)m_hoverAtom=pickAtom(m_lastMouse);
     if (wasEmpty) bestView();
     emit geometryChanged();
     update();
@@ -255,7 +257,17 @@ void MoleculeView::setFocusAtoms(const QVector<int> &indices) {
 }
 
 void MoleculeView::setGeometrySelection(const QVector<int> &indices) {
+    const bool changed=m_geometrySelection!=indices;
     m_geometrySelection = indices;
+    if(changed && m_previewOverlay){
+        auto *fade=findChild<QVariantAnimation *>("SelectionTransition");
+        if(!fade){
+            fade=new QVariantAnimation(this);fade->setObjectName("SelectionTransition");
+            fade->setDuration(120);fade->setEasingCurve(QEasingCurve::OutCubic);
+            connect(fade,&QVariantAnimation::valueChanged,m_previewOverlay,[this](const QVariant &value){m_previewOverlay->setProperty("selectionOpacity",value);m_previewOverlay->update();});
+        }
+        fade->stop();fade->setStartValue(0.45);fade->setEndValue(1.0);fade->start();
+    }
     update();
     if(m_previewOverlay)m_previewOverlay->update();
 }

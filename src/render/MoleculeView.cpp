@@ -34,6 +34,7 @@ MoleculeView::MoleculeView(QWidget *parent) : QOpenGLWidget(parent) {
     setFormat(requested);
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
+    installEventFilter(this);
     m_rotation = QQuaternion();
     m_previewOverlay = new QWidget(this);
     m_previewOverlay->setObjectName(QStringLiteral("DrawingPreviewOverlay"));

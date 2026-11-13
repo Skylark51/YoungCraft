@@ -36,6 +36,14 @@ inline void makeSidebarIconButton(QAbstractButton *button, QStyle::StandardPixma
     makeSidebarIconButton(button, button->style()->standardIcon(icon));
 }
 
+inline QIcon sidebarLockIcon() {
+    QPixmap pixmap(36,36);pixmap.fill(Qt::transparent);QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);painter.scale(2,2);
+    painter.setPen(QPen(QColor("#446781"),1.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(QRectF(4,8,10,8),1.2,1.2);
+    painter.drawArc(QRectF(6,2,6,10),0,180*16);painter.drawLine(9,11,9,13);painter.end();
+    pixmap.setDevicePixelRatio(2);return QIcon(pixmap);
+}
 inline QIcon sidebarSaveIcon() {
     QPixmap pixmap(36, 36);
     pixmap.fill(Qt::transparent);

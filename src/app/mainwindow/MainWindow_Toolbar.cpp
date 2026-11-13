@@ -10,6 +10,8 @@
 #include "ui/DialogThemeSync.h"
 
 #include <QActionGroup>
+#include <QLabel>
+#include <QPushButton>
 #include <QDockWidget>
 #include <QFileInfo>
 #include <QGridLayout>
@@ -64,6 +66,9 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     p.setPen(QPen(ink,2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
     p.setBrush(Qt::NoBrush);
     switch(id) {
+    case 34: {p.drawEllipse(QPointF(16,16),13,13);QFont f=p.font();f.setPixelSize(22);f.setBold(true);p.setFont(f);p.drawText(QRectF(2,2,28,28),Qt::AlignCenter,QStringLiteral("?"));break;}
+    case 33: p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(3,10,29,10);p.drawLine(3,23,29,23);
+        p.drawPolyline(QPolygonF{{13,13},{21,17},{13,21},{13,13}});break;
     case 0: p.drawRoundedRect(QRectF(6,3,20,26),2,2);p.drawLine(11,16,21,16);p.drawLine(16,11,16,21);break;
     case 1: {QPainterPath path;path.moveTo(3,26);path.lineTo(3,8);path.lineTo(12,8);path.lineTo(15,11);path.lineTo(29,11);path.lineTo(26,26);path.closeSubpath();p.drawPath(path);p.drawLine(4,16,27,16);break;}
     case 2: p.drawLine(7,24,23,8);p.drawLine(10,27,26,11);p.drawLine(23,8,26,11);p.drawLine(7,24,6,28);p.drawLine(6,28,10,27);p.drawLine(4,29,28,29);break;
@@ -104,8 +109,8 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     case 28: p.drawRoundedRect(QRectF(6,13,20,15),2,2);p.drawArc(QRectF(10,3,12,20),0,180*16);p.drawLine(16,18,16,23);break;
     case 29: p.drawLine(5,7,27,7);p.drawLine(5,16,27,16);p.drawLine(5,25,27,25);
         p.setBrush(ink);p.drawEllipse(QPointF(12,7),3,3);p.drawEllipse(QPointF(22,16),3,3);p.drawEllipse(QPointF(15,25),3,3);break;
-    case 30: p.drawRect(2,5,21,21);p.drawLine(9,5,9,26);p.drawLine(16,5,16,26);
-        p.drawLine(2,12,23,12);p.drawLine(2,19,23,19);p.drawLine(24,15,30,15);p.drawLine(27,12,27,18);break;
+    case 30: p.drawPolyline(QPolygonF{{4,11},{12,6},{20,11},{20,21},{12,26},{4,21},{4,11}});
+        p.drawLine(20,11,27,6);p.drawLine(20,21,27,26);p.drawEllipse(QPointF(28,5),2,2);p.drawEllipse(QPointF(28,27),2,2);break;
     case 31: p.drawLine(4,5,13,5);p.drawLine(4,5,4,14);p.drawLine(28,5,19,5);p.drawLine(28,5,28,14);
         p.drawLine(4,27,13,27);p.drawLine(4,27,4,18);p.drawLine(28,27,19,27);p.drawLine(28,27,28,18);
         p.drawEllipse(QPointF(16,16),5,5);break;
@@ -198,7 +203,7 @@ void MainWindow::createToolBar() {
         ircCapture->setText(reason.isEmpty() ? QStringLiteral("IRC·TS 캡처…")
             : QStringLiteral("IRC·TS 캡처 · %1").arg(reason));
     });
-    exportMenu->addAction(findChild<QAction *>("OpenMechanismAnimation"));
+
     exportMenu->addAction(findChild<QAction *>("CopyTSAnimation"));
     auto *captureMenu=findChild<QMenu *>("EditCaptureMenu");
     for(auto *action:exportMenu->actions())captureMenu->removeAction(action);
@@ -226,6 +231,7 @@ void MainWindow::createToolBar() {
     };
     addDockToggle(m_explorerDock, QStringLiteral("ToggleResultsSidebar"), QStringLiteral("결과 패널"), 11);
     addDockToggle(m_structureDock, QStringLiteral("ToggleStructureSidebar"), QStringLiteral("구조 패널"), 25);
+
 
     const auto addButton = [](QAction *action, QWidget *parent) {
         auto *button = new QToolButton(parent);
@@ -281,6 +287,12 @@ void MainWindow::createToolBar() {
     });
     output->setIconText(QStringLiteral("원문 보기"));
     toolbar->addAction(output);
+    auto *slash=new QLabel(QStringLiteral(" / "),toolbar);slash->setAccessibleName(QStringLiteral("구분선"));toolbar->addWidget(slash);
+    addCommonAction("OpenMechanismAnimation",QStringLiteral("애니메이션 제작"),33);
+    auto *help=new QAction(QStringLiteral("도움말 / Help"),this);help->setObjectName("YoungcraftHelpAction");
+    help->setShortcut(QKeySequence::HelpContents);help->setProperty("toolbarIconId",34);
+    help->setToolTip(QStringLiteral("도움말 / Help (F1)"));
+    connect(help,&QAction::triggered,this,&MainWindow::showHelp);toolbar->addAction(help);
 
     for (auto *action : toolbar->actions()) {
         if (auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action))) {
@@ -308,6 +320,7 @@ void MainWindow::createToolBar() {
     addDisplayButton(m_atomFocusMenu->menuAction(), 17);
     addDisplayButton(m_syncViewsAction, 10);
 
+    if(auto *ligands=m_drawBar->findChild<QPushButton *>("LabLigandsButton"))ligands->setIcon(actionIcon(30));
     auto *tabs = m_structureTabs->tabBar();
     tabs->setExpanding(false);
     for (int tab = 0; tab < tabs->count(); ++tab) {
@@ -338,11 +351,11 @@ void MainWindow::createToolBar() {
     m_viewportEditMenu = new QMenu(QStringLiteral("정밀 편집"), editPage);
     auto *editTools = new QActionGroup(m_viewportEditMenu);
     editTools->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
-    const QStringList editNames = {QStringLiteral("원자 이동"), QStringLiteral("조각 각도"),
-        QStringLiteral("조각 비틀림"), QStringLiteral("분자 이동"), QStringLiteral("분자 회전")};
+    const QStringList editNames = {QStringLiteral("원자 이동"), QStringLiteral("fragment 각도"),
+        QStringLiteral("fragment 비틀림"), QStringLiteral("molecule 이동"), QStringLiteral("molecule 회전")};
     const QStringList editHints = {QStringLiteral("선택 원자를 왼쪽 버튼으로 드래그 · Ctrl+D"),
         QStringLiteral("가지 원자를 드래그하여 각도 조정"), QStringLiteral("가지 원자를 드래그하여 결합축 회전"),
-        QStringLiteral("분자를 왼쪽 버튼으로 드래그하여 이동"), QStringLiteral("분자를 왼쪽 버튼으로 드래그하여 회전")};
+        QStringLiteral("molecule를 왼쪽 버튼으로 드래그하여 이동"), QStringLiteral("molecule를 왼쪽 버튼으로 드래그하여 회전")};
     m_viewportEditMenu->setToolTipsVisible(true);
     for (int mode = 0; mode < editNames.size(); ++mode) {
         auto *action = m_viewportEditMenu->addAction(editNames[mode]);
@@ -408,9 +421,9 @@ void MainWindow::createToolBar() {
     addEditButton(m_viewportEditMenu->menuAction(), 29);
     m_viewportEditMenu->addSeparator();
     m_viewportEditMenu->addAction(m_geometryAction);
-    auto *insertMenu = new QMenu(QStringLiteral("조각 / 리간드"), editPage);
-    insertMenu->addAction(QStringLiteral("조각 / 리간드 삽입…"), this, [this] { openFragmentBrowser(); });
-    insertMenu->addAction(QStringLiteral("금속–리간드–산소 조합…"), this, &MainWindow::buildLabComplex);
+    auto *insertMenu = new QMenu(QStringLiteral("fragments / ligands"), editPage);
+    insertMenu->addAction(QStringLiteral("fragments / ligands 삽입…"), this, [this] { openFragmentBrowser(); });
+    insertMenu->addAction(QStringLiteral("금속–ligand–산소 조합…"), this, &MainWindow::buildLabComplex);
     addEditButton(insertMenu->menuAction(), 30);
 
     struct Theme { QString name, description, paper, surface, tint, ink, border; };
@@ -526,7 +539,7 @@ void MainWindow::createToolBar() {
             if (iconId.isValid()) action->setIcon(actionIcon(iconId.toInt(), QColor(t.ink)));
         }
         for (int tab = 0; tab < m_structureTabs->count(); ++tab)
-            m_structureTabs->setTabIcon(tab, actionIcon(tab == 0 ? 9 : 2, QColor(t.ink)));
+            m_structureTabs->setTabIcon(tab, actionIcon(tab == 0 ? 9 : tab == 1 ? 2 : 3, QColor(t.ink)));
         themeGroup->actions().at(index)->setChecked(true);
         for(auto *view:findChildren<MoleculeView *>())view->update();
         for(auto *surface:findChildren<QWidget *>(QStringLiteral("MoleculeViewport")))surface->update();
@@ -542,7 +555,7 @@ void MainWindow::createToolBar() {
     patternMenu->setToolTipsVisible(true);
     auto *patternGroup = new QActionGroup(patternMenu);
     patternGroup->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
-    const QStringList names={QStringLiteral("달빛 몽환"),QStringLiteral("랩 모눈"),QStringLiteral("트윌 사선"),QStringLiteral("소다 물결"),QStringLiteral("보태니컬 잎"),QStringLiteral("분자 격자")};
+    const QStringList names={QStringLiteral("달빛 몽환"),QStringLiteral("랩 모눈"),QStringLiteral("트윌 사선"),QStringLiteral("소다 물결"),QStringLiteral("보태니컬 잎"),QStringLiteral("molecule 격자")};
     const QStringList motifDescriptions={QStringLiteral("초승달 · 별빛 · 옅은 빛무리가 떠 있는 꿈속의 하늘"),QStringLiteral("정갈한 실험실 그래프 종이"),QStringLiteral("비스듬히 짜인 가벼운 패브릭"),QStringLiteral("부드럽게 이어지는 잔물결"),QStringLiteral("식물 표본을 닮은 잎사귀"),QStringLiteral("육각 고리와 원자로 이어진 화학 문양")};
     auto applyPattern = [toolbar, patternGroup, applyTheme](int index) {
         index = qBound(-1, index, 5);

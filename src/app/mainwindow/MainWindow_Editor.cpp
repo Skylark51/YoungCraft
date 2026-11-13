@@ -1,5 +1,6 @@
 #include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
+#include <QPainter>
 #include "render/MoleculeView.h"
 #include "animation/AnimationController.h"
 #include <QComboBox>
@@ -32,14 +33,14 @@ void MainWindow::saveLigandTemplate(){
     if(!metal.count()){setStatus(QStringLiteral("템플릿의 배위 기준이 될 금속을 먼저 넣으세요."));return;}
     const auto selected=m_view->selection().atoms;
     QCheckBox selection(QStringLiteral("선택 원자만 저장 (금속 포함)"));selection.setChecked(selected.size()>1);
-    QLabel note(QStringLiteral("용매·기질·산소 조각을 제외한 리간드와 금속만 선택하세요.\n금속은 dummy 기준점으로 저장하며 기존 주개 결합과 상대 좌표를 유지합니다.\n사용자 템플릿은 다음 실행에서도 리간드 목록에 표시됩니다."));note.setWordWrap(true);
-    form.addRow(&note);form.addRow(QStringLiteral("리간드 이름"),&name);form.addRow(QStringLiteral("기준 금속"),&metal);form.addRow(&selection);
+    QLabel note(QStringLiteral("용매·기질·산소 fragment을 제외한 ligand와 금속만 선택하세요.\n금속은 dummy 기준점으로 저장하며 기존 주개 결합과 상대 좌표를 유지합니다.\n사용자 템플릿은 다음 실행에서도 ligand 목록에 표시됩니다."));note.setWordWrap(true);
+    form.addRow(&note);form.addRow(QStringLiteral("ligand 이름"),&name);form.addRow(QStringLiteral("기준 금속"),&metal);form.addRow(&selection);
     QDialogButtonBox buttons(QDialogButtonBox::Save|QDialogButtonBox::Cancel);form.addRow(&buttons);
     connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     if(dialog.exec()!=QDialog::Accepted)return;
     const QString path=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/lab_fragments/ligands/"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".cjson";
     QString error;if(!FragmentLibrary::saveLigand(molecule,metal.currentData().toInt(),selection.isChecked()?selected:QSet<int>{},name.currentText(),path,&error)){setStatus(error,10000);return;}
-    setStatus(QStringLiteral("리간드 템플릿 저장: %1").arg(name.currentText()),8000);
+    setStatus(QStringLiteral("ligand 템플릿 저장: %1").arg(name.currentText()),8000);
 }
 DrawState MainWindow::drawState() const {
     DrawState s;s.element=atomicNumberFor(m_drawElement->currentText());s.bondOrder=m_drawBondOrder->currentData().toDouble();
@@ -72,6 +73,10 @@ void MainWindow::setupEditorControls(QGridLayout *tools) {
     connect(newChain,&QPushButton::clicked,m_view,&MoleculeView::endDrawingChain);
     auto *lab=new QPushButton(QStringLiteral("Lab Ligands…"),m_drawBar);lab->setObjectName("LabLigandsButton");
     makeSidebarIconButton(lab, QStyle::SP_DirOpenIcon);
+    QPixmap ligandPix(32,32);ligandPix.fill(Qt::transparent);QPainter ligandPainter(&ligandPix);
+    ligandPainter.setRenderHint(QPainter::Antialiasing);ligandPainter.setPen(QPen(QColor("#376688"),2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+    ligandPainter.drawPolyline(QPolygonF{{5,11},{12,7},{19,11},{19,20},{12,24},{5,20},{5,11}});
+    ligandPainter.drawLine(19,11,27,6);ligandPainter.drawLine(19,20,27,25);ligandPainter.end();lab->setIcon(QIcon(ligandPix));
     tools->addWidget(lab, 0, 3);
 
     auto *charge=new QSpinBox(m_drawBar);charge->setObjectName("DrawFormalCharge");charge->setRange(-4,4);charge->setPrefix("전하: ");layout->addWidget(charge);
@@ -97,7 +102,12 @@ void MainWindow::connectEditorControls() {
     m_documentConnections.push_back(connect(periodic,&QPushButton::clicked,this,[this]{QDialog d(this);d.setWindowTitle(QStringLiteral("주기율표 — 원소 선택"));QGridLayout grid(&d);
         // Standard periodic-table rows, including separated lanthanide / actinide rows.
         const QVector<QVector<int>> rows={{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2},{3,4,0,0,0,0,0,0,0,0,0,0,5,6,7,8,9,10},{11,12,0,0,0,0,0,0,0,0,0,0,13,14,15,16,17,18},{19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36},{37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54},{55,56,57,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86},{87,88,89,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118},{0,0,58,59,60,61,62,63,64,65,66,67,68,69,70,71},{0,0,90,91,92,93,94,95,96,97,98,99,100,101,102,103}};
-        for(int r=0;r<rows.size();++r)for(int c=0;c<rows[r].size();++c)if(int z=rows[r][c]){auto*b=new QPushButton(elementSymbol(z),&d);b->setToolTip(QString::number(z));grid.addWidget(b,r,c);connect(b,&QPushButton::clicked,&d,[&,z]{m_drawElement->setCurrentText(elementSymbol(z));m_view->setDrawingElement(z);d.accept();});}d.exec();}));
+        for(int r=0;r<rows.size();++r)for(int c=0;c<rows[r].size();++c)if(int z=rows[r][c]){auto*b=new QPushButton(elementSymbol(z),&d);b->setFixedSize(38,38);const bool metalloid=QSet<int>{5,14,32,33,51,52,84}.contains(z);
+            const bool metal=!metalloid && isMetal(z);
+            const QString group=metalloid?QStringLiteral("준금속"):metal?QStringLiteral("금속"):QStringLiteral("비금속");
+            const QString color=metalloid?"#eadcf5":metal?"#d7e8fa":"#d9efdf";
+            b->setStyleSheet(QString("QPushButton{background:%1;color:#172b3a;border:1px solid #8296a5;border-radius:4px;min-width:28px;min-height:28px;}QPushButton:hover{border:2px solid #275b8a;}QPushButton:focus{border:2px solid #275b8a;}").arg(color));
+            b->setToolTip(QString("%1 · %2").arg(z).arg(group));grid.addWidget(b,r,c);connect(b,&QPushButton::clicked,&d,[&,z]{m_drawElement->setCurrentText(elementSymbol(z));m_view->setDrawingElement(z);d.accept();});}grid.addWidget(new QLabel(QStringLiteral("금속: 파랑 · 비금속: 초록 · 준금속: 보라"),&d),9,0,1,18);d.exec();}));
     m_documentConnections.push_back(connect(m_view,&MoleculeView::atomEditRequested,this,[this](int i){
         if(consumeInsertion(i,m_view->molecule().atoms[i].position))return;
         const auto anchor=m_view->molecule().atoms[i].position;
@@ -132,7 +142,7 @@ void MainWindow::changeSelectionElement(){
 }
 void MainWindow::manipulateSelection(){
     auto ids=m_view->selection().atoms;if(ids.isEmpty()&&m_view->selectedAtom()>=0)ids.insert(m_view->selectedAtom());if(ids.isEmpty()){setStatus(QStringLiteral("이동할 원자를 선택하세요."));return;}
-    QDialog d(this);d.setWindowTitle("선택 원자 이동 / 회전");QFormLayout form(&d);QDoubleSpinBox tx,ty,tz,rx,ry,rz;for(auto*b:{&tx,&ty,&tz}){b->setRange(-10000,10000);b->setDecimals(4);b->setSuffix(" Å");}for(auto*b:{&rx,&ry,&rz}){b->setRange(-360,360);b->setSuffix("°");}form.addRow("X축 이동",&tx);form.addRow("Y축 이동",&ty);form.addRow("Z축 이동",&tz);form.addRow("X축 회전",&rx);form.addRow("Y축 회전",&ry);form.addRow("Z축 회전",&rz);QComboBox center;center.addItems({"원점","분자 중심","선택 원자 중심"});center.setCurrentIndex(2);form.addRow("회전 중심",&center);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
+    QDialog d(this);d.setWindowTitle("선택 원자 이동 / 회전");QFormLayout form(&d);QDoubleSpinBox tx,ty,tz,rx,ry,rz;for(auto*b:{&tx,&ty,&tz}){b->setRange(-10000,10000);b->setDecimals(4);b->setSuffix(" Å");}for(auto*b:{&rx,&ry,&rz}){b->setRange(-360,360);b->setSuffix("°");}form.addRow("X축 이동",&tx);form.addRow("Y축 이동",&ty);form.addRow("Z축 이동",&tz);form.addRow("X축 회전",&rx);form.addRow("Y축 회전",&ry);form.addRow("Z축 회전",&rz);QComboBox center;center.addItems({"원점","molecule 중심","선택 원자 중심"});center.setCurrentIndex(2);form.addRow("회전 중심",&center);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
     auto edited=m_view->molecule();QVector3D c;if(center.currentIndex()==1){for(auto a:edited.atoms)c+=a.position;c/=qMax(1,int(edited.atoms.size()));}if(center.currentIndex()==2){for(int i:ids)c+=edited.atoms[i].position;c/=ids.size();}
     MoleculeEditController::transform(edited,ids,{float(tx.value()),float(ty.value()),float(tz.value())},{float(rx.value()),float(ry.value()),float(rz.value())},c);commitEditedMolecule(edited,false);
 }
@@ -151,7 +161,7 @@ void MainWindow::createBuildMenu(){
     auto *menu=menuBar()->addMenu("구조 만들기");menu->setObjectName("StructureBuildMenu");auto add=[&](const QString&text,auto fn){auto*a=menu->addAction(text);connect(a,&QAction::triggered,this,fn);return a;};
     add("Complex 제작 도우미...",[this]{insertCoordinationDialog();});add("Fragment 삽입...",[this]{openFragmentBrowser();});
     add("Ligands for BIOCC...",[this]{openFragmentBrowser(true);});
-    auto *replaceLigand=menu->addAction(QStringLiteral("리간드 자동 인식/교체..."));
+    auto *replaceLigand=menu->addAction(QStringLiteral("ligand 자동 인식/교체..."));
     replaceLigand->setObjectName("ReplaceLigandTemplate");
     connect(replaceLigand,&QAction::triggered,this,&MainWindow::replaceLigandTemplate);
     add("템플릿 저장...",[this]{saveLigandTemplate();});

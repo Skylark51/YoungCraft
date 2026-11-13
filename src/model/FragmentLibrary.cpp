@@ -16,7 +16,7 @@ namespace youngcraft {
 bool FragmentLibrary::metalComplex(const Fragment &f,int metal,int oxidation,int totalCharge,
                                   int multiplicity,Molecule &result,QString *error) {
     if(!isMetal(metal)||(!f.ligand&&f.category!="lab-ligand")||multiplicity<1||oxidation < -4||oxidation>4) {
-        if(error)*error=QStringLiteral("금속, 리간드, 형식 전하와 multiplicity를 확인하세요.");return false;
+        if(error)*error=QStringLiteral("금속, ligand, 형식 전하와 multiplicity를 확인하세요.");return false;
     }
     Molecule complex;DrawState state;state.element=metal;state.formalCharge=oxidation;
     const int center=MoleculeEditController::addAtom(complex,{},state);
@@ -32,9 +32,9 @@ bool FragmentLibrary::saveLigand(const Molecule &m,int metal,const QSet<int> &in
     auto fail=[&](const QString &message){if(error)*error=message;return false;};
     if(!MoleculeEditController::validate(m,error))return false;
     if(metal<0||metal>=m.atoms.size()||!isMetal(m.atoms[metal].atomicNumber)||name.trimmed().isEmpty())
-        return fail(QStringLiteral("유효한 금속 중심과 리간드 이름이 필요합니다."));
+        return fail(QStringLiteral("유효한 금속 중심과 ligand 이름이 필요합니다."));
     QSet<int> ids=included;if(ids.isEmpty())for(int i=0;i<m.atoms.size();++i)ids.insert(i);
-    if(!ids.contains(metal)||ids.size()<2)return fail(QStringLiteral("리간드와 기준 금속을 함께 선택하세요."));
+    if(!ids.contains(metal)||ids.size()<2)return fail(QStringLiteral("ligand와 기준 금속을 함께 선택하세요."));
     QVector<int> ordered{metal};for(int i=0;i<m.atoms.size();++i)if(i!=metal&&ids.contains(i))ordered<<i;
     QMap<int,int> mapping;QJsonArray numbers,coords,charges,ends,orders;int charge=0,donors=0;
     for(int i=0;i<ordered.size();++i){
@@ -135,8 +135,8 @@ bool FragmentLibrary::insert(Molecule &m,const Fragment&f,int target,const QVect
         }else{origin=edited.atoms[target].position;
             if(!coordination) for(int i=edited.atoms.size()-1;i>=0;--i)if(edited.atoms[i].atomicNumber==1&&edited.bondIndex(target,i)>=0){direction=(edited.atoms[i].position-origin).normalized();edited.removeAtom(i);if(i<target)--target;break;}
         }
-        if(f.attachments.isEmpty()&&f.hapticAtoms.isEmpty()){if(error)*error="분자 조각에 연결 정보가 없습니다.";return false;}
-        if(f.ligand&&!coordination){if(error)*error="이 리간드를 연결할 금속 배위 중심을 선택하세요.";return false;}
+        if(f.attachments.isEmpty()&&f.hapticAtoms.isEmpty()){if(error)*error="molecule fragment에 연결 정보가 없습니다.";return false;}
+        if(f.ligand&&!coordination){if(error)*error="이 ligand를 연결할 금속 배위 중심을 선택하세요.";return false;}
     }
     QVector3D anchor=f.anchor;
     auto align=QQuaternion::rotationTo(f.direction,direction);
