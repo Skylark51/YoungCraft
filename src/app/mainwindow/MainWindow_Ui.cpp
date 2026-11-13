@@ -634,6 +634,8 @@ void MainWindow::connectDocumentUi() {
         m_animation->setAmplitude(amplitude);
         m_view->setVibrationVectorScaleFactor(m_analysis->scaledVectorsEnabled() ? amplitude : 1.0);
     }));
+    m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::frequencyVectorLengthChanged,
+        m_view, &MoleculeView::setVibrationVectorLengthFactor));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::animationSaveRequested, this, &MainWindow::exportAnimation));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::animationCopyRequested, this, &MainWindow::copyAnimation));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::coordinateImportRequested, this, [this](const QString &xyz) {

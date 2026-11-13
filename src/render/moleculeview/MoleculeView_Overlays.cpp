@@ -179,7 +179,8 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
         const QVector3D displacement = m_frequencyDisplacements[i];
         if (displacement.length() < m_style.vectorThreshold) continue;
         const QVector3D start3 = i < m_frequencyBase.size() ? m_frequencyBase[i] : m_molecule.atoms[i].position;
-        const float vectorScale = qBound(0.05f, m_style.vectorScale * float(m_vibrationVectorScaleFactor), 20.0f);
+        const float vectorScale = qBound(0.05f, m_style.vectorScale * float(m_vibrationVectorScaleFactor), 20.0f)
+            *float(m_vibrationVectorLengthFactor);
         const QVector3D end3 = start3 + displacement * vectorScale;
         const QVector3D start = project(start3, vp);
         const QVector3D end = project(end3, vp);

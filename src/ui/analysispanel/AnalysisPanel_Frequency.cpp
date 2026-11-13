@@ -57,6 +57,11 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     m_cycleTime=new QDoubleSpinBox(page);m_cycleTime->setObjectName("FrequencyCycleTime");
     m_cycleTime->setRange(.2,20);m_cycleTime->setSingleStep(.1);m_cycleTime->setValue(2);m_cycleTime->setSuffix(QStringLiteral(" 초"));
     form->addRow(QStringLiteral("진동 스케일"),m_amplitude);form->addRow(QStringLiteral("주기"),m_cycleTime);
+    m_vectorLength=new QDoubleSpinBox(page);m_vectorLength->setObjectName("FrequencyVectorLength");
+    m_vectorLength->setRange(0.1,20);m_vectorLength->setSingleStep(0.1);m_vectorLength->setDecimals(1);
+    m_vectorLength->setValue(1);m_vectorLength->setSuffix(QStringLiteral(" 배"));
+    m_vectorLength->setToolTip(QStringLiteral("화살표 길이만 조절합니다. 1배는 기본 길이이며 진동 크기와 주기는 바뀌지 않습니다. 스케일 벡터에도 적용됩니다."));
+    form->addRow(QStringLiteral("벡터 길이"),m_vectorLength);
     m_recountBonds=new QCheckBox(QStringLiteral("결합 다시 계산"),page);m_recountBonds->setChecked(true);
     m_vectors=new QCheckBox(QStringLiteral("변위 벡터 표시"),page);
     m_scaledVectors=new QCheckBox(QStringLiteral("스케일 벡터"),page);m_scaledVectors->setEnabled(false);m_scaledVectors->setObjectName("FrequencyScaledVectors");
@@ -107,6 +112,7 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     connect(m_copyFrequencyAnimation,&QPushButton::clicked,this,&AnalysisPanel::animationCopyRequested);
     connect(m_amplitude,qOverload<double>(&QDoubleSpinBox::valueChanged),this,&AnalysisPanel::frequencyAmplitudeChanged);
     connect(m_cycleTime,qOverload<double>(&QDoubleSpinBox::valueChanged),this,&AnalysisPanel::frequencyCycleTimeChanged);
+    connect(m_vectorLength,qOverload<double>(&QDoubleSpinBox::valueChanged),this,&AnalysisPanel::frequencyVectorLengthChanged);
     connect(m_recountBonds,&QCheckBox::toggled,this,&AnalysisPanel::recountBondsChanged);
     const auto vectorChanged=[this]{emit vibrationVectorsChanged(m_vectors->isChecked(),m_scaledVectors->isChecked());};
     connect(m_vectors,&QCheckBox::toggled,this,[this,vectorChanged](bool enabled){m_scaledVectors->setEnabled(enabled);vectorChanged();});

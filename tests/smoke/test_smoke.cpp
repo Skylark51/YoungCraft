@@ -52,6 +52,7 @@
 #include <QSignalBlocker>
 
 #include <QCheckBox>
+#include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QSettings>
 #include <QComboBox>
@@ -109,6 +110,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void vibrationVectorLengthControl();
     void vibrationVectorContrast();
     void ligandReplacementWorkflow();
     void orbitalCacheAndDetachedWindow();
@@ -3774,6 +3776,41 @@ void SmokeTest::pastedXYZWorkflow() {
 }
 #include "reaction_capture_workflow.inc"
 
+
+
+void SmokeTest::vibrationVectorLengthControl(){
+    MainWindow window;window.show();Molecule molecule;
+    molecule.atoms={{1,6,"C",{-1,0,0}},{2,8,"O",{1,0,0}}};molecule.setBond(0,1,1);
+    window.newDrawingDocument(molecule);window.setDrawingMode(false);
+    auto *panel=window.m_analysis;auto *length=panel->findChild<QDoubleSpinBox *>("FrequencyVectorLength");
+    auto *cycle=panel->findChild<QDoubleSpinBox *>("FrequencyCycleTime");QVERIFY(length);QVERIFY(cycle);
+    QCOMPARE(length->value(),1.0);QCOMPARE(length->minimum(),0.1);QCOMPARE(length->maximum(),20.0);
+    bool correctlyPlaced=false;
+    for(auto *form:panel->findChildren<QFormLayout *>()){
+        int cycleRow=-1,lengthRow=-1;QFormLayout::ItemRole role;
+        form->getWidgetPosition(cycle,&cycleRow,&role);form->getWidgetPosition(length,&lengthRow,&role);
+        if(cycleRow>=0&&lengthRow==cycleRow+1)correctlyPlaced=true;
+    }
+    QVERIFY(correctlyPlaced);
+    FrequencyMode mode;mode.displacement={{0,0.3f,0},{0,-0.3f,0}};
+    window.m_view->setFrequencyMode(&mode);window.m_view->m_rotation=QQuaternion();
+    auto style=window.m_view->style();style.showVibrationVectors=true;style.showAxes=false;style.showLabels=false;style.background=Qt::white;style.vectorColor=QColor(15,65,170);window.m_view->setStyle(style);
+    auto span=[](const QImage &image){int top=image.height(),bottom=-1;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){auto c=image.pixelColor(x,y);if(c.blue()>110&&c.red()<70&&c.green()<110){top=qMin(top,y);bottom=qMax(bottom,y);}}return bottom-top;};
+    const double amplitude=panel->frequencyAmplitude(),period=panel->frequencyCycleTime();
+    QTRY_VERIFY(window.m_view->isValid());
+    const int shortSpan=span(window.m_view->imageAtSize({560,420}));QVERIFY(shortSpan>20);
+    length->setValue(2);QCOMPARE(window.m_view->m_vibrationVectorLengthFactor,2.0);
+    const int longSpan=span(window.m_view->imageAtSize({560,420}));QVERIFY(longSpan>shortSpan*1.5);
+    QCOMPARE(panel->frequencyAmplitude(),amplitude);QCOMPARE(panel->frequencyCycleTime(),period);
+    for(int i=0;i<molecule.atoms.size();++i)QCOMPARE(window.m_view->molecule().atoms[i].position,molecule.atoms[i].position);
+    window.newDrawingDocument(molecule);auto *second=window.m_analysis->findChild<QDoubleSpinBox *>("FrequencyVectorLength");
+    QCOMPARE(second->value(),1.0);second->setValue(0.5);
+    window.m_documentTabs->setCurrentIndex(window.m_documentTabs->count()-2);
+    QCOMPARE(window.m_analysis,panel);QCOMPARE(length->value(),2.0);QCOMPARE(window.m_view->m_vibrationVectorLengthFactor,2.0);
+    length->setValue(3);QCOMPARE(window.m_view->m_vibrationVectorLengthFactor,3.0);
+    window.m_analysis->findChild<QCheckBox *>("FrequencyScaledVectors")->setChecked(true);
+    QCOMPARE(window.m_view->m_vibrationVectorLengthFactor,3.0);QCOMPARE(window.m_view->m_vibrationVectorScaleFactor,amplitude);
+}
 
 void SmokeTest::vibrationVectorContrast(){
     MoleculeView view;view.resize(560,420);view.show();QTRY_VERIFY(view.isValid());

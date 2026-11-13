@@ -65,6 +65,7 @@ signals:
     void framePlayRequested();
     void frequencyAmplitudeChanged(double value);
     void frequencyCycleTimeChanged(double seconds);
+    void frequencyVectorLengthChanged(double factor);
     void recountBondsChanged(bool enabled);
     void vibrationVectorsChanged(bool enabled, bool scaled);
     void animationSaveRequested();
@@ -119,6 +120,7 @@ private:
     QSlider *m_frameSlider = nullptr;
     QDoubleSpinBox *m_amplitude = nullptr;
     QDoubleSpinBox *m_cycleTime = nullptr;
+    QDoubleSpinBox *m_vectorLength = nullptr;
     QCheckBox *m_recountBonds = nullptr;
     QCheckBox *m_vectors = nullptr;
     QCheckBox *m_scaledVectors = nullptr;

@@ -54,6 +54,7 @@ public:
     // Render fresh geometry at the requested pixel size, independently of the widget.
     QImage imageAtSize(const QSize &pixels, bool transparent = false, bool viewportOnly = false);
     void setVibrationVectorScaleFactor(double factor);
+    void setVibrationVectorLengthFactor(double factor);
     void setBonds(const QVector<Bond> &bonds);
     void setDrawingMode(bool enabled) {
         if(m_drawingMode!=enabled)setDrawingArmed(false);
@@ -301,6 +302,7 @@ private:
     QVector<QVector3D> m_frequencyDisplacements;
     QVector<QVector3D> m_frequencyBase;
     double m_vibrationVectorScaleFactor = 1.0;
+    double m_vibrationVectorLengthFactor = 1.0;
     bool m_transparentCapture = false;
     bool m_viewportOnlyCapture = false;
     GLuint m_shadowFbo = 0;
