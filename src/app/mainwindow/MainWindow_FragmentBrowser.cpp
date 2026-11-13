@@ -18,13 +18,13 @@ void MainWindow::openFragmentBrowser(bool labOnly) {
     const auto library=FragmentLibrary::load(&errors);
     if(library.isEmpty()){setStatus(errors);return;}
     QDialog dialog(this);dialog.setObjectName("FragmentBrowser");
-    dialog.setWindowTitle(QStringLiteral("리간드 / 작용기 자동 그리기"));dialog.resize(900,660);
+    dialog.setWindowTitle(labOnly?QStringLiteral("Ligands for BIOCC"):QStringLiteral("Fragment 삽입"));dialog.resize(900,660);
     QVBoxLayout outer(&dialog);
     QLineEdit search;search.setObjectName("FragmentSearch");
     search.setPlaceholderText(QStringLiteral("이름 검색: MTP, MDAP, peroxo, hydroperoxo, MeCN, H2O…"));outer.addWidget(&search);
     QComboBox category;category.setObjectName("FragmentCategory");
     category.addItem(QStringLiteral("All Templates"),QString());
-    category.addItem(QStringLiteral("Lab Ligands · 연구용 리간드"),"lab-ligand");
+    category.addItem(QStringLiteral("Ligands for BIOCC"),"lab-ligand");
     category.addItem(QStringLiteral("Lab Oxygen · 산소 배위 조각"),"lab-adduct");
     category.addItem(QStringLiteral("Lab Solvents · MeCN / H₂O 보조 리간드"),"lab-coligand");
     QStringList categories;

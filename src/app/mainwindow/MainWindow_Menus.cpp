@@ -50,6 +50,7 @@ void MainWindow::createMenus() {
                   const std::function<void()> &function) {
         auto *action = menu->addAction(text);
         if (!shortcut.isEmpty()) action->setShortcut(shortcut);
+        action->setShortcutVisibleInContextMenu(true);
         QObject::connect(action, &QAction::triggered, function);
         return action;
     };
@@ -90,7 +91,12 @@ void MainWindow::createMenus() {
     QMenu *edit = menuBar()->addMenu(QStringLiteral("편집"));
     edit->setObjectName(QStringLiteral("EditMenu"));
     add(edit, QStringLiteral("실행 취소"), QKeySequence(QStringLiteral("Ctrl+Z")), [this] { undoDrawingEdit(); });
-    add(edit, QStringLiteral("다시 실행"), QKeySequence(QStringLiteral("Ctrl+Y")), [this] { redoDrawingEdit(); })->setShortcuts({QKeySequence(QStringLiteral("Ctrl+Y")), QKeySequence(QStringLiteral("Ctrl+Shift+Z"))});
+    auto *redo = add(edit, QStringLiteral("다시 실행"), QKeySequence(QStringLiteral("Ctrl+Y")), [this] { redoDrawingEdit(); });
+    redo->setShortcuts({QKeySequence(QStringLiteral("Ctrl+Y")), QKeySequence(QStringLiteral("Ctrl+Shift+Z"))});
+    // A tab uses Qt's right-aligned shortcut column; keep both existing bindings visible.
+    redo->setText(QStringLiteral("다시 실행\t%1 / %2").arg(redo->shortcuts()[0].toString(QKeySequence::NativeText),
+                                                       redo->shortcuts()[1].toString(QKeySequence::NativeText)));
+    redo->setIconText(QStringLiteral("다시 실행"));
     edit->addSeparator();
     add(edit, QStringLiteral("선택 조각 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
     add(edit, QStringLiteral("분자 조각 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
@@ -110,10 +116,11 @@ void MainWindow::createMenus() {
     capture->setObjectName(QStringLiteral("EditCaptureMenu"));
     auto *mechanism = add(capture, QStringLiteral("전체 메커니즘 애니메이션…"), {}, [this] { openMechanismAnimation(); });
     mechanism->setObjectName(QStringLiteral("OpenMechanismAnimation"));
-    add(build, QStringLiteral("새 구조 그리기"), {}, [this] { newDrawingDocument(); });
+    // Reuse the action so every menu path shows Ctrl+N without duplicate registration.
+    build->addAction(findChild<QAction *>(QStringLiteral("NewStructure")));
     add(build, QStringLiteral("원자 추가"), {}, [this] { if (!m_drawingMode) newDrawingDocument(m_view->molecule()); else setStatus(QStringLiteral("빈 곳을 클릭하여 원자를 추가하세요.")); });
-    add(build, QStringLiteral("조각(fragment) 추가"), {}, [this] { openFragmentBrowser(); });
-    add(build, QStringLiteral("금속–리간드–산소 조합..."), {}, [this] { buildLabComplex(); });
+    add(build, QStringLiteral("Fragment 삽입..."), {}, [this] { openFragmentBrowser(); });
+    add(build, QStringLiteral("Complex 템플릿 적용..."), {}, [this] { buildLabComplex(); });
     add(bonds, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleSelectedBond(); });
     add(selection, QStringLiteral("전체 선택"), QKeySequence::SelectAll, [this] {
         if (isTextInputFocused() || !m_view) return;

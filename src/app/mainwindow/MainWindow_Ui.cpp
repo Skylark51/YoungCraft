@@ -231,7 +231,7 @@ void MainWindow::createDocumentUi() {
     measurementLayout->addWidget(m_measurementReadout, 1);
     makeSidebarIconButton(clearMeasurement, QStyle::SP_DialogResetButton);
     measurementLayout->addWidget(clearMeasurement);
-    auto *approach = new QPushButton(QStringLiteral("Scan 접근 배치…"), measurementRow);
+    auto *approach = new QPushButton(QStringLiteral("Scan용 구조 조정…"), measurementRow);
     approach->setObjectName(QStringLiteral("ScanApproachButton"));
     makeSidebarIconButton(approach, QStyle::SP_ArrowForward);
     measurementLayout->addWidget(approach);

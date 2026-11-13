@@ -26,7 +26,7 @@
 namespace youngcraft {
 void MainWindow::saveLigandTemplate(){
     const Molecule molecule=m_view->molecule();if(molecule.atoms.isEmpty())return;
-    QDialog dialog(this);dialog.setWindowTitle(QStringLiteral("현재 구조를 리간드 템플릿으로 저장"));QFormLayout form(&dialog);
+    QDialog dialog(this);dialog.setWindowTitle(QStringLiteral("템플릿 저장"));QFormLayout form(&dialog);
     QComboBox name;name.setEditable(true);name.addItems({"TBDAP","MDAP","MPDAP","CHDAP","12-MTP (Me3-TPADP)","14-MTP","Me2S-DPADP"});
     QComboBox metal;for(int i=0;i<molecule.atoms.size();++i)if(isMetal(molecule.atoms[i].atomicNumber))metal.addItem(QString("%1 · atom %2").arg(molecule.atoms[i].element).arg(i+1),i);
     if(!metal.count()){setStatus(QStringLiteral("템플릿의 배위 기준이 될 금속을 먼저 넣으세요."));return;}
@@ -137,7 +137,7 @@ void MainWindow::manipulateSelection(){
     MoleculeEditController::transform(edited,ids,{float(tx.value()),float(ty.value()),float(tz.value())},{float(rx.value()),float(ry.value()),float(rz.value())},c);commitEditedMolecule(edited,false);
 }
 void MainWindow::insertCoordinationDialog(){
-    QDialog d(this);d.setWindowTitle("배위 중심 삽입");QFormLayout form(&d);QComboBox element,geometry;for(int z=1;z<=118;++z)element.addItem(elementSymbol(z),z);element.setCurrentIndex(26);geometry.addItems(FragmentLibrary::geometries());geometry.setCurrentIndex(7);QSpinBox charge;charge.setRange(-4,4);charge.setValue(2);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow("원소",&element);form.addRow("형식 전하",&charge);form.addRow("배위 구조",&geometry);form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
+    QDialog d(this);d.setWindowTitle("Complex 제작 도우미");QFormLayout form(&d);QComboBox element,geometry;for(int z=1;z<=118;++z)element.addItem(elementSymbol(z),z);element.setCurrentIndex(26);geometry.addItems(FragmentLibrary::geometries());geometry.setCurrentIndex(7);QSpinBox charge;charge.setRange(-4,4);charge.setValue(2);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow("원소",&element);form.addRow("형식 전하",&charge);form.addRow("배위 구조",&geometry);form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
     setDrawingMode(true);m_view->endDrawingChain();m_view->setProperty("pendingFragment",QString());m_view->setProperty("pendingCenter",element.currentData());m_view->setProperty("pendingCharge",charge.value());m_view->setProperty("pendingGeometry",geometry.currentIndex());m_view->setTemplatePreview(geometry.currentIndex());setStatus(QStringLiteral("빈 공간을 클릭하여 배위 중심을 삽입하세요."),0);
 }
 bool MainWindow::consumeInsertion(int target,const QVector3D&p,const QVector3D&dir){
@@ -148,16 +148,20 @@ bool MainWindow::consumeInsertion(int target,const QVector3D&p,const QVector3D&d
     m_view->setProperty("pendingFragment",QString());m_view->setProperty("pendingCenter",0);m_view->clearInsertionPreview();commitEditedMolecule(edited,true);return true;
 }
 void MainWindow::createBuildMenu(){
-    auto *menu=menuBar()->addMenu("구조 만들기");auto add=[&](const QString&text,auto fn){auto*a=menu->addAction(text);connect(a,&QAction::triggered,this,fn);};
-    add("배위 중심 삽입...",[this]{insertCoordinationDialog();});add("리간드 / 작용기 삽입...",[this]{openFragmentBrowser();});
-    add("Lab Ligands · 연구용 리간드...",[this]{openFragmentBrowser(true);});
-    auto *replaceLigand=menu->addAction(QStringLiteral("리간드 인식 / 템플릿 교체..."));
+    auto *menu=menuBar()->addMenu("구조 만들기");menu->setObjectName("StructureBuildMenu");auto add=[&](const QString&text,auto fn){auto*a=menu->addAction(text);connect(a,&QAction::triggered,this,fn);return a;};
+    add("Complex 제작 도우미...",[this]{insertCoordinationDialog();});add("Fragment 삽입...",[this]{openFragmentBrowser();});
+    add("Ligands for BIOCC...",[this]{openFragmentBrowser(true);});
+    auto *replaceLigand=menu->addAction(QStringLiteral("리간드 자동 인식/교체..."));
     replaceLigand->setObjectName("ReplaceLigandTemplate");
     connect(replaceLigand,&QAction::triggered,this,&MainWindow::replaceLigandTemplate);
-    add("리간드 템플릿 저장...",[this]{saveLigandTemplate();});
-    add("금속–리간드–산소 조합...",[this]{buildLabComplex();});
-    add("Scan 접근 배치...",[this]{arrangeScanApproach();});menu->addSeparator();
-    for(auto pair:{qMakePair(QString("수소 보정"),HydrogenAction::Adjust),qMakePair(QString("수소 추가"),HydrogenAction::Add),qMakePair(QString("과잉 수소 제거"),HydrogenAction::RemoveExtra),qMakePair(QString("모든 수소 제거"),HydrogenAction::RemoveAll)})add(pair.first,[this,pair]{auto edited=m_view->molecule();MoleculeEditController::hydrogens(edited,pair.second);commitEditedMolecule(edited,true,false);});
+    add("템플릿 저장...",[this]{saveLigandTemplate();});
+    add("Complex 템플릿 적용...",[this]{buildLabComplex();});
+    add("Scan용 구조 조정...",[this]{arrangeScanApproach();});menu->addSeparator();
+    for(auto pair:{qMakePair(QString("수소 보정"),HydrogenAction::Adjust),qMakePair(QString("수소 추가"),HydrogenAction::Add),qMakePair(QString("과잉 수소 제거"),HydrogenAction::RemoveExtra),qMakePair(QString("모든 수소 제거"),HydrogenAction::RemoveAll)}) {
+        auto *action=add(pair.first,[this,pair]{auto edited=m_view->molecule();MoleculeEditController::hydrogens(edited,pair.second);commitEditedMolecule(edited,true,false);});
+        if(pair.second==HydrogenAction::Adjust)action->setStatusTip(QStringLiteral("결합 차수와 원자가를 기준으로 수소 개수와 배치를 다시 계산합니다. 고정 원자·금속 결합 수소는 유지합니다."));
+        if(pair.second==HydrogenAction::Add)action->setStatusTip(QStringLiteral("기존 수소의 개수와 위치를 유지하고, 원자가에 부족한 수소만 추가합니다."));
+    }
     for(auto pair:{qMakePair(QStringLiteral("탄소에 붙은 수소 제거"),HydrogenAction::RemoveCarbonBound),qMakePair(QStringLiteral("선택한 수소만 남기기"),HydrogenAction::RemoveExceptSelected)}) {
         auto *action=menu->addAction(pair.first);action->setObjectName(pair.second==HydrogenAction::RemoveCarbonBound?"RemoveCarbonHydrogens":"RemoveUnselectedHydrogens");
         connect(action,&QAction::triggered,this,[this,pair]{

@@ -18,7 +18,7 @@ void MainWindow::buildLabComplex() {
     }
     QString errors;
     const auto fragments=FragmentLibrary::load(&errors);
-    QDialog dialog(this);dialog.setWindowTitle(QStringLiteral("실험실 착물 조합 + MM"));
+    QDialog dialog(this);dialog.setWindowTitle(QStringLiteral("Complex 템플릿 적용"));
     dialog.setObjectName("LabComplexDialog");dialog.setMinimumWidth(540);
     QFormLayout form(&dialog);
     QLabel note(QStringLiteral("금속 + 저장된 ligand + 산소 fragment로 편집 가능한 시작 구조를 만듭니다.\n"
