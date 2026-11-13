@@ -98,15 +98,15 @@ void MainWindow::createMenus() {
                                                        redo->shortcuts()[1].toString(QKeySequence::NativeText)));
     redo->setIconText(QStringLiteral("다시 실행"));
     edit->addSeparator();
-    add(edit, QStringLiteral("선택 조각 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
-    add(edit, QStringLiteral("분자 조각 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
+    add(edit, QStringLiteral("선택 fragment 복사"), QKeySequence(QStringLiteral("Ctrl+C")), [this] { copyStructureFragment(); })->setObjectName("CopyStructureFragment");
+    add(edit, QStringLiteral("molecule fragment 붙여넣기"), QKeySequence(QStringLiteral("Ctrl+V")), [this] { pasteStructureFragment(); })->setObjectName("PasteStructureFragment");
     add(edit, QStringLiteral("선택 삭제"), QKeySequence(QStringLiteral("Delete")), [this] { if(!isTextInputFocused())deleteSelection(); });
     edit->addSeparator();
     auto *build = edit->addMenu(QStringLiteral("구조 생성"));
     build->setObjectName(QStringLiteral("EditBuildMenu"));
     auto *selection = edit->addMenu(QStringLiteral("원자 선택"));
     selection->setObjectName(QStringLiteral("EditSelectionMenu"));
-    auto *fragments = edit->addMenu(QStringLiteral("조각 편집"));
+    auto *fragments = edit->addMenu(QStringLiteral("fragment 편집"));
     fragments->setObjectName(QStringLiteral("EditFragmentsMenu"));
     auto *coordinates = edit->addMenu(QStringLiteral("좌표·이동"));
     coordinates->setObjectName(QStringLiteral("EditCoordinatesMenu"));
@@ -143,9 +143,9 @@ void MainWindow::createMenus() {
     add(selection, QStringLiteral("선택 확장"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms())); });
     add(selection, QStringLiteral("선택 반전"), {}, [this] { applyAtomSelection(StructureTools::invert(m_view->molecule(),selectedStructureAtoms())); });
     add(fragments, QStringLiteral("선택 원자 일괄 작업"), {}, [this] { changeSelectionElement(); });
-    add(fragments, QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가"), {}, [this] { setStatus(QStringLiteral("선택 조각을 분자 조각 데이터베이스에 추가")); });
+    add(fragments, QStringLiteral("선택 fragment을 molecule fragment 데이터베이스에 추가"), {}, [this] { setStatus(QStringLiteral("선택 fragment을 molecule fragment 데이터베이스에 추가")); });
     add(fragments, QStringLiteral("선택 원자 중심에 더미 원자 추가"), {}, [this] { setStatus(QStringLiteral("더미 원자 추가")); });
-    add(fragments, QStringLiteral("선택 분자 조각 중첩"), {}, [this] { setStatus(QStringLiteral("선택 분자 조각 중첩")); });
+    add(fragments, QStringLiteral("선택 molecule fragment 중첩"), {}, [this] { setStatus(QStringLiteral("선택 molecule fragment 중첩")); });
     add(fragments, QStringLiteral("두 그룹 결합"), {}, [this] { setStatus(QStringLiteral("두 그룹 결합")); });
     add(selection, QStringLiteral("선택 원자에 결합된 원자 전체 선택"), {}, [this] { applyAtomSelection(StructureTools::expand(m_view->molecule(),selectedStructureAtoms(),true)); });
     add(coordinates, QStringLiteral("벡터/평면 관련 작업"), {}, [this] { setStatus(QStringLiteral("벡터/평면 관련 작업")); });
@@ -216,7 +216,7 @@ void MainWindow::createMenus() {
     add(view, QStringLiteral("카메라 위치 클립보드 복원"), {}, [this] { m_view->restoreCameraFromClipboard(); });
     add(view, QStringLiteral("고해상도 그림 출력"), QKeySequence(QStringLiteral("Ctrl+Q")), [this] { saveImage(); });
     auto *axes = add(view, QStringLiteral("축 표시"), {}, [this] { m_style.showAxes = !m_style.showAxes; applyStyle(m_style); }); axes->setCheckable(true); axes->setChecked(m_style.showAxes);
-    auto *centerAxes = add(view, QStringLiteral("분자 중심으로 축 이동"), {}, [this] { m_style.centerAxes = !m_style.centerAxes; applyStyle(m_style); }); centerAxes->setCheckable(true); centerAxes->setChecked(m_style.centerAxes);
+    auto *centerAxes = add(view, QStringLiteral("molecule 중심으로 축 이동"), {}, [this] { m_style.centerAxes = !m_style.centerAxes; applyStyle(m_style); }); centerAxes->setCheckable(true); centerAxes->setChecked(m_style.centerAxes);
     auto *showHydrogen = view->addAction(QStringLiteral("수소 표시"));
     showHydrogen->setCheckable(true);
     showHydrogen->setChecked(m_style.showHydrogen);
@@ -318,14 +318,14 @@ void MainWindow::createMenus() {
     add(tools, QStringLiteral("애니메이션 생성"), {}, [this] { exportAnimation(); });
     add(tools, QStringLiteral("데이터 요약"), {}, [this] { showToolMessage(QStringLiteral("데이터 요약"), AnalysisEngine::summary(m_data)); });
     add(tools, QStringLiteral("계산 입력파일 구역 생성"), {}, [this] { createGaussianInput(); });
-    add(tools, QStringLiteral("분자 조각 추출기"), {}, [this] { extractStructureFragments(); });
+    add(tools, QStringLiteral("molecule fragment 추출기"), {}, [this] { extractStructureFragments(); });
     tools->addSeparator();
     add(tools, QStringLiteral("구조 비교"), {}, [this] { setStatus(QStringLiteral("구조 비교")); });
     add(tools, QStringLiteral("구조 결합"), {}, [this] { setStatus(QStringLiteral("구조 결합")); });
-    add(tools, QStringLiteral("분자량 계산"), {}, [this] { showMolecularInformation(); })->setObjectName("MolecularInformationAction");
+    add(tools, QStringLiteral("molecular mass 계산"), {}, [this] { showMolecularInformation(); })->setObjectName("MolecularInformationAction");
     add(tools, QStringLiteral("관성모멘트 계산"), {}, [this] { const QVector3D i = AnalysisEngine::principalMomentApproximation(m_data.molecule); setStatus(QStringLiteral("관성모멘트 근사: %1 / %2 / %3").arg(i.x(), 0, 'f', 3).arg(i.y(), 0, 'f', 3).arg(i.z(), 0, 'f', 3)); });
     add(tools, QStringLiteral("충돌 직경 계산"), {}, [this] { setStatus(QStringLiteral("충돌 직경 근사: %1 Å").arg(AnalysisEngine::collisionDiameter(m_data.molecule), 0, 'f', 3)); });
-    add(tools, QStringLiteral("분자 면적 계산"), {}, [this] { setStatus(QStringLiteral("분자 면적 근사: %1 Å²").arg(AnalysisEngine::molecularAreaApproximation(m_data.molecule), 0, 'f', 3)); });
+    add(tools, QStringLiteral("molecule 면적 계산"), {}, [this] { setStatus(QStringLiteral("molecule 면적 근사: %1 Å²").arg(AnalysisEngine::molecularAreaApproximation(m_data.molecule), 0, 'f', 3)); });
     add(tools, QStringLiteral("반데르발스 반지름 표"), {}, [this] {
         QString table;
         for (int i = 1; i <= 36; ++i) table += QStringLiteral("%1  %2 Å\n").arg(elementSymbol(i), -3).arg(vanDerWaalsRadius(i), 0, 'f', 2);
@@ -353,7 +353,7 @@ void MainWindow::createMenus() {
     settingsAction->setObjectName("ApplicationSettingsAction");
     connect(settingsAction,&QAction::triggered,this,&MainWindow::openStyleEditor);
     QMenu *help = menuBar()->addMenu(QStringLiteral("도움말"));
-    add(help,QStringLiteral("사용 방법 · 단축키"),{},[this]{showToolMessage(QStringLiteral("사용 방법 · 단축키"),QStringLiteral("Ctrl+O: 열기\nCtrl+I: 이미지 복사\nEnter: 베스트 뷰\nP: 재생\n그리기 공백 우클릭: 선택 모드\n우클릭 드래그: 회전"));});
+    add(help,QStringLiteral("도움말 / Help (F1)"),{},[this]{showHelp();});
     add(help, QStringLiteral("Youngcraft 정보"), {}, [this] { showToolMessage(QStringLiteral("Youngcraft 정보"), QStringLiteral("Made by Youngseob Lee, Since 2026, only for JBNU and BIOCC")); });
 }
 

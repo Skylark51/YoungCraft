@@ -1,6 +1,8 @@
 # Youngcraft explicit-topology GFN-FF runtime
 
-This isolated backend is selected only for GFN-FF (method 0). Existing GFN1/2-xTB calculations use ../xtb.exe.
+This isolated backend is selected for GFN-FF (method 0) and for GFN1/2 calculations with fixed Cartesian atoms. Other GFN1/2-xTB calculations use ../xtb.exe.
+
+For this newer backend, XTBPATH points to this backend directory so its matching built-in parameters are used. Do not point it at ../share: the legacy .param_gfnff.xtb has only 86 rows, whereas this backend expects 103, causing a Fortran end-of-file error. The legacy executable continues to use ../share.
 
 Upstream xTB: https://github.com/grimme-lab/xtb/tree/68fe777a02418471b9ddfc7a9ea24b4021d7bca2
 Source snapshot: sources/xtb-68fe777a.zip (unmodified upstream).

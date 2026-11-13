@@ -1,6 +1,7 @@
 #pragma once
 #include "compute/XtbRunner.h"
 #include <QDialog>
+#include <functional>
 class QComboBox;
 class QCheckBox;
 class QSpinBox;
@@ -15,6 +16,9 @@ public:
     XtbDialog(const Molecule &, const QString &runtime, QWidget *parent=nullptr,
               int initialMethod=2, bool automatic=false, const QVector<int> &selection = {});
     void setBondRetention(bool enabled);
+    void embedInSidebar();
+    void setSelectionProvider(std::function<QVector<int>()> provider);
+    void setInputValidator(std::function<bool()> validator) { inputValidator=std::move(validator); }
     void configureOptimization(const QVector<GeometryConstraint> &, int maximum);
     bool calculationActive() const { return runner.state == XtbRunner::State::Starting || runner.state == XtbRunner::State::Running || runner.state == XtbRunner::State::Stopping; }
     void reject() override { close(); }
@@ -41,6 +45,7 @@ private:
     QWidget *settings;
     PlotWidget *plot;
     QVector<QPointF> series;
+    std::function<bool()> inputValidator;
     bool closing=false, applied=false;
     bool automatic=false;
 };

@@ -86,7 +86,7 @@ QByteArray StructureTools::encode(const Molecule &m) {
     return bytes;
 }
 bool StructureTools::decode(const QByteArray &bytes, Molecule &m, QString *error) {
-    auto fail = [&] { if (error) *error = QStringLiteral("유효한 Youngcraft 분자 조각이 아닙니다."); return false; };
+    auto fail = [&] { if (error) *error = QStringLiteral("유효한 Youngcraft molecule fragment이 아닙니다."); return false; };
     if (bytes.size() > 16 * 1024 * 1024 || bytes.isEmpty()) return fail();
     QDataStream s(bytes); s.setVersion(QDataStream::Qt_6_4);
     Molecule result; quint32 magic; qint32 count;
@@ -174,7 +174,7 @@ QString StructureTools::zMatrix(const Molecule &m, QString *error) {
 QString StructureTools::gaussianInput(const Molecule &m, const QString &route, int charge, int multiplicity, QString *error) {
     if (error) error->clear();
     auto fail = [&](const QString &message) { if (error) *error = message; return QString(); };
-    if (m.isEmpty() || !MoleculeEditController::validate(m, error)) return fail(QStringLiteral("유효한 분자 구조가 필요합니다."));
+    if (m.isEmpty() || !MoleculeEditController::validate(m, error)) return fail(QStringLiteral("유효한 molecule 구조가 필요합니다."));
     QString normalized = route.simplified();
     if (!normalized.startsWith('#') || normalized.contains('%') || normalized.contains(QRegularExpression("--\\s*link1\\s*--", QRegularExpression::CaseInsensitiveOption))) return fail(QStringLiteral("#으로 시작하는 단일 계산 경로를 입력하세요."));
     if (normalized.contains(QRegularExpression("\\b(geom\\s*=|gen(ecp)?\\b|chkbasis|pseudo\\s*=\\s*read|guess\\s*=\\s*\\(?\\s*read|opt\\s*=\\s*\\(?\\s*modredundant|units\\s*=\\s*\\(?\\s*(bohr|au))",QRegularExpression::CaseInsensitiveOption))) return fail(QStringLiteral("추가 입력 구역/체크포인트 또는 다른 좌표 단위가 필요한 경로입니다. 독립적인 Cartesian(Å) 계산 경로를 지정하세요."));

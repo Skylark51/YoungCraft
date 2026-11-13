@@ -153,6 +153,8 @@ bool isMetal(int atomicNumber) {
            (atomicNumber >= 11 && atomicNumber <= 13) ||
            (atomicNumber >= 19 && atomicNumber <= 31) ||
            (atomicNumber >= 37 && atomicNumber <= 48) ||
+           atomicNumber == 49 || atomicNumber == 50 || (atomicNumber >= 81 && atomicNumber <= 83) ||
+           (atomicNumber >= 113 && atomicNumber <= 116) ||
            atomicNumber == 55 || atomicNumber == 56 || (atomicNumber >= 87 && atomicNumber <= 112) ||
            (atomicNumber >= 57 && atomicNumber <= 80);
 }

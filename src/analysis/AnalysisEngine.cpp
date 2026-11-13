@@ -110,7 +110,7 @@ QString AnalysisEngine::summary(const CalculationData &data) {
           << QStringLiteral("진동 모드: %1 (허수 %2)").arg(data.frequencies.size())
           .arg(std::count_if(data.frequencies.cbegin(), data.frequencies.cend(), [](const FrequencyMode &m) { return m.imaginary; }))
           << QStringLiteral("SCF 에너지: %1개 / TD-DFT 상태: %2개").arg(data.scfEnergies.size()).arg(data.excitedStates.size())
-          << QStringLiteral("분자량: %1 Da").arg(molecularMass(data.molecule), 0, 'f', 4);
+          << QStringLiteral("molecular mass: %1 Da").arg(molecularMass(data.molecule), 0, 'f', 4);
     if (data.hasPcm) lines << QStringLiteral("용매 모델: %1").arg(data.solvent.isEmpty() ? QStringLiteral("PCM/CPCM") : data.solvent);
     if (data.hasNbo) lines << QStringLiteral("NBO section: 발견됨");
     if (data.hasDipole) lines << QStringLiteral("쌍극자: (%1, %2, %3) D").arg(data.dipoleDebye.x(), 0, 'f', 4).arg(data.dipoleDebye.y(), 0, 'f', 4).arg(data.dipoleDebye.z(), 0, 'f', 4);

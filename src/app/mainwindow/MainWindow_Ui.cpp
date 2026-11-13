@@ -219,6 +219,7 @@ void MainWindow::createDocumentUi() {
     auto *measurementRow = new WorkspacePaper(m_moleculeWorkspace);
     measurementRow->setObjectName(QStringLiteral("WorkspaceMeasurementRow"));
     measurementRow->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
+    measurementRow->setFixedHeight(qMax(sidebarButtonSize+8,measurementRow->fontMetrics().height()*2+8));
     auto *measurementLayout = new QHBoxLayout(measurementRow);
     measurementLayout->setContentsMargins(8, 4, 8, 4);
     m_measurementReadout = new QLabel(QStringLiteral("원자를 순서대로 클릭하세요: 2개 거리 · 3개 각도 · 4개 이면각"), measurementRow);
@@ -230,6 +231,14 @@ void MainWindow::createDocumentUi() {
     clearMeasurement->setObjectName(QStringLiteral("ClearAtomMeasurement"));
     measurementLayout->addWidget(m_measurementReadout, 1);
     makeSidebarIconButton(clearMeasurement, QStyle::SP_DialogResetButton);
+    auto *editMeasurement = new QPushButton(QStringLiteral("거리 / 각도 / 이면각 편집"), measurementRow);
+    editMeasurement->setObjectName("EditAtomMeasurement");
+    makeSidebarIconButton(editMeasurement, QStyle::SP_FileDialogDetailedView);
+    measurementLayout->addWidget(editMeasurement);
+    connect(editMeasurement, &QPushButton::clicked, m_geometryBar, [bar=m_geometryBar] {
+        const bool expanded=!bar->property("editExpanded").toBool();
+        bar->setProperty("editExpanded",expanded);bar->setVisible(expanded);
+    });
     measurementLayout->addWidget(clearMeasurement);
     auto *approach = new QPushButton(QStringLiteral("Scan용 구조 조정…"), measurementRow);
     approach->setObjectName(QStringLiteral("ScanApproachButton"));
@@ -385,7 +394,7 @@ void MainWindow::createDocumentUi() {
     m_mmPlot = new PlotWidget(m_mmBar);
     m_mmPlot->setObjectName(QStringLiteral("MMEnergyPlot"));
     m_mmPlot->setMinimumHeight(140);
-    m_mmPlot->setEmptyMessage(QStringLiteral("분자역학 에너지 변화"));
+    m_mmPlot->setEmptyMessage(QStringLiteral("MM 에너지 변화"));
     mmLayout->addWidget(m_mmPlot);
 
     m_mmBar->hide(); moleculeLayout->addWidget(m_mmBar);
@@ -582,6 +591,14 @@ void MainWindow::connectDocumentUi() {
         showAtom(index);
         if (m_bondEditMode) handleBondPick(index);
         else if (index<0 || m_geometryMode || !m_drawingMode) handleGeometryPick(index);
+    }));
+    m_documentConnections.push_back(connect(m_view, &MoleculeView::atomSelectionChanged, this, [this] {
+        const auto selected=m_view->selection().atoms;
+        QVector<int> ordered;
+        for(int id:m_geometrySelection)if(selected.contains(id))ordered<<id;
+        auto remaining=selected.values();std::sort(remaining.begin(),remaining.end());
+        for(int id:remaining)if(!ordered.contains(id))ordered<<id;
+        m_geometrySelection=ordered;m_view->setGeometrySelection(ordered);updateGeometryReadout();
     }));
     m_documentConnections.push_back(connect(m_view, &MoleculeView::canvasClicked, this, [this](const QVector3D &position) {
         if (m_drawingMode && !consumeInsertion(-1,position)) addDrawnAtom(position);

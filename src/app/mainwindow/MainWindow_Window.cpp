@@ -76,10 +76,24 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         if(!event->text().isEmpty()&&event->text()[0].isLetter()){
             qint64 now=QDateTime::currentMSecsSinceEpoch();QString buffer=m_drawBar->property("elementBuffer").toString();
             if(now-m_drawBar->property("elementBufferTime").toLongLong()>700||buffer.size()>=2)buffer.clear();
-            QString candidate=buffer+event->text();int z=atomicNumberFor(candidate);
+            if(event->isAutoRepeat()){event->accept();return;}
+            const QString letter=event->text().toLower();
+            const int hovered=m_view->hoveredAtom();
+            if(m_drawBar->property("elementHover").toInt()!=hovered)buffer.clear();
+            QString candidate=buffer+letter;
+            if(letter=="c" && buffer.compare("c",Qt::CaseInsensitive)==0)candidate="Cl";
+            int z=atomicNumberFor(candidate);
             if(z<1){candidate=event->text();z=atomicNumberFor(candidate);}
-            if(z>0)m_drawElement->setCurrentText(elementSymbol(z));
+            if(z>0){
+                m_drawElement->setCurrentText(elementSymbol(z));
+                if(hovered>=0 && hovered<m_view->molecule().atoms.size()){
+                    auto edited=m_view->molecule();
+                    MoleculeEditController::replace(edited,{hovered},z,edited.atoms[hovered].formalCharge);
+                    commitEditedMolecule(edited,true);
+                }
+            }
             else if(candidate.compare("A",Qt::CaseInsensitive)==0)m_drawBondOrder->setCurrentIndex(m_drawBondOrder->findData(0.0));
+            m_drawBar->setProperty("elementHover",hovered);
             m_drawBar->setProperty("elementBuffer",candidate);m_drawBar->setProperty("elementBufferTime",now);event->accept();return;
         }
     }

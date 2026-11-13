@@ -100,7 +100,7 @@ void MoleculeView::paintGL() {
     if (m_molecule.atoms.isEmpty()) {
         QPainter painter; beginOverlayPainter(painter);
         painter.setPen(m_style.labelColor);
-        painter.drawText(QRectF(QPointF(), renderLogicalSize()), Qt::AlignCenter, QStringLiteral("파일을 열어 분자 구조를 표시하세요"));
+        painter.drawText(QRectF(QPointF(), renderLogicalSize()), Qt::AlignCenter, QStringLiteral("파일을 열어 molecule 구조를 표시하세요"));
         return;
     }
 

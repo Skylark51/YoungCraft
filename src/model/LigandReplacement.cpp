@@ -93,7 +93,7 @@ QVector<LigandCandidate> LigandReplacement::recognize(const Molecule &m,int meta
         for(int i=0;i<m.atoms.size();++i)if(c.atoms.contains(i)&&donors.contains(i))c.donors<<i;
         QStringList names;for(const auto &f:library)if((f.ligand||f.category=="lab-ligand")&&matches(m,c,f))names<<f.name;
         c.knownTemplate=!names.isEmpty();
-        c.name=names.isEmpty()?QStringLiteral("미등록 리간드"):names.join(" / ");result<<c;
+        c.name=names.isEmpty()?QStringLiteral("미등록 ligand"):names.join(" / ");result<<c;
     }
     return result;
 }
@@ -104,11 +104,11 @@ bool LigandReplacement::replace(const Molecule &source,const LigandCandidate &ca
     if(!MoleculeEditController::validate(source,error))return false;
     LigandCandidate c;bool found=false;
     for(const auto &actual:recognize(source,candidate.metal,{},protectedAtoms))if(actual.atoms==candidate.atoms){c=actual;found=true;break;}
-    if(!found)return fail(QStringLiteral("금속에서 분리 가능한 리간드를 다시 선택하세요. 가교·haptic 리간드는 지원하지 않습니다."));
-    if(c.protectedCore)return fail(QStringLiteral("반응 중심 또는 고정 원자를 포함한 리간드는 교체할 수 없습니다."));
+    if(!found)return fail(QStringLiteral("금속에서 분리 가능한 ligand를 다시 선택하세요. 가교·haptic ligand는 지원하지 않습니다."));
+    if(c.protectedCore)return fail(QStringLiteral("반응 중심 또는 고정 원자를 포함한 ligand는 교체할 수 없습니다."));
     if(!(f.ligand||f.category=="lab-ligand")||f.dummyAtoms.size()!=1||!f.hapticAtoms.isEmpty()||
         f.attachments.isEmpty()||f.attachments.size()!=c.donors.size()||f.attachments.size()>6)
-        return fail(QStringLiteral("동일한 주개 수(1–6개)와 금속 기준점 하나를 가진 리간드 템플릿이 필요합니다."));
+        return fail(QStringLiteral("동일한 주개 수(1–6개)와 금속 기준점 하나를 가진 ligand 템플릿이 필요합니다."));
     const int dummy=f.dummyAtoms[0];
     if(dummy<0||dummy>=f.atoms.size())return fail(QStringLiteral("잘못된 템플릿 기준점입니다."));
     Molecule templateMolecule;templateMolecule.atoms=f.atoms;templateMolecule.bonds=f.bonds;
@@ -117,7 +117,7 @@ bool LigandReplacement::replace(const Molecule &source,const LigandCandidate &ca
     const auto templateParts=recognize(templateMolecule,dummy);
     if(templateParts.size()!=1||templateParts[0].atoms.size()!=f.atoms.size()-1||
         QSet<int>(templateParts[0].donors.begin(),templateParts[0].donors.end())!=QSet<int>(f.attachments.begin(),f.attachments.end()))
-        return fail(QStringLiteral("템플릿은 금속 기준점에 연결된 리간드 하나만 포함해야 합니다."));
+        return fail(QStringLiteral("템플릿은 금속 기준점에 연결된 ligand 하나만 포함해야 합니다."));
     const auto anchor=f.atoms[dummy].position,origin=source.atoms[c.metal].position;
     for(const auto &a:f.atoms)if(!std::isfinite(a.position.x())||!std::isfinite(a.position.y())||!std::isfinite(a.position.z())||isMetal(a.atomicNumber))
         return fail(QStringLiteral("템플릿 좌표와 원소를 확인하세요."));
@@ -149,7 +149,7 @@ bool LigandReplacement::replace(const Molecule &source,const LigandCandidate &ca
             if(score<bestScore){bestScore=score;best=rotation;}
         }
     }while(std::next_permutation(permutation.begin(),permutation.end()));
-    if(!std::isfinite(bestScore))return fail(QStringLiteral("기존 리간드의 금속–주개 방향을 정의할 수 없습니다."));
+    if(!std::isfinite(bestScore))return fail(QStringLiteral("기존 ligand의 금속–주개 방향을 정의할 수 없습니다."));
     Molecule edited=source;int metal=c.metal;
     for(int i=source.atoms.size()-1;i>=0;--i)if(c.atoms.contains(i)){edited.removeAtom(i);if(i<c.metal)--metal;}
     QVector<int> map(f.atoms.size(),-1);

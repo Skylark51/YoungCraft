@@ -48,6 +48,10 @@ QVector3D MoleculeView::project(const QVector3D &position, const QMatrix4x4 &vp)
 }
 
 bool MoleculeView::eventFilter(QObject *watched, QEvent *event) {
+    if(watched==this && event->type()==QEvent::Leave){
+        m_hoverAtom=-1;m_hoverBond=-1;if(m_previewOverlay)m_previewOverlay->update();
+    }
+
     if (watched == m_previewOverlay && event->type() == QEvent::Paint) {
         drawEditorPreview();
         // Keep measurements visible when Qt recomposites the OpenGL child widget.
@@ -65,11 +69,15 @@ void MoleculeView::drawEditorPreview() {
     const QColor neon=selectionNeon(m_style.background);
     const QColor halo=m_style.background.lightnessF()>=0.55?QColor(0,24,82,140):QColor(0,0,0,190);
     const auto shown = [this](int i) { return i>=0 && i<m_molecule.atoms.size() && m_molecule.atoms[i].visible && (m_style.showHydrogen || m_molecule.atoms[i].atomicNumber!=1); };
+    painter.save();
+    const auto opacity=m_previewOverlay->property("selectionOpacity");
+    painter.setOpacity(opacity.isValid()?opacity.toDouble():1.0);
     for(int i:m_selection.atoms)if(shown(i)){
         const QPointF p=point(m_molecule.atoms[i].position);
-        painter.setPen(QPen(halo,6));painter.drawEllipse(p,13,13);
-        painter.setPen(QPen(neon,2.8));painter.drawEllipse(p,13,13);
+        painter.setPen(QPen(halo,3));painter.drawEllipse(p,13,13);
+        painter.setPen(QPen(neon,1.8));painter.drawEllipse(p,13,13);
     }
+    painter.restore();
     painter.setPen(QPen(neon,3));
     for(int i:m_selection.bonds)if(i>=0&&i<m_molecule.bonds.size()){auto b=m_molecule.bonds[i];if(shown(b.first)&&shown(b.second))painter.drawLine(point(m_molecule.atoms[b.first].position),point(m_molecule.atoms[b.second].position));}
     if(shown(m_hoverAtom)){painter.setPen(QPen((m_dragButton==Qt::RightButton&&m_drawingMode?QColor(240,70,70,220):QColor(255,190,80,170)),2));painter.drawEllipse(point(m_molecule.atoms[m_hoverAtom].position),16,16);}
@@ -200,15 +208,15 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
 
 void MoleculeView::drawGeometryMeasurements(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     if (m_geometrySelection.isEmpty()) return;
-    for (int i : m_geometrySelection)
+    for (int i : m_geometrySelection.mid(0,4))
         if (i < 0 || i >= m_molecule.atoms.size() || !m_molecule.atoms[i].visible ||
             (!m_style.showHydrogen && m_molecule.atoms[i].atomicNumber == 1)) return;
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
     QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
     painter.setRenderHints(QPainter::Antialiasing|QPainter::TextAntialiasing);
-    QVector<QPointF> points;for(int index:m_geometrySelection){if(index<0||index>=m_molecule.atoms.size())return;const QVector3D p=project(m_molecule.atoms[index].position,vp);points.push_back({p.x(),p.y()});}
-    for(int i=0;i<points.size();++i){const Atom &atom=m_molecule.atoms[m_geometrySelection[i]];const auto edge=project(atom.position+m_rotation.conjugated().rotatedVector(QVector3D(atomVisualRadius(atom),0,0)),vp);const double radius=QLineF(points[i],QPointF(edge.x(),edge.y())).length()+3;painter.setPen(QPen(QColor(230,165,35),2));painter.setBrush(Qt::NoBrush);painter.drawEllipse(points[i],radius,radius);}
+    QVector<QPointF> points;for(int index:m_geometrySelection.mid(0,4)){if(index<0||index>=m_molecule.atoms.size())return;const QVector3D p=project(m_molecule.atoms[index].position,vp);points.push_back({p.x(),p.y()});}
+    for(int i=0;i<points.size();++i){if(overlayPainter && m_selection.atoms.contains(m_geometrySelection[i]))continue;const Atom &atom=m_molecule.atoms[m_geometrySelection[i]];const auto edge=project(atom.position+m_rotation.conjugated().rotatedVector(QVector3D(atomVisualRadius(atom),0,0)),vp);const double radius=QLineF(points[i],QPointF(edge.x(),edge.y())).length()+3;painter.setPen(QPen(QColor(230,165,35),2));painter.setBrush(Qt::NoBrush);painter.drawEllipse(points[i],radius,radius);}
     auto style=[&](int kind){MeasurementTextStyle value=m_measurementStyles[kind];if(value.fontFamily.isEmpty())value.fontFamily=painter.font().family();QFont font(value.fontFamily,value.pointSize);font.setBold(value.bold);painter.setFont(font);painter.setPen(QPen(value.color,1.5,Qt::DashLine,Qt::RoundCap,Qt::RoundJoin));};
     // Place callouts in nearby free space rather than on the measured geometry.
     QVector<QRectF> atomBounds;

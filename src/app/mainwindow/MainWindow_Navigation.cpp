@@ -185,7 +185,7 @@ void MainWindow::updateAtomVisibility() {
 
 void MainWindow::emphasizeSelectedAtoms(int mode) {
     const Molecule source = m_view->molecule();
-    if (source.isEmpty()) { setStatus(QStringLiteral("먼저 분자 구조를 열어주세요.")); return; }
+    if (source.isEmpty()) { setStatus(QStringLiteral("먼저 molecule 구조를 열어주세요.")); return; }
     auto selected = selectedStructureAtoms();
     if (selected.isEmpty()) for (int i : m_geometrySelection)
         if (i >= 0 && i < source.atoms.size()) selected.insert(i);

@@ -159,7 +159,7 @@ void MoleculeEditController::transform(Molecule &m,const QSet<int>&ids,const QVe
 bool MoleculeEditController::bondGeometry(Molecule&m,int a,int b,int kind,double value,bool opposite,QString*error) {
     if(m.bondIndex(a,b)<0)return false;
     auto sa=side(m,a,a,b),sb=side(m,b,a,b);
-    if(sa.contains(b)){if(error)*error="고리 결합: 분자 조각을 안전하게 분리할 수 없습니다.";return false;}
+    if(sa.contains(b)){if(error)*error="고리 결합: molecule fragment을 안전하게 분리할 수 없습니다.";return false;}
     bool moveA=sa.size()<sb.size();if(opposite)moveA=!moveA;if(moveA)std::swap(a,b);
     if(kind==0)return GeometryEditor::setDistance(m,a,b,value,GeometryMoveMode::OneSide,error);
     int outerA=-1,outerB=-1;

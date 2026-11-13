@@ -22,7 +22,7 @@ void MainWindow::arrangeScanApproach() {
     if(ids.size()!=2) { setStatus(QStringLiteral("접근시킬 반응 원자 두 개를 순서대로 클릭하세요."),8000); return; }
     QDialog dialog(this); dialog.setWindowTitle(QStringLiteral("Scan용 구조 조정"));
     QFormLayout form(&dialog);
-    QLabel note(QStringLiteral("원자 %1 → %2\n각 조각의 내부 구조를 유지하며 반응 자리가 마주 보게 회전·이동합니다.\n축 주위 회전을 탐색하여 비결합 접촉을 줄입니다. 전체 구조 최적화는 별도로 실행하세요.")
+    QLabel note(QStringLiteral("원자 %1 → %2\n각 fragment의 내부 구조를 유지하며 반응 자리가 마주 보게 회전·이동합니다.\n축 주위 회전을 탐색하여 비결합 접촉을 줄입니다. 전체 구조 최적화는 별도로 실행하세요.")
         .arg(ids[0]+1).arg(ids[1]+1)); note.setWordWrap(true); form.addRow(&note);
     QDoubleSpinBox separation; separation.setRange(0.5,100); separation.setDecimals(3);
     separation.setSuffix(QStringLiteral(" Å")); separation.setValue(3.0);
@@ -59,17 +59,17 @@ void MainWindow::handleGeometryPick(int index){
         setStatus(QStringLiteral("측정: 원자 %1 선택 취소 (%2개 선택)").arg(m_view->molecule().atoms[index].index).arg(m_geometrySelection.size()));
         return;
     }
-    if(m_geometrySelection.size()>=4)m_geometrySelection.clear();
+    m_view->selection().atoms.insert(index);
     m_geometrySelection.push_back(index);m_view->setGeometrySelection(m_geometrySelection);m_geometryBar->setSelection(m_view->molecule(),m_geometrySelection);
     updateGeometryReadout();
     setStatus(QStringLiteral("측정: %1번째 원자 선택 (%2 %3)").arg(m_geometrySelection.size()).arg(m_view->molecule().atoms[index].element).arg(m_view->molecule().atoms[index].index));
 }
 
-void MainWindow::clearGeometrySelection(){m_geometrySelection.clear();m_view->setGeometrySelection({});if(m_geometryBar)m_geometryBar->setSelection(m_view->molecule(),{});updateGeometryReadout();}
+void MainWindow::clearGeometrySelection(){if(m_geometryBar)m_geometryBar->setProperty("editExpanded",false);m_view->selection().clear();m_view->setSelectedAtom(-1);m_geometrySelection.clear();m_view->setGeometrySelection({});if(m_geometryBar)m_geometryBar->setSelection(m_view->molecule(),{});updateGeometryReadout();}
 
 void MainWindow::updateGeometryReadout() {
     if (!m_measurementReadout) return;
-    if (m_geometryBar) m_geometryBar->setVisible(m_geometryMode || m_geometrySelection.size() >= 2);
+    if (m_geometryBar) m_geometryBar->setVisible(m_geometryMode || m_geometryBar->property("editExpanded").toBool());
     const auto &molecule = m_view->molecule();
     for (int id : m_geometrySelection) {
         if (id < 0 || id >= molecule.atoms.size()) { clearGeometrySelection(); return; }
@@ -88,6 +88,7 @@ void MainWindow::updateGeometryReadout() {
     if (ids.size() >= 2) values << QStringLiteral("거리 %1").arg(format(GeometryEditor::distance(molecule, ids[0], ids[1]), 2, QStringLiteral(" Å")));
     if (ids.size() >= 3) values << QStringLiteral("각도 %1").arg(format(GeometryEditor::angleDegrees(molecule, ids[0], ids[1], ids[2]), 2, QStringLiteral("°")));
     if (ids.size() >= 4) values << QStringLiteral("이면각 %1").arg(format(GeometryEditor::dihedralDegrees(molecule, ids[0], ids[1], ids[2], ids[3]), 2, QStringLiteral("°")));
+    if (atoms.size() > 8) atoms = atoms.mid(0, 8) << QStringLiteral("… (%1 atoms)").arg(ids.size());
     m_measurementReadout->setText(QStringLiteral("선택 %1  |  %2").arg(atoms.join(QStringLiteral(" → ")),
         values.isEmpty() ? QStringLiteral("다음 원자를 클릭하세요") : values.join(QStringLiteral("  ·  "))));
     if (m_geometryBar) m_geometryBar->setSelection(molecule, ids);

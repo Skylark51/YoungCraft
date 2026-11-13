@@ -161,7 +161,11 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
     int threads=o.threads==0?qMin(4,qMax(1,QThread::idealThreadCount()/2)):qBound(1,o.threads,8);
     env.insert("OPENBLAS_NUM_THREADS",QString::number(threads));env.insert("OMP_NUM_THREADS",QString::number(threads));env.insert("MKL_NUM_THREADS",QString::number(threads));
     env.insert("OMP_STACKSIZE","256M");env.insert("OMP_MAX_ACTIVE_LEVELS","1");
-    env.insert("XTBPATH",QDir(runtime).absoluteFilePath("share"));
+    // The newer backend has 103-element built-in GFN-FF parameters. The legacy
+    // Windows share/.param_gfnff.xtb contains only 86 rows and crashes it at EOF.
+    // Keep that legacy parameter directory exclusive to the legacy executable.
+    const bool newerBackend=QFileInfo(exe).absolutePath()==QDir(runtime).absoluteFilePath("gfnff");
+    env.insert("XTBPATH",newerBackend?QFileInfo(exe).absolutePath():QDir(runtime).absoluteFilePath("share"));
     env.remove("XTBHOME");
     env.insert("PATH",QDir(runtime).absolutePath()+QDir::listSeparator()+env.value("PATH"));
     process.setProcessEnvironment(env);process.setWorkingDirectory(directory);

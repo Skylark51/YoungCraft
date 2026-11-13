@@ -184,6 +184,7 @@ private:
     void pasteStructureFragment();
     void extractStructureFragments();
     void showMolecularInformation();
+    void showHelp();
     void showZMatrix();
     void createGaussianInput();
     void openFragmentBrowser(bool labOnly = false);
@@ -199,6 +200,7 @@ private:
     MMState m_mmState = MMState::Idle;
     void failMMOptimization(const QString &message);
     void startMMOptimization();
+    void runMMOptimization(const QString &field, int steps, bool retainBonds, const QVector<GeometryConstraint> &entries);
     void stopMMOptimization(const QString &message = {});
     void scheduleMMStep();
     void handleMMOutput();

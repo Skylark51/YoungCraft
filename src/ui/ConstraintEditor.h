@@ -2,6 +2,8 @@
 #include "compute/GeometryConstraints.h"
 #include "model/GeometryEditor.h"
 #include <QWidget>
+#include "ui/SidebarButton.h"
+#include <functional>
 #include <QTableWidget>
 #include <QHeaderView>
 #include <QComboBox>
@@ -19,11 +21,16 @@ public:
     ConstraintEditor(const Molecule &m, const QVector<int> &selected, QWidget *parent = nullptr, bool compactButtons = false) : QWidget(parent), molecule(m), selection(selected) {
         setObjectName("ConstraintEditor");
         auto *layout = new QVBoxLayout(this); layout->setContentsMargins(0,0,0,0);
-        auto *hint = new QLabel(QStringLiteral("Constraint · 원자 번호는 1부터, 거리 Å / 각도 °\n목표값을 유지하는 조화 restraint입니다. 선택 원자 2–4개를 추가하면 현재 값을 가져옵니다.\n고정 원자는 좌표가 변하지 않습니다. 기존 구조를 먼저 고정한 뒤 조각을 추가하세요."));
+        auto *hint = new QLabel(QStringLiteral("Constraint · 원자 번호는 1부터, 거리 Å / 각도 °\n목표값을 유지하는 조화 restraint입니다. 선택 원자 2–4개를 추가하면 현재 값을 가져옵니다.\n고정 원자는 좌표가 변하지 않습니다. 기존 구조를 먼저 고정한 뒤 fragment을 추가하세요."));
+        if(compactButtons)hint->setText(QStringLiteral("영역 선택 → 자물쇠: 원자 고정\n거리·각도·이면각: 조화 restraint"));
         hint->setWordWrap(true); layout->addWidget(hint);
         table = new QTableWidget(0,3,this); table->setObjectName("ConstraintTable");
-        table->setHorizontalHeaderLabels({QStringLiteral("종류"),QStringLiteral("원자 번호 (순서대로)"),QStringLiteral("목표값")});
+        table->setHorizontalHeaderLabels({QStringLiteral("종류"),compactButtons?QStringLiteral("원자"):QStringLiteral("원자 번호 (순서대로)"),QStringLiteral("목표값")});
+        table->horizontalHeaderItem(1)->setToolTip(QStringLiteral("원자 번호 (1부터, 순서대로)"));
+        if(compactButtons)table->verticalHeader()->hide();
+        table->horizontalHeader()->setMinimumSectionSize(30);
         table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        table->setMinimumWidth(0);table->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
         table->setMinimumHeight(100); table->setMaximumHeight(160); layout->addWidget(table);
         auto *buttons = new QGridLayout; layout->addLayout(buttons);
         const int columns=compactButtons?2:4;
@@ -39,12 +46,20 @@ public:
             for(int i:ids) { bool exists=false; for(const auto &c:entries)if(c.type=="fixed"&&c.atoms.contains(i))exists=true; if(!exists)entries<<GeometryConstraint{"fixed",{i},0}; }
             setEntries(entries);
         };
-        connect(freeze,&QPushButton::clicked,this,[this,appendFixed]{appendFixed(selection);});
+        connect(freeze,&QPushButton::clicked,this,[this,appendFixed]{
+            if(selectionProvider)selection=selectionProvider();
+            appendFixed(selection);
+        });
+        makeSidebarIconButton(add,QStyle::SP_FileDialogNewFolder);
+        makeSidebarIconButton(remove,QStyle::SP_TrashIcon);
+        makeSidebarIconButton(freeze,sidebarLockIcon());
+        makeSidebarIconButton(all,QStyle::SP_DialogYesButton);
         connect(all,&QPushButton::clicked,this,[this,appendFixed]{QVector<int> ids;for(int i=0;i<molecule.atoms.size();++i)ids<<i;appendFixed(ids);});
         QVector<GeometryConstraint> retained;for(int i=0;i<m.atoms.size();++i)if(m.atoms[i].optimizationFixed)retained<<GeometryConstraint{"fixed",{i},0};setEntries(retained);
-        connect(add,&QPushButton::clicked,this,[this]{ addRow(); });
+        connect(add,&QPushButton::clicked,this,[this]{ if(selectionProvider)selection=selectionProvider();addRow(); });
         connect(remove,&QPushButton::clicked,this,[this]{ if(table->currentRow()>=0) table->removeRow(table->currentRow()); });
     }
+    void setSelectionProvider(std::function<QVector<int>()> provider) { selectionProvider=std::move(provider); }
     void setEntries(const QVector<GeometryConstraint> &entries) {
         table->setRowCount(0);
         for(const auto &c:entries) {
@@ -71,13 +86,14 @@ public:
         return true;
     }
 private:
+    std::function<QVector<int>()> selectionProvider;
     void addRow() {
         const int row=table->rowCount(); table->insertRow(row);
-        auto *type=new QComboBox; type->addItem(QStringLiteral("거리"),"distance"); type->addItem(QStringLiteral("각도"),"angle"); type->addItem(QStringLiteral("이면각"),"dihedral"); type->addItem(QStringLiteral("원자 고정"),"fixed");
+        auto *type=new QComboBox; type->addItem(QStringLiteral("거리"),"distance"); type->addItem(QStringLiteral("각도"),"angle"); type->addItem(QStringLiteral("이면각"),"dihedral"); type->addItem(QStringLiteral("고정"),"fixed");
         auto *ids=new QLineEdit; ids->setPlaceholderText("1, 2");
         auto *target=new QDoubleSpinBox; target->setDecimals(4); target->setRange(0.0001,10000); target->setValue(1.5);
         table->setCellWidget(row,0,type); table->setCellWidget(row,1,ids); table->setCellWidget(row,2,target);
-        connect(type,&QComboBox::currentIndexChanged,this,[target](int i){ target->setEnabled(i!=3); target->setRange(i==3?0:i==2?-180:0.0001,i==0?10000:i==1?179.9999:180); target->setSuffix(i==0?QStringLiteral(" Å"):QStringLiteral(" °")); });
+        connect(type,&QComboBox::currentIndexChanged,this,[target](int i){ target->setSpecialValueText(i==3?QStringLiteral("—"):QString()); target->setEnabled(i!=3); target->setRange(i==3?0:i==2?-180:0.0001,i==0?10000:i==1?179.9999:180); target->setSuffix(i==0?QStringLiteral(" Å"):QStringLiteral(" °")); });
         target->setSuffix(QStringLiteral(" Å"));
         if(selection.size()>=2 && selection.size()<=4) {
             type->setCurrentIndex(selection.size()-2); QStringList text; for(int i:selection)text<<QString::number(i+1); ids->setText(text.join(", "));
