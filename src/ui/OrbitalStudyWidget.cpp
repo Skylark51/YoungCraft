@@ -9,6 +9,8 @@
 #include "ui/SidebarFlowLayout.h"
 #include <QTabBar>
 #include <QResizeEvent>
+#include <QSplitter>
+#include <QScrollArea>
 #include <QStyle>
 #include <QAbstractItemModel>
 #include <QTimer>
@@ -99,7 +101,23 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
         connect(heartbeat,&QTimer::timeout,this,[clock]{const auto gap=clock->restart();if(gap>100)recordOrbitalDiagnostic({{"event","gui-gap"},{"gap_ms",double(gap)}});});
         heartbeat->start();
     }
-    auto *layout=new QVBoxLayout(this); layout->setContentsMargins(2,2,2,2);
+    auto *root = new QVBoxLayout(this);root->setContentsMargins(0,0,0,0);
+    m_columns = new QSplitter(Qt::Horizontal, this);m_columns->setObjectName("OrbitalColumns");
+    m_columns->setChildrenCollapsible(false);root->addWidget(m_columns);
+    auto column = [this](const char *name) {
+        auto *scroll = new QScrollArea(m_columns);scroll->setObjectName(name);
+        scroll->setFrameShape(QFrame::NoFrame);scroll->setWidgetResizable(true);
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);scroll->setMinimumSize(0,0);
+        auto *page = new QWidget;page->setMinimumWidth(0);page->setAutoFillBackground(true);
+        page->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+        scroll->setWidget(page);m_columns->addWidget(scroll);
+        auto *layout = new QVBoxLayout(page);layout->setContentsMargins(8,8,8,8);
+        layout->setSizeConstraint(QLayout::SetNoConstraint);return layout;
+    };
+    auto *layout = column("OrbitalSelectionColumn");
+    auto *controls = column("OrbitalSurfaceColumn");
+    m_columns->setStretchFactor(0,3);m_columns->setStretchFactor(1,2);
+    connect(m_columns,&QSplitter::splitterMoved,this,[this]{updateResponsiveControls();});
     setMinimumWidth(0);
     m_source=new QLabel; m_source->setWordWrap(true); layout->addWidget(m_source);
     auto *sourceActions=new QWidget(this);sourceActions->setObjectName("OrbitalSourceActions");
@@ -139,7 +157,7 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     auto *reconnect=new QPushButton(QStringLiteral("비밀번호 로그인"));reconnect->setObjectName("ReconnectGaussianServer");adaptiveButton(reconnect,style()->standardIcon(QStyle::SP_BrowserReload));remoteFlow->addWidget(reconnect);
     connect(reconnect,&QPushButton::clicked,connection,[connection]{SshPasswordBroker::forgetPasswords();QTimer::singleShot(0,connection,[connection]{connection->connectNow(true);});});
     auto *remoteOptions=new QPushButton(QStringLiteral("서버 설정…"));remoteOptions->setObjectName("RemoteGaussianSettingsButton");adaptiveButton(remoteOptions,style()->standardIcon(QStyle::SP_ComputerIcon));remoteFlow->addWidget(remoteOptions);
-    auto *remoteDialog=new QDialog(this);remoteDialog->setObjectName("RemoteGaussianSettings");remoteDialog->setWindowTitle(QStringLiteral("계산 서버 · Gaussian 설정"));
+    auto *remoteDialog=new QDialog(this);remoteDialog->setObjectName("RemoteGaussianSettings");remoteDialog->setProperty("solidWorkspace",true);remoteDialog->setWindowTitle(QStringLiteral("계산 서버 · Gaussian 설정"));
     auto *remoteForm=new QFormLayout(remoteDialog);
     connect(remoteOptions,&QPushButton::clicked,this,[remoteDialog,connection]{remoteDialog->exec();connection->connectNow(true);});
     auto *remoteHelp=new QLabel(QStringLiteral("라이온 서버 비밀번호는 별도 로그인 창에서 입력합니다. 비밀번호는 현재 앱의 메모리에서만 사용하며 파일이나 설정에 저장하지 않습니다."));
@@ -187,7 +205,7 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     connect(m_orbitals,&QTableWidget::cellClicked,this,[this](int row,int){if(m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
     connect(m_orbitals,&QTableWidget::cellDoubleClicked,this,[this](int row,int){if(!m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
     m_orbitals->setToolTip(QStringLiteral("처음에는 MO를 두 번 클릭하거나 생성 버튼을 누르세요. 이미 생성한 MO는 한 번 클릭하면 바로 표시합니다."));
-    m_tables->addTab(m_orbitals,"FMO"); layout->addWidget(m_tables);
+    m_tables->addTab(m_orbitals,"FMO"); layout->addWidget(m_tables,1);
     auto *tableActions=new QWidget(this);tableActions->setObjectName("OrbitalTableActions");auto *frontier=new SidebarFlowLayout(tableActions);
     auto *exportButton=new QPushButton(QStringLiteral("표 저장…"));exportButton->setObjectName("ExportOrbitalTable");adaptiveButton(exportButton,style()->standardIcon(QStyle::SP_DialogSaveButton));frontier->addWidget(exportButton);connect(exportButton,&QPushButton::clicked,this,&OrbitalStudyWidget::exportTable);
     auto *expand=new QPushButton(QStringLiteral("분석 표 확대"));expand->setObjectName("ExpandOrbitalTable");adaptiveButton(expand,style()->standardIcon(QStyle::SP_TitleBarMaxButton));frontier->addWidget(expand);connect(expand,&QPushButton::clicked,this,&OrbitalStudyWidget::expandTable);layout->addWidget(tableActions);
@@ -196,9 +214,9 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     auto *form=new QFormLayout;
     m_resolution=new QComboBox; m_resolution->setObjectName("OrbitalGridResolution");m_resolution->addItems({"40 (빠르게)","80 (표준)","120 (정밀)"});m_resolution->setCurrentIndex(1);form->addRow(QStringLiteral("격자 해상도"),m_resolution);
     m_density=new QComboBox;m_density->addItems({"SCF","MP2","CI","QCI"});m_density->setToolTip(QStringLiteral("FCHK에 저장된 밀도 유형을 선택하세요. 없는 밀도는 cubegen이 오류를 보고합니다."));form->addRow(QStringLiteral("MEP 밀도"),m_density);
-    layout->addLayout(form);
+    controls->addLayout(form);
     auto *generationActions=new QWidget(this);generationActions->setObjectName("OrbitalGenerationActions");auto *actions=new SidebarFlowLayout(generationActions); m_generateMo=new QPushButton(QStringLiteral("선택 MO 표시 / 생성"));m_generateMo->setObjectName("GenerateMo");
-    adaptiveButton(m_generateMo,style()->standardIcon(QStyle::SP_MediaPlay));actions->addWidget(m_generateMo);layout->addWidget(generationActions);
+    adaptiveButton(m_generateMo,style()->standardIcon(QStyle::SP_MediaPlay));actions->addWidget(m_generateMo);controls->addWidget(generationActions);
     connect(m_generateMo,&QPushButton::clicked,this,[this]{generate(false);});
     auto *map=new QPushButton(QStringLiteral("현재 density cube에 potential cube 매핑…"));map->setObjectName("MapOrbitalPotential");adaptiveButton(map,style()->standardIcon(QStyle::SP_BrowserReload));actions->addWidget(map);
     connect(map,&QPushButton::clicked,this,[this]{
@@ -239,8 +257,8 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     connect(m_surfacePattern,qOverload<int>(&QComboBox::currentIndexChanged),this,[this]{applyStyle();});
     m_min=spin("MEP min (a.u.)",-100,100,-0.05,4);m_max=spin("MEP max (a.u.)",-100,100,0.05,4);
     colorButton(QStringLiteral("MEP 낮은 값"),&m_lowColor);colorButton(QStringLiteral("MEP 높은 값"),&m_highColor);
-    layout->addWidget(surfaceGroup);
-    m_legend=new QLabel;m_legend->setWordWrap(true);layout->addWidget(m_legend);
+    surfaceGroup->setObjectName("OrbitalSurfaceSettings");controls->addWidget(surfaceGroup);
+    m_legend=new QLabel;m_legend->setWordWrap(true);controls->addWidget(m_legend);controls->addStretch();
     connect(m_iso,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[this](double value){
         (m_mep ? m_mepIsovalue : m_moIsovalue) = value;
         applyStyle();
@@ -269,8 +287,20 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     setData(CalculationData{});updateResponsiveControls();
 }
 QSize OrbitalStudyWidget::minimumSizeHint() const { return QSize(0,QWidget::minimumSizeHint().height()); }
-void OrbitalStudyWidget::resizeEvent(QResizeEvent *event){QWidget::resizeEvent(event);updateResponsiveControls();}
+void OrbitalStudyWidget::resizeEvent(QResizeEvent *event){
+    QWidget::resizeEvent(event);
+    QTimer::singleShot(0,this,[this]{updateResponsiveControls();});
+}
 void OrbitalStudyWidget::updateResponsiveControls(){
+    if (m_columns) {
+        const auto orientation = width() >= 780 ? Qt::Horizontal : Qt::Vertical;
+        const bool changed=m_columns->orientation()!=orientation;
+        if (changed) m_columns->setOrientation(orientation);
+        if (changed || !m_columns->property("columnsSized").toBool()) {
+            const int extent=orientation==Qt::Horizontal?width():height();
+            m_columns->setSizes({extent*3/5,extent*2/5});m_columns->setProperty("columnsSized",true);
+        }
+    }
     const bool narrow=width()<300;
     const auto sourceName=m_data.filePath.isEmpty()?QStringLiteral("Orbitals · CHK / FMO / MEP / NBO / Wiberg"):QFileInfo(m_data.filePath).fileName();
     m_source->setText(m_source->fontMetrics().elidedText(sourceName,Qt::ElideMiddle,qMax(32,width()-8)));
@@ -279,11 +309,11 @@ void OrbitalStudyWidget::updateResponsiveControls(){
         const auto description=combo->property("orbitalControlDescription").toString();combo->setToolTip(description.isEmpty()?combo->currentText():description+"\n"+combo->currentText());
     }
     for(auto *form:findChildren<QFormLayout*>())if(sidebarControl(form->parentWidget(),this))
-        form->setRowWrapPolicy(narrow?QFormLayout::WrapAllRows:QFormLayout::WrapLongRows);
+        form->setRowWrapPolicy(form->parentWidget()->width()<300?QFormLayout::WrapAllRows:QFormLayout::WrapLongRows);
     for(auto *button:findChildren<QPushButton*>())if(button->property("orbitalResponsiveButton").toBool()){
         const auto label=button->property("orbitalButtonLabel").toString();
         const int fullWidth=button->fontMetrics().horizontalAdvance(label)+sidebarIconSize+26;
-        const bool compact=narrow||fullWidth>qMax(32,width()-24);
+        const bool compact=narrow||fullWidth>qMax(32,button->parentWidget()->width()-16);
         const QSize target(compact?sidebarButtonSize:fullWidth,sidebarButtonSize);
         if(button->size()!=target)button->setFixedSize(target);
         button->setText(compact?QString():label);
@@ -296,7 +326,7 @@ void OrbitalStudyWidget::updateResponsiveControls(){
 void OrbitalStudyWidget::expandTable(){
     auto *source=qobject_cast<QTableWidget*>(m_tables->currentWidget());
     if(!source){m_status->setText(QStringLiteral("확대할 분석 표를 선택하세요."));return;}
-    auto *dialog=new QDialog(this);dialog->setObjectName("ExpandedOrbitalTableDialog");dialog->setAttribute(Qt::WA_DeleteOnClose);
+    auto *dialog=new QDialog(this);dialog->setObjectName("ExpandedOrbitalTableDialog");dialog->setProperty("solidWorkspace",true);dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle(QStringLiteral("분석 표 · ")+m_tables->tabText(m_tables->currentIndex()));dialog->resize(900,560);
     auto *layout=new QVBoxLayout(dialog);auto *copy=new QTableWidget(source->rowCount(),source->columnCount(),dialog);copy->setObjectName("ExpandedOrbitalTable");
     copy->setEditTriggers(QAbstractItemView::NoEditTriggers);copy->setSelectionBehavior(QAbstractItemView::SelectRows);copy->setSelectionMode(QAbstractItemView::SingleSelection);copy->verticalHeader()->hide();
@@ -414,7 +444,8 @@ void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std
     if(m_view)m_view->setCubeGrid(m_surface,float(m_iso->value()));
     applyStyle();
     recordOrbitalDiagnostic({{"event","surface-displayed"},{"source",m_runner->lastResultSource()},
-        {"display_ms",double(displayTimer.nsecsElapsed())/1e6},{"mep",m_mep}});
+        {"display_ms",double(displayTimer.nsecsElapsed())/1e6},{"mep",m_mep},
+        {"background",m_view?m_view->style().background.name():QString()}});
     m_status->setToolTip(QStringLiteral("생성된 cube: %1\n%2").arg(m_surface->filePath,m_potential?m_potential->filePath:QString()));
     m_status->setText(m_mep?QStringLiteral("MEP: 전자밀도 등가면에 정전기 퍼텐셜 매핑. 이미지 복사/저장으로 내보낼 수 있습니다."):QStringLiteral("MO 등가면 생성 완료. Isovalue와 위상 색상을 조절하고 이미지 복사/저장으로 내보내세요."));
     if(m_runner->lastResultSource()=="memory")m_status->setText(QStringLiteral("저장된 오비탈 즉시 표시 · 재계산 없음"));

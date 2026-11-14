@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QSet>
 class QTableWidget;
+class QSplitter;
 class QTabWidget;
 class QDoubleSpinBox;
 class QComboBox;
@@ -29,6 +30,7 @@ signals:
     void openRequested(const QString &path);
 private:
     void updateResponsiveControls();
+    QSplitter *m_columns = nullptr;
     void expandTable();
     void generate(bool mep);
     void applyStyle();

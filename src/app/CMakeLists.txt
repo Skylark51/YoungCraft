@@ -20,8 +20,6 @@ add_library(youngcraft_app OBJECT
     mainwindow/MainWindow_LigandReplacement.cpp
     mainwindow/MainWindow_Editor.cpp
     ParseWorker.cpp
-    ${PROJECT_SOURCE_DIR}/resources/youngcraft.qrc
-    ${PROJECT_SOURCE_DIR}/resources/fragments.qrc
 )
 youngcraft_enable_warnings(youngcraft_app)
 target_link_libraries(youngcraft_app
@@ -40,4 +38,14 @@ if(BUILD_TESTING)
         mainwindow/MainWindow_MM.cpp
         mainwindow/MainWindow_Xtb.cpp
     )
+endif()
+
+# Compile RCC outputs in each final executable. Visual Studio cannot reliably
+# locate AUTORCC object files propagated through an OBJECT library.
+set(_youngcraft_resources
+    ${PROJECT_SOURCE_DIR}/resources/youngcraft.qrc
+    ${PROJECT_SOURCE_DIR}/resources/fragments.qrc)
+target_sources(Youngcraft PRIVATE ${_youngcraft_resources})
+if(BUILD_TESTING)
+    target_sources(test_smoke PRIVATE ${_youngcraft_resources})
 endif()

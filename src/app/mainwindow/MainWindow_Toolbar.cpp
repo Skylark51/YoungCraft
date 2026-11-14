@@ -497,6 +497,12 @@ void MainWindow::createToolBar() {
         colors.setColor(QPalette::ToolTipBase,QColor(field));
         colors.setColor(QPalette::ToolTipText,QColor(text));
         setPalette(colors);
+        // Match the molecular canvas to the selected paper palette, including
+        // existing saved dark backgrounds. Explicit style edits still work.
+        m_style.background=QColor(t.paper);
+        for (auto *view:findChildren<MoleculeView *>()) {
+            auto style=view->style();style.background=m_style.background;view->setStyle(style);
+        }
         setStyleSheet(QStringLiteral(
             "QMainWindow,QDockWidget,QToolBar,QStatusBar { background:%1; color:%2; }"
             "QLabel,QCheckBox,QRadioButton,QGroupBox { color:%2; }"

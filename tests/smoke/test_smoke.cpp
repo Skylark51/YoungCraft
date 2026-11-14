@@ -119,6 +119,7 @@ private slots:
     void vibrationVectorContrast();
     void ligandReplacementWorkflow();
     void orbitalCacheAndDetachedWindow();
+    void orbitalHorizontalWorkspace();
     void reactionCoordinatePresentationWorkflow();
     void hydrogenRemovalActions();
     void selectedHydrogenActions();
@@ -3924,6 +3925,42 @@ void SmokeTest::ligandReplacementWorkflow(){
         QVERIFY(!d->findChild<QPushButton *>("ApplyLigandReplacement")->isEnabled());d->reject();
     });
     action->trigger();QCOMPARE(window.m_documentTabs->count(),initialTabs+1);
+}
+
+void SmokeTest::orbitalHorizontalWorkspace() {
+    MainWindow owner;owner.resize(1200,760);owner.show();
+    QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    owner.openFile(QFileInfo("tests/data/mvp.out").absoluteFilePath());
+    QTRY_VERIFY_WITH_TIMEOUT(owner.m_workspace->property("loadFinished").toBool(),10000);
+    QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    owner.newDrawingDocument(owner.m_data.molecule);
+    QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    QTRY_VERIFY(owner.m_view->isValid());QTest::qWait(100);
+    QCOMPARE(owner.m_view->grabFramebuffer().pixelColor(0,0),owner.palette().color(QPalette::Window));
+    owner.findChild<QAction *>("PastelTheme0")->trigger();
+    QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    owner.findChild<QAction *>("PastelTheme2")->trigger();
+    QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    auto *open=owner.findChild<QPushButton *>("OpenOrbitalWindow");QVERIFY(open);open->click();
+    auto *dialog=owner.findChild<QDialog *>("OrbitalManagerWindow");QVERIFY(dialog);
+    auto *columns=dialog->findChild<QSplitter *>("OrbitalColumns");QVERIFY(columns);
+    auto *selection=dialog->findChild<QScrollArea *>("OrbitalSelectionColumn");
+    auto *surface=dialog->findChild<QScrollArea *>("OrbitalSurfaceColumn");QVERIFY(selection);QVERIFY(surface);
+    QVERIFY(dialog->property("solidWorkspace").toBool());QVERIFY(!dialog->testAttribute(Qt::WA_TranslucentBackground));
+    QCOMPARE(dialog->windowOpacity(),1.0);QCOMPARE(dialog->palette().color(QPalette::Window).alpha(),255);
+    for(const auto size:{QSize(1120,640),QSize(840,560)}) {
+        dialog->resize(size);QTRY_COMPARE(columns->orientation(),Qt::Horizontal);QTest::qWait(60);
+        QVERIFY(selection->geometry().right()<surface->geometry().left());
+        QVERIFY(selection->width()>dialog->width()/3);QVERIFY(surface->width()>dialog->width()/4);
+        QVERIFY(dialog->rect().contains(QRect(surface->mapTo(dialog,QPoint()),surface->size())));
+        QCOMPARE(selection->horizontalScrollBar()->maximum(),0);QCOMPARE(surface->horizontalScrollBar()->maximum(),0);
+    }
+    dialog->resize(420,480);QTRY_COMPARE(columns->orientation(),Qt::Vertical);
+    QTRY_VERIFY(dialog->screen()->availableGeometry().contains(dialog->frameGeometry()));
+    dialog->close();
+    // Related dialogs also recover an off-screen native placement.
+    QDialog related(&owner);related.resize(600,400);related.move(-1600,-1000);related.show();
+    QTRY_VERIFY(related.screen()->availableGeometry().contains(related.frameGeometry()));related.close();
 }
 
 void SmokeTest::orbitalCacheAndDetachedWindow() {
