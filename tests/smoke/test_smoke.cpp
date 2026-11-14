@@ -3941,6 +3941,9 @@ void SmokeTest::orbitalHorizontalWorkspace() {
     QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
     owner.findChild<QAction *>("PastelTheme2")->trigger();
     QCOMPARE(owner.m_view->style().background,owner.palette().color(QPalette::Window));
+    owner.m_documentTabs->setCurrentIndex(0);
+    QCOMPARE(owner.m_style.background,owner.palette().color(QPalette::Window));
+    QCOMPARE(owner.m_view->style().background,owner.m_style.background);
     auto *open=owner.findChild<QPushButton *>("OpenOrbitalWindow");QVERIFY(open);open->click();
     auto *dialog=owner.findChild<QDialog *>("OrbitalManagerWindow");QVERIFY(dialog);
     auto *columns=dialog->findChild<QSplitter *>("OrbitalColumns");QVERIFY(columns);
