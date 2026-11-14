@@ -143,13 +143,26 @@ void MoleculeEditController::hydrogens(Molecule &m,HydrogenAction action,const Q
         return;
     }
     if(action==HydrogenAction::RemoveAll) { for(int i=m.atoms.size()-1;i>=0;--i)if(m.atoms[i].atomicNumber==1)m.removeAtom(i);return; }
-    if(action==HydrogenAction::Add){m.reconcileAutoHydrogens(true,false);return;}
+    QSet<int> scope;
+    for (int i : selection) if (i >= 0 && i < m.atoms.size() && m.atoms[i].atomicNumber != 1)
+        scope.insert(i);
+    if (!selection.isEmpty() && scope.isEmpty()) return;
+    if(action==HydrogenAction::Add){m.reconcileAutoHydrogens(true,false,scope);return;}
     // Explicit adjustment can replace singly bound main-group hydrogen.
     for(int i=0;i<m.atoms.size();++i)if(m.atoms[i].atomicNumber==1) {
-        int count=0;bool metal=false,locked=false;for(auto b:m.bonds)if(b.first==i||b.second==i){++count;auto &neighbor=m.atoms[b.first==i?b.second:b.first];metal|=isMetal(neighbor.atomicNumber);locked|=neighbor.autoHydrogenLocked;}
-        if(count==1&&!metal&&(!locked||action==HydrogenAction::RemoveExtra)) m.atoms[i].autoHydrogen=true;
+        if (m.atoms[i].optimizationFixed) continue;
+        int count = 0, owner = -1;
+        bool protectedBond = false;
+        for (const auto &b : m.bonds) if (b.first == i || b.second == i) {
+            ++count; owner = b.first == i ? b.second : b.first;
+            const auto &neighbor = m.atoms[owner];
+            protectedBond |= b.coordination || b.order != 1.0 || isMetal(neighbor.atomicNumber) ||
+                             neighbor.autoHydrogenLocked || neighbor.optimizationFixed;
+        }
+        if (count == 1 && !protectedBond && (scope.isEmpty() || scope.contains(owner)))
+            m.atoms[i].autoHydrogen = true;
     }
-    m.reconcileAutoHydrogens(action==HydrogenAction::Add,action==HydrogenAction::RemoveExtra);
+    m.reconcileAutoHydrogens(false,action==HydrogenAction::RemoveExtra,scope);
 }
 void MoleculeEditController::transform(Molecule &m,const QSet<int>&ids,const QVector3D&t,const QVector3D&r,const QVector3D&c) {
     auto q=QQuaternion::fromEulerAngles(r);

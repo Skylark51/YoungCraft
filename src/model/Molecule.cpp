@@ -276,15 +276,37 @@ int hydrogenValence(const Atom &a, double used) {
 }
 }
 void Molecule::reconcileAutoHydrogens(bool addOnly, bool removeOnly) {
+    reconcileAutoHydrogens(addOnly, removeOnly, {});
+}
+
+void Molecule::reconcileAutoHydrogens(bool addOnly, bool removeOnly, const QSet<int> &onlyOnAtoms) {
+    // Track scope through atom removals; original selection indices may shift.
+    QVector<bool> editable;
+    for (int i = 0; i < atoms.size(); ++i)
+        editable << ((onlyOnAtoms.isEmpty() || onlyOnAtoms.contains(i)) &&
+                     atoms[i].atomicNumber != 1 && !isMetal(atoms[i].atomicNumber) &&
+                     !atoms[i].optimizationFixed && !atoms[i].autoHydrogenLocked);
+    auto removableHydrogen = [&](int h) {
+        if (atoms[h].atomicNumber != 1 || !atoms[h].autoHydrogen || atoms[h].optimizationFixed) return false;
+        int owner = -1, count = 0;
+        bool ordinary = false;
+        for (const auto &bond : bonds) if (bond.first == h || bond.second == h) {
+            ++count; owner = bond.first == h ? bond.second : bond.first;
+            ordinary = !bond.coordination && bond.order == 1.0;
+        }
+        // Global automatic editing also clears generated H orphaned by deleting a heavy atom.
+        if (count == 0) return onlyOnAtoms.isEmpty();
+        return count == 1 && ordinary && owner >= 0 && editable[owner];
+    };
     if (removeOnly) {
         QSet<int> remove;
         for(int i=0;i<atoms.size();++i){
-            if(atoms[i].atomicNumber==1)continue;
+            if(!editable[i])continue;
             double used=0;QVector<int> hs;
             for(auto bond:bonds)if(bond.first==i||bond.second==i){
                 int n=bond.first==i?bond.second:bond.first;
                 if(bond.coordination||isMetal(atoms[n].atomicNumber))continue;
-                used+=bond.order;if(atoms[n].atomicNumber==1&&atoms[n].autoHydrogen)hs<<n;
+                used+=bond.order;if(removableHydrogen(n))hs<<n;
             }
             int excess=qMax(0,int(std::ceil(used-hydrogenValence(atoms[i],used))));
             for(int n:hs){if(excess--<=0)break;remove.insert(n);}
@@ -293,12 +315,12 @@ void Molecule::reconcileAutoHydrogens(bool addOnly, bool removeOnly) {
         return;
     }
     if (!addOnly) for (int i = atoms.size() - 1; i >= 0; --i)
-        if (atoms[i].atomicNumber == 1 && atoms[i].autoHydrogen && !atoms[i].optimizationFixed) removeAtom(i);
+        if (removableHydrogen(i)) { removeAtom(i); editable.removeAt(i); }
 
     const int heavyCount = atoms.size();
     for (int i = 0; i < heavyCount; ++i) {
         const Atom &heavy = atoms[i];
-        if (isMetal(heavy.atomicNumber) || heavy.atomicNumber==1 || heavy.autoHydrogenLocked || heavy.optimizationFixed) continue;
+        if (!editable[i]) continue;
         double used = 0.0, maxOrder=1.0;
         QVector<QVector3D> occupied;
         for (const Bond &bond : bonds) {

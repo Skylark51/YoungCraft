@@ -172,6 +172,23 @@ void MainWindow::createBuildMenu(){
         if(pair.second==HydrogenAction::Adjust)action->setStatusTip(QStringLiteral("결합 차수와 원자가를 기준으로 수소 개수와 배치를 다시 계산합니다. 고정 원자·금속 결합 수소는 유지합니다."));
         if(pair.second==HydrogenAction::Add)action->setStatusTip(QStringLiteral("기존 수소의 개수와 위치를 유지하고, 원자가에 부족한 수소만 추가합니다."));
     }
+    for (auto pair : {qMakePair(QStringLiteral("선택 원자 수소 추가"), HydrogenAction::Add),
+                      qMakePair(QStringLiteral("선택 원자 수소 보정"), HydrogenAction::Adjust)}) {
+        auto *action = add(pair.first, [this, pair] {
+            auto selected = m_view->selection().atoms;
+            if (selected.isEmpty() && m_view->selectedAtom() >= 0) selected.insert(m_view->selectedAtom());
+            bool hasHeavy = false;
+            for (int i : selected) if (i >= 0 && i < m_view->molecule().atoms.size() &&
+                                      m_view->molecule().atoms[i].atomicNumber != 1) hasHeavy = true;
+            if (!hasHeavy) { setStatus(QStringLiteral("수소를 처리할 원자를 먼저 선택하세요.")); return; }
+            auto edited = m_view->molecule();
+            MoleculeEditController::hydrogens(edited, pair.second, selected);
+            commitEditedMolecule(edited, true, false);
+            setStatus(QStringLiteral("선택 원자의 수소를 처리했습니다. Ctrl+Z로 되돌릴 수 있습니다."));
+        });
+        action->setObjectName(pair.second == HydrogenAction::Add ? "AddHydrogensToSelection" : "AdjustHydrogensOnSelection");
+        action->setStatusTip(QStringLiteral("선택한 원자에만 적용합니다. 고정 원자와 잠긴 원자, 금속 결합 수소는 유지합니다."));
+    }
     for(auto pair:{qMakePair(QStringLiteral("탄소에 붙은 수소 제거"),HydrogenAction::RemoveCarbonBound),qMakePair(QStringLiteral("선택한 수소만 남기기"),HydrogenAction::RemoveExceptSelected)}) {
         auto *action=menu->addAction(pair.first);action->setObjectName(pair.second==HydrogenAction::RemoveCarbonBound?"RemoveCarbonHydrogens":"RemoveUnselectedHydrogens");
         connect(action,&QAction::triggered,this,[this,pair]{

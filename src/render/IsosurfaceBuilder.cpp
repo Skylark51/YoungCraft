@@ -3,6 +3,7 @@
 #include <QVector>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace youngcraft {
@@ -46,8 +47,6 @@ SurfaceMesh IsosurfaceBuilder::build(const CubeGrid &grid, float isovalue, bool 
             ((grid.nz - 1 + stride - 1) / stride)) > maximumCells) {
         ++stride;
     }
-    mesh.positions.reserve(std::min<qint64>(qint64(maxTriangles) * 3, totalCells * 3));
-    mesh.normals.reserve(mesh.positions.capacity());
 
     // The six tetrahedra share the long diagonal (0, 6) of each voxel.
     constexpr int tetrahedra[6][4] = {
@@ -77,30 +76,43 @@ SurfaceMesh IsosurfaceBuilder::build(const CubeGrid &grid, float isovalue, bool 
                 const int ix[8] = {x, x1, x1, x, x, x1, x1, x};
                 const int iy[8] = {y, y, y1, y1, y, y, y1, y1};
                 const int iz[8] = {z, z, z, z, z1, z1, z1, z1};
+                // Trim empty voxels before computing world positions and gradients.
+                // Keep the existing tetrahedra and ordering so cached surfaces are identical.
+                float values[8];
+                unsigned mask = 0;
+                for (int i = 0; i < 8; ++i) {
+                    const float value = grid.value(ix[i], iy[i], iz[i]);
+                    values[i] = positive ? value : -value;
+                    if (values[i] >= level) mask |= 1u << i;
+                }
+                if (mask == 0 || mask == 255) continue;
+                if (mesh.positions.capacity() == 0) {
+                    mesh.positions.reserve(std::min<qint64>(qint64(maxTriangles) * 3, totalCells * 3));
+                    mesh.normals.reserve(mesh.positions.capacity());
+                }
                 Sample corners[8];
                 for (int i = 0; i < 8; ++i) {
                     corners[i].position = grid.origin + grid.axisX * float(ix[i]) +
                                           grid.axisY * float(iy[i]) + grid.axisZ * float(iz[i]);
-                    const float value = grid.value(ix[i], iy[i], iz[i]);
-                    corners[i].value = positive ? value : -value;
+                    corners[i].value = values[i];
                     corners[i].normal = normalAt(ix[i],iy[i],iz[i]);
                 }
 
                 for (const auto &tetra : tetrahedra) {
                     Sample points[4] = {corners[tetra[0]], corners[tetra[1]],
                                         corners[tetra[2]], corners[tetra[3]]};
-                    QVector<Sample> intersections;
-                    intersections.reserve(4);
+                    std::array<Sample, 4> intersections;
+                    int intersectionCount = 0;
                     for (const auto &edge : edges) {
                         const Sample &a = points[edge[0]];
                         const Sample &b = points[edge[1]];
                         if ((a.value >= level) != (b.value >= level)) {
-                            intersections.push_back(interpolate(a, b, level));
+                            intersections[intersectionCount++] = interpolate(a, b, level);
                         }
                     }
-                    if (intersections.size() == 3) {
+                    if (intersectionCount == 3) {
                         appendTriangle(mesh, intersections[0], intersections[1], intersections[2]);
-                    } else if (intersections.size() == 4) {
+                    } else if (intersectionCount == 4) {
                         // Edge enumeration is not polygon order: sort the planar quad
                         // before triangulating, otherwise a bow-tie leaves holes.
                         QVector3D center;for(const auto &point:intersections)center+=point.position;center*=.25f;
