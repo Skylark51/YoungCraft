@@ -67,19 +67,22 @@ QWidget *AnalysisPanel::makeOrbitalsTab() {
     dialog->setObjectName("OrbitalManagerWindow");
     dialog->setWindowTitle(QStringLiteral("영크래프트 · 오비탈 관리"));
     dialog->setModal(false);
+    dialog->setProperty("solidWorkspace",true);
+    dialog->setAutoFillBackground(true);
+    dialog->setAttribute(Qt::WA_TranslucentBackground,false);
+    dialog->setWindowOpacity(1.0);
     auto *dialogLayout = new QVBoxLayout(dialog);
-    auto *scroll = new QScrollArea(dialog);
-    scroll->setWidgetResizable(true);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_orbitalStudy = new OrbitalStudyWidget;
-    scroll->setWidget(m_orbitalStudy); dialogLayout->addWidget(scroll);
+    dialogLayout->setContentsMargins(4,4,4,4);
+    dialogLayout->setSizeConstraint(QLayout::SetNoConstraint);
+    m_orbitalStudy = new OrbitalStudyWidget(dialog);
+    dialogLayout->addWidget(m_orbitalStudy);
     connect(open, &QPushButton::clicked, this, [page, dialog] {
         const bool first=!dialog->property("orbitalWindowPlaced").toBool();
         auto *screen = first ? page->window()->screen() : dialog->screen();
         if (!screen) screen = QGuiApplication::primaryScreen();
         if (screen && first) {
             const QRect area=screen->availableGeometry();
-            const QSize size(qMin(680,area.width()*9/10),qMin(1000,area.height()*9/10));
+            const QSize size(qMin(1120,area.width()*9/10),qMin(680,area.height()*8/10));
             dialog->resize(size);
             dialog->move(area.right()-size.width()-16,area.center().y()-size.height()/2);
             dialog->setProperty("orbitalWindowPlaced",true);
