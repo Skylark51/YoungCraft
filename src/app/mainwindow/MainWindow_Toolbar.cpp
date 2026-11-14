@@ -503,6 +503,8 @@ void MainWindow::createToolBar() {
         for (auto *view:findChildren<MoleculeView *>()) {
             auto style=view->style();style.background=m_style.background;view->setStyle(style);
         }
+        for (const auto &document:m_documents) document->style.background=QColor(t.paper);
+        if(m_emptyDocument)m_emptyDocument->style.background=QColor(t.paper);
         setStyleSheet(QStringLiteral(
             "QMainWindow,QDockWidget,QToolBar,QStatusBar { background:%1; color:%2; }"
             "QLabel,QCheckBox,QRadioButton,QGroupBox { color:%2; }"
