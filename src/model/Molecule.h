@@ -3,6 +3,7 @@
 
 #include <QColor>
 #include <QMap>
+#include <QSet>
 #include <QString>
 #include <QVector>
 #include <QVector3D>
@@ -146,6 +147,7 @@ struct Molecule {
     void removeBond(int first, int second);
     bool removeAtom(int index);
     void reconcileAutoHydrogens(bool addOnly = false, bool removeOnly = false);
+    void reconcileAutoHydrogens(bool addOnly, bool removeOnly, const QSet<int> &onlyOnAtoms);
 };
 
 struct ParseIndex {

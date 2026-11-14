@@ -16,6 +16,7 @@ private slots:
     void ligandReplacementRejectsUnsafeEdits();
     void drawingTransactions();
     void chargedHydrogens();
+    void scopedHydrogens();
     void snappingAndAutomatic();
     void selectionAndRigidBody();
     void attachedFragmentRotation();
@@ -36,6 +37,39 @@ void EditorTest::drawingTransactions(){
     for(int order:{1,2,3}){s.bondOrder=order;QVERIFY(MoleculeEditController::drawBond(m,a,b,s));QCOMPARE(m.bonds[0].order,double(order));}
     Molecule before=m;m.removeBond(a,b);QCOMPARE(m.atoms.size(),2);QCOMPARE(m.bonds.size(),0);m=before;m.removeAtom(a);QCOMPARE(m.atoms.size(),1);QCOMPARE(m.bonds.size(),0);QVERIFY(MoleculeEditController::validate(m));
     m=before;QVERIFY(MoleculeEditController::replace(m,{a},7,1));QCOMPARE(m.atoms[a].element,QString("N"));QCOMPARE(m.atoms[a].formalCharge,1);QCOMPARE(m.bonds.size(),1);
+}
+void EditorTest::scopedHydrogens() {
+    Molecule m;
+    // A hydrogen before its owner exercises selection remapping during adjustment.
+    m.atoms={{1,1,"H",{-1,0,0}},{2,6,"C",{}},{3,8,"O",{1.4f,0,0}},
+             {4,1,"H",{2,1,0}},{5,27,"Co",{4,0,0}},{6,1,"H",{5,0,0}}};
+    m.setBond(0,1,1);m.setBond(1,2,1);m.setBond(2,3,1);m.setBond(4,5,1);
+    m.atoms[3].autoHydrogen=true;m.atoms[5].autoHydrogen=true;
+    const auto source=m;
+    MoleculeEditController::hydrogens(m,HydrogenAction::Adjust,{1});
+    QCOMPARE(m.atoms.size(),8);QCOMPARE(m.atoms[0].element,QString("C"));
+    QCOMPARE(m.atoms[1].position,source.atoms[2].position);
+    QCOMPARE(m.atoms[2].position,source.atoms[3].position);
+    QCOMPARE(m.atoms[4].position,source.atoms[5].position);
+    QCOMPARE(m.atoms[2].autoHydrogen,true);QVERIFY(MoleculeEditController::validate(m));
+    MoleculeEditController::hydrogens(m,HydrogenAction::Add,{0});QCOMPARE(m.atoms.size(),8);
+    auto unchanged=source;
+    for(auto selection:{QSet<int>{-1,99},QSet<int>{0}}) {
+        MoleculeEditController::hydrogens(unchanged,HydrogenAction::Adjust,selection);
+        QCOMPARE(unchanged.atoms.size(),source.atoms.size());QCOMPARE(unchanged.atoms[0].autoHydrogen,false);
+    }
+    auto fixed=source;fixed.atoms[1].optimizationFixed=true;
+    MoleculeEditController::hydrogens(fixed,HydrogenAction::Adjust,{1});QCOMPARE(fixed.atoms.size(),source.atoms.size());
+    auto locked=source;locked.atoms[1].autoHydrogenLocked=true;
+    MoleculeEditController::hydrogens(locked,HydrogenAction::Adjust,{1});QCOMPARE(locked.atoms.size(),source.atoms.size());
+    auto fixedH=source;fixedH.atoms[0].optimizationFixed=true;
+    MoleculeEditController::hydrogens(fixedH,HydrogenAction::Adjust,{1});
+    QCOMPARE(fixedH.atoms.size(),8);QCOMPARE(fixedH.atoms[0].position,source.atoms[0].position);QVERIFY(!fixedH.atoms[0].autoHydrogen);
+    auto bridge=source;bridge.setBond(0,4,1,true);bridge.atoms[0].autoHydrogen=true;
+    MoleculeEditController::hydrogens(bridge,HydrogenAction::Adjust,{1});
+    QCOMPARE(bridge.atoms[0].position,source.atoms[0].position);QCOMPARE(bridge.bondIndex(0,4)>=0,true);
+    Molecule charged;charged.atoms={{1,7,"N",{}},{2,8,"O",{4,0,0}}};charged.atoms[0].formalCharge=1;charged.charge=1;
+    MoleculeEditController::hydrogens(charged,HydrogenAction::Add,{0});QCOMPARE(charged.atoms.size(),6);QCOMPARE(charged.charge,1);
 }
 void EditorTest::chargedHydrogens(){
     for(auto test:{QVector<int>{6,0,4}, {7,0,3},{7,1,4},{8,0,2},{8,-1,1},{8,-2,0},{15,0,3},{16,0,2},{17,-1,0}}){

@@ -96,6 +96,22 @@ private slots:
         auto malformed=cube(true);malformed.replace("1 7\n","2 7 8\n");QVERIFY(write(path,malformed));QVERIFY(!CubeParser::parse(path).valid);
         auto angstrom=cube(false);angstrom.replace("2 1 0 0","-2 1 0 0");angstrom.replace("2 0 1 0","-2 0 1 0");angstrom.replace("2 0 0 1","-2 0 0 1");QVERIFY(write(path,angstrom));QCOMPARE(CubeParser::parse(path).axisX.x(),1.f);
     }
+    void emptyAndSignedSurfaces() {
+        CubeGrid grid;grid.valid=true;grid.nx=grid.ny=grid.nz=3;
+        grid.axisX={1,0,0};grid.axisY={0,1,0};grid.axisZ={0,0,1};grid.values.fill(0,27);
+        auto empty=IsosurfaceBuilder::build(grid,.02f,true);
+        QVERIFY(empty.isEmpty());QCOMPARE(empty.positions.capacity(),0);QCOMPARE(empty.normals.capacity(),0);
+        for(int z=0;z<3;++z)for(int y=0;y<3;++y)for(int x=0;x<3;++x)grid.values[(z*3+y)*3+x]=x-1.f;
+        for(bool positive:{true,false}) {
+            const auto mesh=IsosurfaceBuilder::build(grid,.25f,positive);
+            QVERIFY(!mesh.isEmpty());QCOMPARE(mesh.positions.size(),mesh.normals.size());QVERIFY(!mesh.truncated);
+            for(int i=0;i<mesh.positions.size();++i) {
+                QVERIFY(qAbs(mesh.positions[i].x()-(positive?1.25f:.75f))<1e-6);
+                QVERIFY(qAbs(mesh.normals[i].x()-(positive?-1.f:1.f))<1e-6);
+            }
+            const auto capped=IsosurfaceBuilder::build(grid,.25f,positive,1);QVERIFY(capped.truncated);QVERIFY(!capped.isEmpty());
+        }
+    }
     void skewInterpolationAndSurface() {
         CubeGrid grid;grid.valid=true;grid.nx=grid.ny=grid.nz=2;grid.axisX={1,0,0};grid.axisY={.2f,1,0};grid.axisZ={0,.3f,1};grid.values={0,100,10,110,1,101,11,111};
         QCOMPARE(grid.sample((grid.axisX+grid.axisY+grid.axisZ)*.5f),55.5f);

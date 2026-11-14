@@ -121,6 +121,7 @@ private slots:
     void orbitalCacheAndDetachedWindow();
     void reactionCoordinatePresentationWorkflow();
     void hydrogenRemovalActions();
+    void selectedHydrogenActions();
     void wholeMechanismAnimationWorkflow();
     void mechanismPowerPointWorkflow();
     void suppliedMechanismPreview();
@@ -4134,8 +4135,9 @@ void SmokeTest::orbitalStudyControlsAndRendering() {
     auto *orbitals=panel->findChild<QTableWidget*>("OrbitalTable");QVERIFY(orbitals);QCOMPARE(orbitals->rowCount(),4);QCOMPARE(orbitals->currentRow(),0);
     auto *toolbar=w.findChild<QToolBar*>("MainToolBar");QVERIFY(toolbar);QCOMPARE(toolbar->toolButtonStyle(),Qt::ToolButtonIconOnly);
     for (auto *action : toolbar->actions()) {
-        if (action->isSeparator()) continue;
-        QVERIFY(!action->icon().isNull());
+        // The toolbar also contains a QLabel separator, which has no action icon.
+        if (action->isSeparator() || !qobject_cast<QToolButton *>(toolbar->widgetForAction(action))) continue;
+        QVERIFY2(!action->icon().isNull(), qPrintable(action->text()));
         QVERIFY(!action->toolTip().isEmpty());
     }
     auto grid=std::make_shared<CubeGrid>();grid->valid=true;grid->nx=grid->ny=grid->nz=33;grid->origin={-4,-4,-4};grid->axisX={.25f,0,0};grid->axisY={0,.25f,0};grid->axisZ={0,0,.25f};grid->molecule=w.m_view->molecule();
@@ -4377,6 +4379,23 @@ void SmokeTest::reactionCoordinatePresentationWorkflow() {
         QVERIFY(hasContent(0,split));QVERIFY(hasContent(split,frame.height()));
     }
     dialog->close();
+}
+
+void SmokeTest::selectedHydrogenActions() {
+    Molecule source;source.atoms={{1,6,"C",{}},{2,8,"O",{1.4f,0,0}},{3,1,"H",{2,1,0}},{4,1,"H",{-1,0,0}}};
+    source.setBond(0,1,1);source.setBond(1,2,1);source.setBond(0,3,1);
+    MainWindow window;window.newDrawingDocument(source);
+    auto *add=window.findChild<QAction *>("AddHydrogensToSelection");
+    auto *adjust=window.findChild<QAction *>("AdjustHydrogensOnSelection");QVERIFY(add);QVERIFY(adjust);
+    window.applyAtomSelection({});add->trigger();QCOMPARE(window.m_view->molecule().atoms.size(),4);
+    window.applyAtomSelection({0});add->trigger();QCOMPARE(window.m_view->molecule().atoms.size(),6);
+    QCOMPARE(window.m_view->molecule().atoms[2].position,source.atoms[2].position);
+    window.undoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),4);
+    window.redoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),6);
+    window.applyAtomSelection({0});adjust->trigger();QCOMPARE(window.m_view->molecule().atoms.size(),6);
+    QCOMPARE(window.m_view->molecule().atoms[2].position,source.atoms[2].position);
+    window.undoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),6);
+    window.undoDrawingEdit();QCOMPARE(window.m_view->molecule().atoms.size(),4);
 }
 
 void SmokeTest::hydrogenRemovalActions() {
