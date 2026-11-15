@@ -76,8 +76,10 @@ QWidget *AnalysisPanel::makeIrcTab() {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     m_ircList = new QListWidget;
+    m_ircList->setObjectName(QStringLiteral("IrcPointList"));
     layout->addWidget(m_ircList, 1);
     m_ircPlot = new PlotWidget;
+    m_ircPlot->setObjectName(QStringLiteral("IrcEnergyPlot"));
     layout->addWidget(m_ircPlot, 3);
     m_ircList->installEventFilter(this);
     m_ircPlot->installEventFilter(this);

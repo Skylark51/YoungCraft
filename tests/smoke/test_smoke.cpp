@@ -112,6 +112,7 @@ class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
     void discreteSpectrumSelection();
+    void linkedIrcAndTddftGeometrySelection();
     void cifCoordinateEditAndSaveWorkflow();
     void unlimitedSelectionAndHoverElements();
     void sidebarOptimizationFixedSelection();
@@ -438,6 +439,43 @@ void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
     QVERIFY(saved.crystal);
     QVERIFY((saved.crystal->asymmetricUnit.atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
     QCOMPARE(saved.crystal->a, 10.0);
+}
+
+void SmokeTest::linkedIrcAndTddftGeometrySelection() {
+    MainWindow window;
+    Molecule molecule; molecule.atoms = {{1, 1, "H", {0, 0, 0}}};
+    window.newDrawingDocument(molecule);
+    window.setDrawingMode(false);
+    Frame first, second;
+    first.coordinates = {{1, 0, 0}}; first.metrics.energyHartree = -1.0;
+    second.coordinates = {{2, 0, 0}}; second.metrics.energyHartree = -1.1;
+    window.m_data.frames = {first, second};
+    window.m_data.ircPoints = {{1, -1, -1, 62.75, 0, "reverse"}, {2, 1, -1.1, 0, 1, "forward"}};
+    ExcitedState a, b;
+    a.state = 1; a.wavelengthNm = 250; a.oscillatorStrength = 0.1; a.frameIndex = 0;
+    b.state = 2; b.wavelengthNm = 300; b.oscillatorStrength = 0.2; b.frameIndex = 1;
+    window.m_data.excitedStates = {a, b};
+    window.m_analysis->setData(window.m_data);
+    auto *irc = window.m_analysis->findChild<PlotWidget*>("IrcEnergyPlot");
+    auto *list = window.m_analysis->findChild<QListWidget*>("IrcPointList");
+    auto *states = window.m_analysis->findChild<QTableWidget*>("TddftStatesTable");
+    QVERIFY(irc); QVERIFY(list); QVERIFY(states);
+    irc->pointClicked(0);
+    QCOMPARE(window.m_currentFrame, 0);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, first.coordinates[0]);
+    QCOMPARE(list->currentRow(), 0);
+    QCOMPARE(irc->selectedPoint(), 0);
+    window.showFrame(1);
+    QCOMPARE(list->currentRow(), 1);
+    QCOMPARE(irc->selectedPoint(), 1);
+    window.m_tddftWorkspacePlot->pointClicked(0);
+    QCOMPARE(states->currentRow(), 0);
+    QCOMPARE(window.m_currentFrame, 0);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, first.coordinates[0]);
+    states->setCurrentCell(1, 0);
+    QCOMPARE(window.m_tddftWorkspacePlot->selectedPoint(), 1);
+    QCOMPARE(window.m_currentFrame, 1);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, second.coordinates[0]);
 }
 
 void SmokeTest::discreteSpectrumSelection() {

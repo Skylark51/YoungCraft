@@ -75,7 +75,7 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         shell: pwsh
         run: |
-          $tests = @('cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture')
+          $tests = @('linkedIrcAndTddftGeometrySelection', 'cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture')
           $failed = @()
           foreach ($test in $tests) {
             & ./build/test_smoke.exe $test -o "gui-november-$test.txt,txt"
