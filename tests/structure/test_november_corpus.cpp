@@ -57,6 +57,27 @@ void NovemberCorpusTest::publicCorpus() {
             QCOMPARE(output.crystal->packing.atoms.size(), output.crystal->unitCell.atoms.size() * 8);
         } else {
             ++calculations;
+            if (path.contains("ansaBPFP2_acetylene_ircf_LQA.out")) {
+                QCOMPARE(data.ircPoints.size(), 103);
+                QCOMPARE(data.ircPoints[1].coordinate, 0.23513);
+                QCOMPARE(data.ircPoints.last().coordinate, 23.17564);
+                for (const auto &point : data.ircPoints)
+                    QCOMPARE(point.energyHartree, data.frames[point.frameIndex].metrics.energyHartree);
+            }
+            if (path.contains("ORCA4.2/dvb_scan.out")) {
+                QCOMPARE(data.scanPoints.size(), 12);
+                QCOMPARE(data.scanPoints.first().coordinate, 0.0);
+                QCOMPARE(data.scanPoints.last().coordinate, 360.0);
+                QVERIFY(qAbs(data.scanPoints.first().energyHartree - (-379.77794933)) < 1e-7);
+                QVERIFY(qAbs(data.scanPoints.last().energyHartree - (-379.77794979)) < 1e-7);
+                QVERIFY(data.scanHasSummary);
+                for (const auto &point : data.scanPoints) {
+                    QVERIFY(!point.inProgress);
+                    QVERIFY(!point.optimizationFrames.isEmpty());
+                    QCOMPARE(point.energyHartree, data.frames[point.frameIndex].metrics.energyHartree);
+                    QCOMPARE(point.coordinate, data.frames[point.frameIndex].metrics.scanCoordinate);
+                }
+            }
             if (path.contains("ORCA4.0/dvb_td.out")) {
                 QCOMPARE(data.excitedStates.size(), 10);
                 QCOMPARE(data.excitedStates[0].energyEv, 5.352);
@@ -99,7 +120,7 @@ void NovemberCorpusTest::publicCorpus() {
                 << "IRC" << data.ircPoints.size() << "TD" << data.excitedStates.size();
         }
     }
-    QCOMPARE(calculations, 20);
+    QCOMPARE(calculations, 22);
     QCOMPARE(crystals, 10);
 }
 

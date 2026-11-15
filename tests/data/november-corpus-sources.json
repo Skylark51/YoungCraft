@@ -148,5 +148,15 @@
     "path": "CIF/1000050.cif",
     "url": "https://www.crystallography.net/cod/1000050.cif",
     "sha256": "f142fccc5c2a56e0975c86c1640e4d9e8f9e205c273c745c867cb48ccb6ef760"
+  },
+  {
+    "path": "Gaussian/Gaussian09/ansaBPFP2_acetylene_ircf_LQA.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/ansaBPFP2_acetylene_ircf_LQA.out",
+    "sha256": "ca71eddb3a95d93bcb0031da6cf1b41c0e86e85c86da51dc27f9f4f4b20e0592"
+  },
+  {
+    "path": "ORCA/ORCA4.2/dvb_scan.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.2/dvb_scan.out",
+    "sha256": "6a40af7bf073e3f3c9ccc3f6c3f8304a4c221b34d3623d1f74b95c31ecfc9d9c"
   }
 ]

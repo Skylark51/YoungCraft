@@ -173,6 +173,9 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     QString irUnit;
     int intensityColumn = 2;
     int step = 0;
+    int currentScan = -1;
+    const QRegularExpression scanStepRe(QStringLiteral(R"(RELAXED SURFACE SCAN STEP\s+(\d+))"));
+    const QRegularExpression scanAxisRe(QStringLiteral(R"((Bond|Distance|Angle|Dihedral)\s*\(\s*([0-9, ]+)\)\s*:\s*([+\-0-9.EeDd]+))"));
     QString excitedMultiplicity;
     int currentExcited = -1;
     bool absorptionTable = false;
@@ -201,6 +204,34 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         const QString line = QString::fromUtf8(file.readLine());
         const QString trimmed = line.trimmed();
         if (!trimmed.isEmpty()) hasContent = true;
+        const auto scanStep = scanStepRe.match(line);
+        if (scanStep.hasMatch()) {
+            data.scanDetected = true;
+            ScanPoint point; point.index = scanStep.captured(1).toInt(); point.inProgress = true;
+            data.scanPoints.push_back(point);
+            currentScan = data.scanPoints.size() - 1;
+        }
+        const auto scanAxis = scanAxisRe.match(line);
+        if (currentScan >= 0 && scanAxis.hasMatch()) {
+            double coordinate = kNaN;
+            if (number(scanAxis.captured(3), coordinate)) {
+                auto &point = data.scanPoints[currentScan];
+                const auto type = scanAxis.captured(1);
+                if (!std::isfinite(point.coordinate)) {
+                    point.coordinate = coordinate;
+                    data.scanCoordinateType = type;
+                    data.scanAxisLabel = type + (type == "Bond" || type == "Distance" ? " (Å)" : " (°)");
+                    data.scanAtoms.clear();
+                    for (const auto &atom : scanAxis.captured(2).split(',', Qt::SkipEmptyParts)) data.scanAtoms.push_back(atom.trimmed().toInt());
+                } else {
+                    point.coordinate2 = coordinate; data.scanDimensions = 2; data.scanAxisLabel2 = type;
+                }
+            }
+        }
+        if (currentScan >= 0 && trimmed.contains("THE OPTIMIZATION HAS CONVERGED"))
+            data.scanPoints[currentScan].inProgress = false;
+        if (trimmed == "RELAXED SURFACE SCAN RESULTS") data.scanHasSummary = true;
+
         if (trimmed.contains("EXCITED STATES") && trimmed.startsWith("TD-DFT")) {
             const bool triplet = trimmed.contains("TRIPLETS");
             if (!triplet) data.excitedStates.clear();
@@ -262,6 +293,7 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                     data.frames.push_back(std::move(frame));
                     data.index.sectionOffsets[QStringLiteral("frame_geometry")].push_back(offset);
                     pendingFrame = data.frames.size() - 1;
+                    if (currentScan >= 0) data.scanPoints[currentScan].optimizationFrames.push_back(pendingFrame);
                 }
             }
             continue;
@@ -279,6 +311,11 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                 data.scfEnergies.push_back(energy);
             if (pendingFrame >= 0) {
                 data.frames[pendingFrame].metrics.energyHartree = energy;
+                if (currentScan >= 0 && energyMatch.hasMatch()) {
+                    auto &point = data.scanPoints[currentScan];
+                    point.energyHartree = energy; point.frameIndex = pendingFrame;
+                    data.frames[pendingFrame].metrics.scanCoordinate = point.coordinate;
+                }
             }
         }
 
@@ -399,6 +436,11 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     if (std::isfinite(latestEnergy) && !data.frames.isEmpty() &&
         !std::isfinite(data.frames.last().metrics.energyHartree))
         data.frames.last().metrics.energyHartree = latestEnergy;
+    double scanMinimum = std::numeric_limits<double>::infinity();
+    for (const auto &point : data.scanPoints)
+        if (std::isfinite(point.energyHartree)) scanMinimum = std::min(scanMinimum, point.energyHartree);
+    for (auto &point : data.scanPoints)
+        if (std::isfinite(point.energyHartree)) point.relativeKcal = (point.energyHartree - scanMinimum) * 627.509474;
     result.success = !data.molecule.atoms.isEmpty();
     if (!result.success)
         result.error = QStringLiteral("ORCA Cartesian 좌표를 찾지 못했습니다.");

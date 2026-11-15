@@ -66,3 +66,11 @@ The Release application and structure target built; console structure tests repo
 ORCA geometry convergence RMS/MAX gradient and displacement values now attach to their current frame. Synthetic assertions cover all four metrics; the real CASSCF optimization fixture verifies frame 2 against the printed values. CIF export updates both fractional and Cartesian columns when both exist and rejects incomplete alternate coordinate sets. Console runs: ORCA 13 passes; structure 9 passes; public corpus 3 passes, with no failures.
 
 Remote run 43766208458 built successfully and passed nine of ten console/calculation suites. xTB failed: the new workflow lacked the real runtime required by existing integration tests. Added the same SHA256-verified runtime provisioning used by the portable release workflow, explicit xTB text output, and independent remote GUI execution after a successful build even when a separate console suite fails. Subsequent remote verification is required; no GUI success is claimed yet.
+
+## Full reaction-path corpus
+
+Expanded the checksum-pinned corpus to 22 calculation outputs plus 10 COD CIFs with an actual 103-point Gaussian LQA IRC (TS plus 102 points) and a 12-point ORCA 4.2 relaxed dihedral scan. The new assertions first reproduced missing IRC and scan extraction.
+
+Gaussian now recognizes printed path-direction lines and accumulated reaction coordinates, associating each completed path point with its evaluated frame and energy. Legacy IRC fallback uses each frame's own energy rather than aligning separate array tails. The real IRC checks 103 points, first nonzero coordinate 0.23513, final coordinate 23.17564, and exact frame-energy correspondence.
+
+ORCA relaxed scan parsing retains axis coordinates, atom indices, per-point optimization histories, converged/in-progress state and final evaluated frames. The real scan checks 12 points, endpoints 0/360 degrees, source endpoint energies, completed status, and exact point-to-frame energy/coordinate matching (134 frames). Console regression: Gaussian 16 passes/1 optional skip, ORCA 13 passes, corpus 3 passes/0 failures across 32 files. Remote integration for the latest path changes and final application/package rebuild remain required.
