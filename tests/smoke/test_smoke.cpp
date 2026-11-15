@@ -427,7 +427,9 @@ void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
             choseFile = true; file->selectFile(path); QMetaObject::invokeMethod(file, "accept");
         } else if (dialog->objectName() == "SaveStructureChoice" && !choseCif) {
             choseCif = true;
-            if (auto *button = dialog->findChild<QPushButton*>("SaveCIFChoice")) button->click();
+            // Return from this timer callback before entering the nested file dialog.
+            if (auto *button = dialog->findChild<QPushButton*>("SaveCIFChoice"))
+                QTimer::singleShot(0, button, &QPushButton::click);
             else dialog->reject();
         }
     });
@@ -3574,7 +3576,7 @@ void SmokeTest::frequencyPagingAndDetails(){
     if(!capture.isEmpty())QVERIFY(window.grab().save(capture+"/frequency-page.png"));
     details->click();auto *dialog=panel->findChild<QDialog*>("FrequencyDetailsDialog");QVERIFY(dialog->isVisible());
     auto *table=dialog->findChild<QTableWidget*>("FrequencyDetailsTable");QCOMPARE(table->rowCount(),12);QCOMPARE(table->columnCount(),5);
-    QCOMPARE(table->item(10,2)->text(),QString("10.2500"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
+    QCOMPARE(table->item(10,2)->text(),QString("10.2500 km/mol"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
     if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+"/frequency-details.png"));
     dialog->hide();window.m_analysis->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());
     for(int tab:{6,7}){
