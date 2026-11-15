@@ -1,4 +1,6 @@
 #include "io/OrcaParser.h"
+#include "io/XYZParser.h"
+#include <QDir>
 
 #include "io/ParserCommon.h"
 
@@ -129,6 +131,54 @@ void readNormalModes(QFile &file, QVector<FrequencyMode> &modes, int atomCount) 
     }
 }
 
+void attachIrcTrajectory(CalculationData &data, const QVector<FrameMetrics> &summary,
+                         int transitionState, const QString &trajectoryPath) {
+    if (summary.isEmpty()) return;
+    QVector<Frame> trajectory;
+    QFile trajectoryFile(trajectoryPath);
+    QString warning;
+    if (!trajectoryFile.open(QIODevice::ReadOnly)) warning = QStringLiteral("ORCA IRC 구조에는 전체 trajectory 파일이 필요합니다: ") + trajectoryPath;
+    else {
+        while (!trajectoryFile.atEnd()) {
+            const auto countLine = trajectoryFile.readLine();
+            if (countLine.trimmed().isEmpty()) continue;
+            bool ok = false; const int count = countLine.trimmed().toInt(&ok);
+            if (!ok || count <= 0 || count > 1000000) { warning = QStringLiteral("IRC trajectory 원자 수가 유효하지 않습니다."); break; }
+            QByteArray block = countLine + trajectoryFile.readLine();
+            for (int atom = 0; atom < count && !trajectoryFile.atEnd(); ++atom) block += trajectoryFile.readLine();
+            const auto parsed = XYZParser::parseText(QString::fromUtf8(block));
+            if (!parsed.success || parsed.data.molecule.atoms.size() != data.molecule.atoms.size()) {
+                warning = QStringLiteral("IRC trajectory 좌표/원자 수가 출력 구조와 일치하지 않습니다."); break;
+            }
+            for (int atom = 0; atom < count; ++atom)
+                if (parsed.data.molecule.atoms[atom].atomicNumber != data.molecule.atoms[atom].atomicNumber) {
+                    warning = QStringLiteral("IRC trajectory 원소 순서가 출력 구조와 일치하지 않습니다."); break;
+                }
+            if (!warning.isEmpty()) break;
+            Frame frame;
+            for (const auto &atom : parsed.data.molecule.atoms) frame.coordinates.push_back(atom.position);
+            trajectory.push_back(frame);
+        }
+        if (warning.isEmpty() && trajectory.size() != summary.size()) warning = QStringLiteral("IRC 요약과 전체 trajectory의 프레임 수가 다릅니다.");
+    }
+    if (!warning.isEmpty()) { trajectory.clear(); data.warningMessage += "\n" + warning; }
+    double minimum = std::numeric_limits<double>::infinity();
+    for (const auto &metrics : summary) minimum = std::min(minimum, metrics.energyHartree);
+    for (int row = 0; row < summary.size(); ++row) {
+        int frame = -1;
+        const double coordinate = transitionState >= 0 ? row - transitionState : row;
+        if (!trajectory.isEmpty()) {
+            frame = data.frames.size();
+            trajectory[row].metrics = summary[row];
+            trajectory[row].metrics.ircCoordinate = coordinate;
+            data.frames.push_back(trajectory[row]);
+        }
+        data.ircPoints.push_back({summary[row].step, coordinate, summary[row].energyHartree,
+            (summary[row].energyHartree - minimum) * 627.509474, frame,
+            transitionState < 0 ? QStringLiteral("path") : row < transitionState ? QStringLiteral("reverse") : row == transitionState ? QStringLiteral("TS") : QStringLiteral("forward")});
+    }
+}
+
 Frame frameFrom(const QVector<Atom> &atoms) {
     Frame frame;
     for (const Atom &atom : atoms) frame.coordinates.push_back(atom.position);
@@ -173,6 +223,10 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     QString irUnit;
     int intensityColumn = 2;
     int step = 0;
+    bool inIrcSummary = false;
+    QVector<FrameMetrics> ircSummary;
+    int ircTransitionState = -1;
+    QString ircTrajectory = QFileInfo(filePath).completeBaseName() + QStringLiteral("_IRC_Full_trj.xyz");
     int currentScan = -1;
     const QRegularExpression scanStepRe(QStringLiteral(R"(RELAXED SURFACE SCAN STEP\s+(\d+))"));
     const QRegularExpression scanAxisRe(QStringLiteral(R"((Bond|Distance|Angle|Dihedral)\s*\(\s*([0-9, ]+)\)\s*:\s*([+\-0-9.EeDd]+))"));
@@ -204,6 +258,23 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         const QString line = QString::fromUtf8(file.readLine());
         const QString trimmed = line.trimmed();
         if (!trimmed.isEmpty()) hasContent = true;
+        if (trimmed.contains("Storing full IRC trajectory in")) {
+            const auto values = parser::columns(trimmed);
+            if (!values.isEmpty()) ircTrajectory = QFileInfo(values.last()).fileName();
+        }
+        if (trimmed == "IRC PATH SUMMARY") { inIrcSummary = true; ircSummary.clear(); }
+        else if (inIrcSummary) {
+            const auto values = parser::columns(trimmed);
+            bool ok = false; const int stepNumber = values.value(0).toInt(&ok);
+            double energy = kNaN, maxGradient = kNaN, rmsGradient = kNaN;
+            if (ok && values.size() >= 5 && number(values[1], energy) && number(values[3], maxGradient) && number(values[4], rmsGradient)) {
+                FrameMetrics metrics; metrics.step = stepNumber; metrics.energyHartree = energy;
+                metrics.maxForce = maxGradient; metrics.rmsForce = rmsGradient;
+                if (trimmed.contains("TS")) ircTransitionState = ircSummary.size();
+                ircSummary.push_back(metrics);
+            } else if (!ircSummary.isEmpty() && !trimmed.isEmpty() && !isSeparator(trimmed)) inIrcSummary = false;
+        }
+
         const auto scanStep = scanStepRe.match(line);
         if (scanStep.hasMatch()) {
             data.scanDetected = true;
@@ -441,6 +512,7 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         if (std::isfinite(point.energyHartree)) scanMinimum = std::min(scanMinimum, point.energyHartree);
     for (auto &point : data.scanPoints)
         if (std::isfinite(point.energyHartree)) point.relativeKcal = (point.energyHartree - scanMinimum) * 627.509474;
+    attachIrcTrajectory(data, ircSummary, ircTransitionState, QFileInfo(filePath).dir().filePath(ircTrajectory));
     result.success = !data.molecule.atoms.isEmpty();
     if (!result.success)
         result.error = QStringLiteral("ORCA Cartesian 좌표를 찾지 못했습니다.");

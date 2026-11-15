@@ -75,14 +75,19 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         shell: pwsh
         run: |
-          & ./build/test_smoke.exe cifCoordinateEditAndSaveWorkflow discreteSpectrumSelection optimizationGraphWindow optimizationGraphSynchronizes scanArrowNavigation scanOptimizationPoints frequencyPagingAndDetails frequencySelectionStartsAnimationAndShowsCoordinates tddftPublicationSpectrum documentsAreIndependent projectLibraryOpensOnDemand geometryEditPreservesCalculation drawingModeCreatesAtomsAndBonds rendersShadowAndTransparentCapture -o gui-november-results.txt,txt
-          if ($LASTEXITCODE -ne 0) { throw 'Analysis/rendering regression failed' }
+          $tests = @('cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture')
+          $failed = @()
+          foreach ($test in $tests) {
+            & ./build/test_smoke.exe $test -o "gui-november-$test.txt,txt"
+            if ($LASTEXITCODE -ne 0) { $failed += $test }
+          }
+          if ($failed.Count) { throw "GUI regressions failed: $($failed -join ', ')" }
       - name: Upload regression evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: november-regression-evidence
           path: |
-            gui-november-results.txt
+            gui-november-*.txt
             build/Testing/Temporary/LastTest.log
             .build/november-corpus/provenance.json

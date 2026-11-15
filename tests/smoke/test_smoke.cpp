@@ -3251,7 +3251,7 @@ void SmokeTest::optimizationGraphSynchronizes() {
     QCOMPARE(plot->series().size(), 2);
     QCOMPARE(plot->series()[0].y(), 2.0 * 627.509474);
     QCOMPARE(plot->series()[1].x(), 3.0);
-    QCOMPARE(plot->selectedPoint(), 1);
+    QCOMPARE(plot->selectedPoint(), -1); // Final frame has no energy; highlight no other frame.
     QSignalSpy requested(&panel, &AnalysisPanel::frameRequested);
     panel.setCurrentFrame(0);
     QCOMPARE(requested.count(), 0); // Playback/display updates must not request another frame.

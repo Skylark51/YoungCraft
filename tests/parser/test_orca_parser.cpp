@@ -12,6 +12,7 @@ class OrcaParserTest final : public QObject {
     Q_OBJECT
 private slots:
     void parsesCompleteOutput();
+    void attachesIrcSummaryToCompleteTrajectory();
     void readsNormalModeBlocks();
     void readsExcitedStatesAndSpinForbiddenTransitions();
     void acceptsIncompleteOptimization();
@@ -113,6 +114,46 @@ ORCA TERMINATED NORMALLY
     const auto modern = OrcaParser::parse(file.fileName());
     QCOMPARE(modern.data.frequencies[0].irIntensity, 42.5);
     QCOMPARE(modern.data.frequencies[0].irIntensityUnit, QString("km/mol"));
+}
+
+void OrcaParserTest::attachesIrcSummaryToCompleteTrajectory() {
+    QTemporaryDir dir;
+    const auto path = dir.filePath("reaction.out");
+    QFile output(path);
+    QVERIFY(output.open(QIODevice::WriteOnly));
+    output.write("O   R   C   A\nCARTESIAN COORDINATES (ANGSTROEM)\n---\nH 0 0 0\n\n"
+        "IRC PATH SUMMARY\n-----\nAll gradients are in Eh/Bohr.\n"
+        "Step E(Eh) dE(kcal/mol) max(|G|) RMS(G)\n"
+        "1 -1.2 -62.75 0.002 0.001\n2 -1.1 0 0.003 0.002 <= TS\n"
+        "3 -1.3 -125.5 0.001 0.0005\n\nORCA TERMINATED NORMALLY\n");
+    output.close();
+    auto parsed = OrcaParser::parse(path);
+    QVERIFY(parsed.success);
+    QCOMPARE(parsed.data.ircPoints.size(), 3);
+    QCOMPARE(parsed.data.ircPoints[0].frameIndex, -1);
+    QVERIFY(!parsed.data.warningMessage.isEmpty());
+    QFile trajectory(dir.filePath("reaction_IRC_Full_trj.xyz"));
+    QVERIFY(trajectory.open(QIODevice::WriteOnly));
+    trajectory.write("1\nfirst\nH 1 0 0\n1\nTS\nH 2 0 0\n1\nlast\nH 3 0 0\n");
+    trajectory.close();
+    parsed = OrcaParser::parse(path);
+    QCOMPARE(parsed.data.ircPoints.size(), 3);
+    QCOMPARE(parsed.data.ircPoints[0].coordinate, -1.0);
+    QCOMPARE(parsed.data.ircPoints[1].coordinate, 0.0);
+    QCOMPARE(parsed.data.ircPoints[1].direction, QString("TS"));
+    for (int i = 0; i < 3; ++i) {
+        const auto &point = parsed.data.ircPoints[i];
+        QVERIFY(point.frameIndex >= 0);
+        const auto &frame = parsed.data.frames[point.frameIndex];
+        QCOMPARE(frame.coordinates[0].x(), float(i + 1));
+        QCOMPARE(frame.metrics.energyHartree, point.energyHartree);
+    }
+    QVERIFY(trajectory.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    trajectory.write("1\nwrong element\nC 1 0 0\n"); trajectory.close();
+    parsed = OrcaParser::parse(path);
+    QVERIFY(parsed.success);
+    QCOMPARE(parsed.data.ircPoints[0].frameIndex, -1);
+    QVERIFY(!parsed.data.warningMessage.isEmpty());
 }
 
 void OrcaParserTest::parsesCompleteOutput() {

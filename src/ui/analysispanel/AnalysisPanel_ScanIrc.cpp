@@ -129,7 +129,7 @@ void AnalysisPanel::fillIrcPlot() {
                                .arg(point.index).arg(point.direction).arg(numberOrDash(point.relativeKcal, 3)));
         series.push_back({point.coordinate, point.relativeKcal});
     }
-    m_ircPlot->setSeries(series, QStringLiteral("Reaction coordinate"), QStringLiteral("ΔE (kcal mol⁻¹)"));
+    m_ircPlot->setSeries(series, m_data.format == QStringLiteral("ORCA") ? QStringLiteral("IRC path step (relative to TS)") : QStringLiteral("Reaction coordinate"), QStringLiteral("ΔE (kcal mol⁻¹)"));
     m_ircPlot->setMarkers(series);
 }
 
