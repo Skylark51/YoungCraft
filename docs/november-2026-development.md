@@ -96,3 +96,7 @@ Final-source portable packaging via tools/package_portable.ps1 -ReuseMmRuntime s
 ## Direct panel-to-geometry regression
 
 Added a GUI integration test that verifies IRC graph selection updates molecular coordinates, frame navigation updates the IRC list/graph, and TD graph/table selection updates the exact associated geometry. This complements the discrete mouse-picking test and parser frame-energy checks. Windows Release application and GUI test compilation passed. GUI execution remains remote-only and pending. The prior package hash above predates the added IRC widget object names; rebuild packaging after final source verification. Read-only verification of that prepared package found 1243 matching manifest entries and matching reused MM worker.
+
+## Bounded remote GUI execution
+
+Added tools/run_gui_regressions.py for remote-only GUI execution. It runs every named test separately, limits each to 120 seconds and writes per-case text logs plus a JSON status summary. Syntax was checked locally without launching GUI tests. This prevents an indefinitely waiting test from hiding the remaining cases. The already-running remote job 43768672446 remains under observation; it uses the previous unbounded loop. Current-source portable packaging completed again; installation is still gated on remote GUI evidence.
