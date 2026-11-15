@@ -1,6 +1,6 @@
-# 2026년 11월 개발 결과 보고 — 검증 진행 중
+# 2026년 11월 개발 결과 보고
 
-이 문서는 최종 보고 초안이다. 원격 GUI 회귀, 최신 패키지 설치, 기본 브랜치 병합이 완료되기 전에는 작업 완료를 의미하지 않는다.
+Windows Release 빌드, 공개 계산 출력·CIF 검증, 원격 GUI 회귀와 로컬 portable 설치를 완료했다. 로컬 GUI 실행 없이 백그라운드에서 검증·배포했다. GitHub 반영 기록은 [PR #21](https://github.com/Skylark51/YoungCraft/pull/21)에서 확인할 수 있다.
 
 ## 1. 작업 전 구현 수준
 
@@ -30,11 +30,11 @@
 | 실제 경로의 구조·에너지 대응 | Gaussian IRC 103개 지점, ORCA Scan 12개 계산점/134개 프레임, 원문 수치와 프레임 인덱스 검사 | 콘솔 통과 |
 | ORCA IRC 연결 | 공식 출력 형식의 합성 fixture, trajectory 부재·일치·원소 불일치 검사 | 파서 통과; 실제 IRC 원문 확대 검증 한계 |
 | 콘솔 CTest | parser_gaussian/parser_orca/structure_files/november_public_corpus 4/4 | 로컬 통과 |
-| 기존 계산·편집 회귀 | 원격 실행 43767759353에서 콘솔·계산 10/10, 실제 xTB 포함 | 해당 소스 통과; 최신 소스 원격 재검증 진행 |
-| 그래프·3D·그리기·탭·프로젝트·CIF GUI 흐름 | 원격 Windows 개별 테스트 및 JSON 요약 | 진행 중 |
-| Windows Release | 앱·파서·GUI 테스트 바이너리 컴파일 | 로컬 통과; 마지막 IRC 안내 변경 재빌드 중 |
-| Portable 설치·바로가기 | 지정 스크립트 패키징, 준비본 1243개 manifest 해시 일치, C: 바로가기 경로 확인 | 설치 전; 최종 재패키징 필요 |
-| GitHub 기본 브랜치 반영 | PR #21 | 검증 중 draft; 병합 전 |
+| 기존 계산·편집 회귀 | 최종 원격 실행 43773421414에서 콘솔·계산 CTest 10/10, 실제 xTB 포함 | 통과 |
+| 그래프·3D·그리기·탭·프로젝트·CIF GUI 흐름 | 같은 실행에서 개별 GUI 테스트 15/15, 실제 CIF 저장 대화상자·재읽기 포함 | 통과 |
+| Windows Release | 앱·파서·GUI 테스트 바이너리 로컬 및 원격 컴파일 | 통과 |
+| Portable 설치·바로가기 | 지정 스크립트 패키징·설치, 설치본 1243개 manifest 해시 일치, C: 바로가기 경로 확인 | 통과 |
+| GitHub 반영 | 최종 검증 커밋 1cd7a38695a7d6f8ee40b785ee14aabee62ee9ab, PR #21 | 두 Windows 검사 성공; 병합 상태는 PR 기록 참조 |
 
 재현: `python tools/fetch_november_corpus.py .build/november-corpus` 후 `YOUNGCRAFT_NOVEMBER_CORPUS`를 해당 경로로 설정하고 `november_public_corpus` CTest를 실행한다. GUI 검사는 사용자 요청에 따라 로컬에서 실행하지 않고 GitHub Windows 실행기에서만 실행한다. 상세 이력은 `november-2026-development.md`에 기록했다.
 
@@ -56,4 +56,11 @@
 
 ## 6. 커밋·GitHub·배포 상태
 
-작업 브랜치: `codex/november-analysis-crystal-20261116`. PR: https://github.com/Skylark51/YoungCraft/pull/21 . 최종 커밋·병합 SHA·최신 CI 실행·설치된 실행 파일 해시는 검증과 설치 완료 후 이 절에 확정한다. 기존 개인 파일과 관련 없는 미커밋 변경은 보존했다.
+작업 브랜치: `codex/november-analysis-crystal-20261116`. [PR #21](https://github.com/Skylark51/YoungCraft/pull/21)에 커밋·기본 브랜치 병합 기록을 남긴다. 최종 코드 검증 커밋은 `1cd7a38695a7d6f8ee40b785ee14aabee62ee9ab`이며, 이후 최종 보고 정리는 문서만 변경한다. 마지막 앱 소스 변경 `4e037f8` 이후 검증 커밋까지 `src` 차이가 없다.
+
+- [전체 Windows 회귀 실행 43773421414](https://github.com/Skylark51/YoungCraft/actions/runs/43773421414): Release 빌드, CTest 10/10, GUI 15/15 성공.
+- [ORCA 파서 실행 43773421399](https://github.com/Skylark51/YoungCraft/actions/runs/43773421399): 성공.
+- `tools/package_portable.ps1 -BuildDir build-current -ReuseMmRuntime` 및 `tools/install_portable.ps1` 실행 완료. MM 코드는 변경하지 않았으며 검증된 기존 runtime을 재사용했다.
+- 설치 위치: `C:\Users\UNIST\AppData\Local\Programs\Youngcraft Portable`. 바탕화면 `Youngcraft.lnk`는 해당 폴더의 `Youngcraft.exe`를 가리킨다. 설치 후 앱을 실행하지 않았다.
+- 설치본 파일 1,243개를 manifest와 대조해 불일치 0개. 빌드·패키지·설치 실행 파일 SHA256은 `44C620A1DE64D095F70DAF79F8F7147438F53A9CC7BD19EAC54FCBEACBBB2B00`으로 일치한다.
+- 기존 개인 파일과 관련 없는 미커밋 변경은 보존했다.
