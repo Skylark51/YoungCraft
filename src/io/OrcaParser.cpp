@@ -91,6 +91,44 @@ void readMulliken(QFile &file, QVector<Atom> &atoms) {
     }
 }
 
+void readNormalModes(QFile &file, QVector<FrequencyMode> &modes, int atomCount) {
+    const QRegularExpression header(QStringLiteral(R"(^\s*\d+(?:\s+\d+)*\s*$)"));
+    QVector<int> columns;
+    QVector<QVector<QVector3D>> vectors;
+    int nextRow = 0, preamble = 0;
+    bool started = false;
+    while (!file.atEnd()) {
+        const auto offset = file.pos();
+        const auto line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || isSeparator(line)) continue;
+        const auto values = parser::columns(line);
+        if (header.match(line).hasMatch()) {
+            columns.clear(); vectors.clear(); nextRow = 0; started = true;
+            for (const auto &value : values) {
+                columns.push_back(value.toInt());
+                vectors.push_back(QVector<QVector3D>(atomCount));
+            }
+            continue;
+        }
+        if (!started && ++preamble < 20) continue;
+        bool ok = false;
+        const int row = values.value(0).toInt(&ok);
+        if (!ok || row != nextRow || row >= 3 * atomCount || values.size() != columns.size() + 1) {
+            file.seek(offset); break;
+        }
+        for (int i = 0; i < columns.size(); ++i) {
+            double value = kNaN;
+            if (!number(values[i + 1], value)) { file.seek(offset); return; }
+            vectors[i][row / 3][row % 3] = float(value);
+        }
+        if (++nextRow == 3 * atomCount) {
+            for (int i = 0; i < columns.size(); ++i)
+                for (auto &mode : modes)
+                    if (mode.number == columns[i] + 1) mode.displacement = vectors[i];
+        }
+    }
+}
+
 Frame frameFrom(const QVector<Atom> &atoms) {
     Frame frame;
     for (const Atom &atom : atoms) frame.coordinates.push_back(atom.position);
@@ -130,7 +168,19 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     int pendingFrame = -1;
     bool hasContent = false;
     bool inFrequencyTable = false;
+    int vibrationalSpectrum = 0; // 1: IR, 2: Raman
+    bool spectrumHasRows = false;
+    QString irUnit;
+    int intensityColumn = 2;
     int step = 0;
+    QString excitedMultiplicity;
+    int currentExcited = -1;
+    bool absorptionTable = false;
+    const QRegularExpression stateRe(QStringLiteral(
+        R"(^STATE\s+(\d+):\s+E=\s*([+\-0-9.EeDd]+)\s+au\s+([+\-0-9.EeDd]+)\s+eV)"));
+    const QRegularExpression transitionRe(QStringLiteral(
+        R"(^\s*(\d+[ab]?)\s*->\s*(\d+[ab]?)\s*:\s*[+\-0-9.EeDd]+\s*\(c=\s*([+\-0-9.EeDd]+)\))"));
+
     const QRegularExpression freqRe(QStringLiteral(
         R"(^\s*(\d+)\s*:\s*([+-]?\d+(?:\.\d+)?(?:[EeDd][+-]?\d+)?)\s*cm\*\*-1)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -149,6 +199,52 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         const QString line = QString::fromUtf8(file.readLine());
         const QString trimmed = line.trimmed();
         if (!trimmed.isEmpty()) hasContent = true;
+        if (trimmed.contains("EXCITED STATES") && trimmed.startsWith("TD-DFT")) {
+            const bool triplet = trimmed.contains("TRIPLETS");
+            if (!triplet) data.excitedStates.clear();
+            excitedMultiplicity = triplet ? QStringLiteral("Triplet") : QStringLiteral("Singlet");
+            currentExcited = -1;
+        }
+        const auto stateMatch = stateRe.match(trimmed);
+        if (!excitedMultiplicity.isEmpty() && stateMatch.hasMatch()) {
+            double ev = kNaN;
+            if (number(stateMatch.captured(3), ev) && ev > 0) {
+                ExcitedState state;
+                state.state = data.excitedStates.size() + 1;
+                state.label = excitedMultiplicity + " " + stateMatch.captured(1);
+                state.energyEv = ev;
+                state.wavelengthNm = 1239.8419843320026 / ev;
+                state.frameIndex = pendingFrame;
+                data.excitedStates.push_back(state);
+                data.index.sectionOffsets[QStringLiteral("excited_states")].push_back(offset);
+                currentExcited = data.excitedStates.size() - 1;
+            }
+        }
+        const auto transitionMatch = transitionRe.match(line);
+        if (currentExcited >= 0 && transitionMatch.hasMatch()) {
+            double coefficient = kNaN;
+            if (number(transitionMatch.captured(3), coefficient))
+                data.excitedStates[currentExcited].transitions.push_back(
+                    {transitionMatch.captured(1), transitionMatch.captured(2), coefficient});
+        }
+        if (trimmed.contains("ABSORPTION SPECTRUM")) {
+            absorptionTable = trimmed.contains("TRANSITION ELECTRIC DIPOLE MOMENTS");
+            currentExcited = -1;
+            excitedMultiplicity.clear();
+        } else if (absorptionTable) {
+            const auto cols = parser::columns(trimmed);
+            bool ok = false;
+            const int row = cols.value(0).toInt(&ok) - 1;
+            double wave = kNaN, strength = kNaN;
+            if (ok && row >= 0 && row < data.excitedStates.size() && cols.size() >= 4 &&
+                number(cols[2], wave) && wave > 0) {
+                auto &state = data.excitedStates[row];
+                state.wavelengthNm = wave;
+                if (number(cols[3], strength)) state.oscillatorStrength = strength;
+                else if (trimmed.contains("spin forbidden")) state.oscillatorStrength = 0.0;
+            }
+        }
+
 
         if (trimmed.contains(QStringLiteral("CARTESIAN COORDINATES (ANGSTROEM)"),
                              Qt::CaseInsensitive) ||
@@ -196,6 +292,39 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
             continue;
         }
 
+        if (trimmed == QStringLiteral("NORMAL MODES")) {
+            inFrequencyTable = false;
+            readNormalModes(file, data.frequencies, atoms.size());
+            continue;
+        }
+        if (trimmed == QStringLiteral("IR SPECTRUM") || trimmed == QStringLiteral("RAMAN SPECTRUM")) {
+            inFrequencyTable = false;
+            vibrationalSpectrum = trimmed.startsWith("IR") ? 1 : 2;
+            spectrumHasRows = false;
+            intensityColumn = 2;
+            irUnit = QStringLiteral("ORCA reported units");
+            continue;
+        }
+        if (vibrationalSpectrum) {
+            if (trimmed.startsWith("Mode") && trimmed.contains("Int")) intensityColumn = 3;
+            if (trimmed.contains("T**2") && !trimmed.contains("Int")) irUnit = QStringLiteral("ORCA T²");
+            if (trimmed.contains("km/mol")) irUnit = QStringLiteral("km/mol");
+            const auto values = parser::columns(trimmed);
+            bool ok = false;
+            QString modeText = values.value(0);
+            if (modeText.endsWith(':')) modeText.chop(1);
+            const int modeIndex = modeText.toInt(&ok);
+            double frequency = kNaN, intensity = kNaN;
+            if (ok && values.size() > intensityColumn && number(values[1], frequency) && number(values[intensityColumn], intensity)) {
+                for (auto &mode : data.frequencies) if (mode.number == modeIndex + 1) {
+                    if (vibrationalSpectrum == 1) { mode.irIntensity = intensity; mode.irIntensityUnit = irUnit; }
+                    else mode.ramanActivity = intensity;
+                }
+                spectrumHasRows = true;
+                continue;
+            }
+            if (spectrumHasRows && !trimmed.isEmpty() && !isSeparator(trimmed)) vibrationalSpectrum = 0;
+        }
         if (trimmed == QStringLiteral("VIBRATIONAL FREQUENCIES")) {
             inFrequencyTable = true;
             data.index.sectionOffsets[QStringLiteral("frequencies")].push_back(offset);

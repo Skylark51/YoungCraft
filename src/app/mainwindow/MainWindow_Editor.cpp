@@ -48,6 +48,8 @@ DrawState MainWindow::drawState() const {
     s.autoHydrogen=m_autoHButton->isChecked();return s;
 }
 void MainWindow::ensureEditableDocument() {
+    // CIF coordinates stay attached to the original crystallographic document.
+    if (m_crystal && !m_crystal->sourceCif.isEmpty() && m_crystal->displayMode == 0) return;
     if(m_currentFile.isEmpty()&&m_data.frames.isEmpty())return;
     Molecule original=m_view->molecule();
     newDrawingDocument(original);

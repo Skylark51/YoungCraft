@@ -266,6 +266,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
 
         ExcitedState excitedState;
         if (parseExcitedState(line, excitedState)) {
+            excitedState.frameIndex = result.data.frames.size() - 1;
             result.data.index.sectionOffsets[QStringLiteral("excited_states")].push_back(offset);
             result.data.excitedStates.push_back(excitedState);
             currentExcitedState = result.data.excitedStates.size() - 1;

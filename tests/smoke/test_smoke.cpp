@@ -111,6 +111,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void discreteSpectrumSelection();
     void unlimitedSelectionAndHoverElements();
     void sidebarOptimizationFixedSelection();
     void bilingualCategorizedHelp();
@@ -387,6 +388,27 @@ void SmokeTest::selectAllAndFragmentRotation(){
     QVERIFY((view->molecule().atoms[2].position-before.atoms[2].position).length()>0.05f);
     QCOMPARE(view->selection().atoms,QSet<int>({1,2,3,4}));
 }
+void SmokeTest::discreteSpectrumSelection() {
+    PlotWidget plot;
+    plot.resize(600, 400);
+    plot.show();
+    plot.setSeries({{100, 0}, {200, 1}}, "nm", "intensity");
+    plot.setSelectablePoints({{150, 0.5}, {175, 0.75}});
+    QVERIFY(plot.setManualRange({100, 200, 0, 1}));
+    QSignalSpy selected(&plot, &PlotWidget::pointClicked);
+    const auto area = plot.plotArea();
+    const QPoint first(qRound(area.left() + area.width() * 0.5),
+                       qRound(area.bottom() - area.height() * 0.5));
+    QTest::mouseClick(&plot, Qt::LeftButton, Qt::NoModifier, first);
+    QCOMPARE(selected.size(), 1);
+    QCOMPARE(selected.takeFirst()[0].toInt(), 0);
+    plot.setSelectedPoint(1);
+    QCOMPARE(plot.selectedPoint(), 1);
+    QCOMPARE(plot.selectablePoints()[1], QPointF(175, 0.75));
+    plot.clear();
+    QVERIFY(plot.selectablePoints().isEmpty());
+}
+
 void SmokeTest::optimizationGraphWindow(){
     AnalysisPanel panel;panel.resize(400,700);panel.show();CalculationData data;
     data.molecule.atoms={{1,1,"H",{0,0,0}}};
@@ -396,6 +418,9 @@ void SmokeTest::optimizationGraphWindow(){
     QVERIFY(button);QVERIFY(dialog);QVERIFY(plot);QVERIFY(button->isEnabled());QVERIFY(!dialog->isVisible());QVERIFY(plot->parentWidget()==dialog);
     button->click();QVERIFY(dialog->isVisible());QSignalSpy selected(&panel,&AnalysisPanel::frameRequested);plot->pointClicked(1);QCOMPARE(panel.currentFrame(),1);QCOMPARE(selected.size(),1);
     dialog->close();QVERIFY(!dialog->isVisible());button->click();QVERIFY(dialog->isVisible());
+    data.frames[2].metrics.energyHartree = kNaN;
+    panel.setData(data);panel.setCurrentFrame(2);
+    QCOMPARE(plot->selectedPoint(), -1);
     panel.setData({});QVERIFY(!button->isEnabled());QVERIFY(!dialog->isVisible());
 }
 

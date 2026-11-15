@@ -1,0 +1,47 @@
+name: November analysis and crystallography regression
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows-regression:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch checksum-verified public corpus
+        run: python tools/fetch_november_corpus.py .build/november-corpus
+      - name: Configure and build Release
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
+          cmake --build build --parallel 4
+      - name: Run console and calculation regressions
+        shell: pwsh
+        run: |
+          $env:YOUNGCRAFT_NOVEMBER_CORPUS=(Resolve-Path '.build/november-corpus').Path
+          ctest --test-dir build -C Release --output-on-failure --timeout 180 -E 'gui_smoke|orbital_study'
+          if ($LASTEXITCODE -ne 0) { throw 'Console regression failed' }
+      # Run graphical checks on the remote runner, never on the user's desktop.
+      - name: Verify analysis interaction and existing rendering/editing
+        shell: pwsh
+        run: |
+          & ./build/test_smoke.exe discreteSpectrumSelection optimizationGraphWindow optimizationGraphSynchronizes scanArrowNavigation scanOptimizationPoints frequencyPagingAndDetails frequencySelectionStartsAnimationAndShowsCoordinates tddftPublicationSpectrum documentsAreIndependent projectLibraryOpensOnDemand geometryEditPreservesCalculation drawingModeCreatesAtomsAndBonds rendersShadowAndTransparentCapture -o gui-november-results.txt,txt
+          if ($LASTEXITCODE -ne 0) { throw 'Analysis/rendering regression failed' }
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: november-regression-evidence
+          path: |
+            gui-november-results.txt
+            build/Testing/Temporary/LastTest.log
+            .build/november-corpus/provenance.json

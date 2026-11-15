@@ -146,7 +146,7 @@ void AnalysisPanel::fillFrequencyList() {
         hasImaginary|=imaginary;
         auto *entry=new QListWidgetItem(QStringLiteral("%1: %2 cm⁻¹%3").arg(mode.number).arg(numberOrDash(mode.wavenumber,3)).arg(imaginary?QStringLiteral(" [허수]"):QString()),m_frequencyList);
         entry->setSizeHint(QSize(0,frequencyRowHeight));
-        const QStringList values={QString::number(mode.number),numberOrDash(mode.wavenumber),numberOrDash(mode.irIntensity),numberOrDash(mode.ramanActivity),imaginary?QStringLiteral("허수 진동"):QStringLiteral("정상 진동")};
+        const QStringList values={QString::number(mode.number),numberOrDash(mode.wavenumber),(numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit),numberOrDash(mode.ramanActivity),imaginary?QStringLiteral("허수 진동"):QStringLiteral("정상 진동")};
         for(int col=0;col<values.size();++col)m_frequencyDetailsTable->setItem(row,col,new QTableWidgetItem(values[col]));
         bars.push_back({double(mode.number),mode.wavenumber});
     }
@@ -166,7 +166,7 @@ void AnalysisPanel::setCurrentFrequency(int index) {
     m_frequencyList->setCurrentRow(index);m_frequencyDetailsTable->selectRow(index);
     const auto &mode=m_data.frequencies[index];
     m_frequencyInfo->setText(QStringLiteral("모드 %1 · 파수: %2 cm⁻¹ · IR 세기: %3 · Raman 활성도: %4 · %5")
-        .arg(mode.number).arg(numberOrDash(mode.wavenumber)).arg(numberOrDash(mode.irIntensity)).arg(numberOrDash(mode.ramanActivity))
+        .arg(mode.number).arg(numberOrDash(mode.wavenumber)).arg((numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit)).arg(numberOrDash(mode.ramanActivity))
         .arg(mode.imaginary||mode.wavenumber<0?QStringLiteral("허수 진동"):QStringLiteral("정상 진동")));
 }
 } // namespace youngcraft

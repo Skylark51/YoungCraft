@@ -1,5 +1,7 @@
 #include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
+#include <cmath>
+#include <algorithm>
 #include "app/DocumentTabs.h"
 
 #include "analysis/AnalysisEngine.h"
@@ -670,7 +672,24 @@ void MainWindow::connectDocumentUi() {
         m_workspace->setCurrentWidget(tddft ? m_tddftWorkspace : m_moleculeWorkspace);
     }));
     if(auto *states=m_analysis->findChild<QTableWidget*>("TddftStatesTable"))
-        m_documentConnections.push_back(connect(states,&QTableWidget::currentCellChanged,this,[this](int row,int,int,int){if(row>=0 && m_outputDock->isVisible())updateOutputSource("excited_states",row);}));
+        m_documentConnections.push_back(connect(states,&QTableWidget::currentCellChanged,this,[this](int row,int,int,int){
+            m_tddftWorkspacePlot->setSelectedPoint(row);
+            if (row < 0 || row >= m_data.excitedStates.size()) return;
+            const int frame = m_data.excitedStates[row].frameIndex;
+            if (frame >= 0 && frame < m_data.frames.size()) {
+                m_animation->stop();
+                m_currentFrame = frame;
+                m_view->setFrequencyMode(nullptr);
+                m_view->setCoordinates(m_data.frames[frame].coordinates);
+                m_analysis->setCurrentFrame(frame);
+                updateGeometryReadout();
+            }
+            if(m_outputDock->isVisible())updateOutputSource("excited_states",row);
+        }));
+    m_documentConnections.push_back(connect(m_tddftWorkspacePlot, &PlotWidget::pointClicked, this, [this](int row) {
+        if (auto *states = m_analysis->findChild<QTableWidget*>("TddftStatesTable"))
+            if (row >= 0 && row < states->rowCount()) states->setCurrentCell(row, 0);
+    }));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::tddftSpectrumChanged, this,
             [this](const QVector<QPointF> &spectrum, const QVector<QPointF> &sticks, const QString &summary) {
         const bool normalized=m_analysis->findChild<QCheckBox *>(QStringLiteral("TddftNormalize"))->isChecked();
@@ -678,6 +697,16 @@ void MainWindow::connectDocumentUi() {
             normalized ? QStringLiteral("Normalized absorption (a.u.)") : QStringLiteral("Calculated absorption (a.u.)"));
         m_tddftWorkspacePlot->setMarkers({});
         m_tddftWorkspacePlot->setStickSeries(sticks);
+        QVector<QPointF> transitions;
+        double maximum = 0;
+        for (const auto &state : m_data.excitedStates)
+            if (std::isfinite(state.oscillatorStrength)) maximum = std::max(maximum, state.oscillatorStrength);
+        for (const auto &state : m_data.excitedStates)
+            transitions.push_back({state.wavelengthNm,
+                normalized && maximum > 0 ? state.oscillatorStrength / maximum : state.oscillatorStrength});
+        m_tddftWorkspacePlot->setSelectablePoints(transitions);
+        if (auto *states = m_analysis->findChild<QTableWidget*>("TddftStatesTable"))
+            m_tddftWorkspacePlot->setSelectedPoint(states->currentRow());
         m_tddftWorkspacePlot->setEmptyMessage(
             summary == QStringLiteral("TD-DFT 데이터 없음")
                 ? summary

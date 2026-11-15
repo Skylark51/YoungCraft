@@ -67,6 +67,7 @@ AnalysisPanel::AnalysisPanel(QWidget *parent) : QWidget(parent) {
 void AnalysisPanel::setData(const CalculationData &data) {
     m_data = data;
     fillFrameList(); fillFrequencyList(); fillScanPlot(); fillIrcPlot(); fillTddft(); fillAtoms(); fillOrbitals();
+    if (!m_data.frames.isEmpty()) setCurrentFrame(m_data.frames.size() - 1);
     emit dataChanged();
 }
 

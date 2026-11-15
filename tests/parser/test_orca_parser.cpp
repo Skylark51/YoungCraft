@@ -12,6 +12,8 @@ class OrcaParserTest final : public QObject {
     Q_OBJECT
 private slots:
     void parsesCompleteOutput();
+    void readsNormalModeBlocks();
+    void readsExcitedStatesAndSpinForbiddenTransitions();
     void acceptsIncompleteOptimization();
     void keepsGaussianDispatch();
     void rejectsUnrecognizedOutput();
@@ -21,6 +23,97 @@ private slots:
     void preservesOrdinaryXyz();
     void rejectsMixedGsmAtoms();
 };
+
+void OrcaParserTest::readsExcitedStatesAndSpinForbiddenTransitions() {
+    QTemporaryDir dir;
+    QFile file(dir.filePath("td.out"));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(R"OUT(O   R   C   A
+CARTESIAN COORDINATES (ANGSTROEM)
+--------------------------------
+H 0 0 0
+H 0 0 0.74
+
+TD-DFT/TDA EXCITED STATES (SINGLETS)
+STATE  1:  E=   0.196686 au      5.352 eV    43167.6 cm**-1
+    33a ->  35a  :     0.563723 (c=  0.75081502)
+TD-DFT/TDA EXCITED STATES (TRIPLETS)
+STATE  1:  E=   0.115235 au      3.136 eV    25291.1 cm**-1
+    34a ->  35a  :     0.99 (c= -0.995)
+ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS
+State Energy Wavelength fosc
+1 43167.6 231.7 0.005629700
+2 25291.1 395.4 spin forbidden (mult=3)
+ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS
+1 43167.6 231.7 0.999
+ORCA TERMINATED NORMALLY
+)OUT");
+    file.close();
+    const auto result = OrcaParser::parse(file.fileName());
+    QVERIFY(result.success);
+    QCOMPARE(result.data.excitedStates.size(), 2);
+    const auto &singlet = result.data.excitedStates[0];
+    const auto &triplet = result.data.excitedStates[1];
+    QCOMPARE(singlet.energyEv, 5.352);
+    QCOMPARE(singlet.wavelengthNm, 231.7);
+    QCOMPARE(singlet.oscillatorStrength, 0.005629700);
+    QCOMPARE(singlet.transitions.size(), 1);
+    QCOMPARE(singlet.transitions[0].coefficient, 0.75081502);
+    QCOMPARE(singlet.label, QString("Singlet 1"));
+    QCOMPARE(singlet.frameIndex, 0);
+    QCOMPARE(triplet.label, QString("Triplet 1"));
+    QCOMPARE(triplet.oscillatorStrength, 0.0);
+    QCOMPARE(triplet.transitions[0].coefficient, -0.995);
+}
+
+void OrcaParserTest::readsNormalModeBlocks() {
+    QTemporaryDir dir;
+    QFile file(dir.filePath("modes.out"));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(R"OUT(O   R   C   A
+CARTESIAN COORDINATES (ANGSTROEM)
+------------------------------
+H 0 0 0
+
+VIBRATIONAL FREQUENCIES
+0: -10.0 cm**-1
+1: 20.0 cm**-1
+NORMAL MODES
+------------
+ 0 1
+0 0.1 0.4
+1 0.2 0.5
+2 0.3 0.6
+IR SPECTRUM
+Mode freq (cm**-1) T**2 TX TY TZ
+0: -10.0 2.5 (0 0 0)
+1: 20.0 3.5 (0 0 0)
+
+RAMAN SPECTRUM
+Mode freq (cm**-1) Activity Depolarization
+0: -10.0 4.5 0.5
+1: 20.0 5.5 0.5
+
+ORCA TERMINATED NORMALLY
+)OUT");
+    file.close();
+    const auto result = OrcaParser::parse(file.fileName());
+    QVERIFY(result.success);
+    QCOMPARE(result.data.frequencies.size(), 2);
+    QCOMPARE(result.data.frequencies[0].displacement, QVector<QVector3D>({{0.1f, 0.2f, 0.3f}}));
+    QCOMPARE(result.data.frequencies[1].displacement, QVector<QVector3D>({{0.4f, 0.5f, 0.6f}}));
+    QVERIFY(result.data.frequencies[0].imaginary);
+    QCOMPARE(result.data.frequencies[0].irIntensity, 2.5);
+    QCOMPARE(result.data.frequencies[1].ramanActivity, 5.5);
+    QCOMPARE(result.data.status, CalculationStatus::NormalTermination);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Append));
+    file.write("\nIR SPECTRUM\nMode freq eps Int T**2 TX TY TZ\n"
+               "cm**-1 L/(mol*cm) km/mol a.u.\n0: -10 0.1 42.5 0.3 (0 0 0)\n");
+    file.close();
+    const auto modern = OrcaParser::parse(file.fileName());
+    QCOMPARE(modern.data.frequencies[0].irIntensity, 42.5);
+    QCOMPARE(modern.data.frequencies[0].irIntensityUnit, QString("km/mol"));
+}
 
 void OrcaParserTest::parsesCompleteOutput() {
     QTemporaryDir dir;
