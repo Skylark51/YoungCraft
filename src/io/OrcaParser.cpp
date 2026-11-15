@@ -305,7 +305,10 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
 
         if (trimmed.contains("EXCITED STATES") && trimmed.startsWith("TD-DFT")) {
             const bool triplet = trimmed.contains("TRIPLETS");
-            if (!triplet) data.excitedStates.clear();
+            if (!triplet) {
+                data.excitedStates.clear();
+                data.index.sectionOffsets[QStringLiteral("excited_states")].clear();
+            }
             excitedMultiplicity = triplet ? QStringLiteral("Triplet") : QStringLiteral("Singlet");
             currentExcited = -1;
         }

@@ -65,6 +65,19 @@ ORCA TERMINATED NORMALLY
     QCOMPARE(triplet.label, QString("Triplet 1"));
     QCOMPARE(triplet.oscillatorStrength, 0.0);
     QCOMPARE(triplet.transitions[0].coefficient, -0.995);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Append));
+    file.write("\nTD-DFT/TDA EXCITED STATES (SINGLETS)\n"
+               "STATE 1: E= 0.25 au 6.5 eV 52426 cm**-1\n");
+    file.close();
+    const auto repeated = OrcaParser::parse(file.fileName());
+    QCOMPARE(repeated.data.excitedStates.size(), 1);
+    QCOMPARE(repeated.data.excitedStates[0].energyEv, 6.5);
+    const auto offsets = repeated.data.index.sectionOffsets.value("excited_states");
+    QCOMPARE(offsets.size(), 1);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QVERIFY(file.seek(offsets[0]));
+    QVERIFY(file.readLine().contains("6.5 eV"));
+    file.close();
 }
 
 void OrcaParserTest::readsNormalModeBlocks() {
