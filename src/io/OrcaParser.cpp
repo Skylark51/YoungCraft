@@ -303,7 +303,8 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
             data.scanPoints[currentScan].inProgress = false;
         if (trimmed == "RELAXED SURFACE SCAN RESULTS") data.scanHasSummary = true;
 
-        if (trimmed.contains("EXCITED STATES") && trimmed.startsWith("TD-DFT")) {
+        if (trimmed.contains("EXCITED STATES") &&
+            (trimmed.startsWith("TD-DFT") || trimmed.startsWith("CIS-EXCITED STATES"))) {
             const bool triplet = trimmed.contains("TRIPLETS");
             if (!triplet) {
                 data.excitedStates.clear();
@@ -341,13 +342,20 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         } else if (absorptionTable) {
             const auto cols = parser::columns(trimmed);
             bool ok = false;
-            const int row = cols.value(0).toInt(&ok) - 1;
+            const bool modern = cols.value(1) == QStringLiteral("->");
+            const int row = (modern ? cols.value(2).section('-', 0, 0) : cols.value(0)).toInt(&ok) - 1;
+            const int wavelengthColumn = modern ? 5 : 2;
+            const int strengthColumn = modern ? 6 : 3;
             double wave = kNaN, strength = kNaN;
-            if (ok && row >= 0 && row < data.excitedStates.size() && cols.size() >= 4 &&
-                number(cols[2], wave) && wave > 0) {
+            if (ok && row >= 0 && row < data.excitedStates.size() && cols.size() > strengthColumn &&
+                number(cols[wavelengthColumn], wave) && wave > 0) {
                 auto &state = data.excitedStates[row];
                 state.wavelengthNm = wave;
-                if (number(cols[3], strength)) state.oscillatorStrength = strength;
+                if (modern) {
+                    double energyEv = kNaN;
+                    if (number(cols[3], energyEv) && energyEv > 0) state.energyEv = energyEv;
+                }
+                if (number(cols[strengthColumn], strength)) state.oscillatorStrength = strength;
                 else if (trimmed.contains("spin forbidden")) state.oscillatorStrength = 0.0;
             }
         }

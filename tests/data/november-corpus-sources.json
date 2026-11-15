@@ -158,5 +158,15 @@
     "path": "ORCA/ORCA4.2/dvb_scan.out",
     "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.2/dvb_scan.out",
     "sha256": "6a40af7bf073e3f3c9ccc3f6c3f8304a4c221b34d3623d1f74b95c31ecfc9d9c"
+  },
+  {
+    "path": "ORCA/ORCA5.0/Benzene_opt_etsyms.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA5.0/Benzene_opt_etsyms.log",
+    "sha256": "0cc81388f21704531ea5ecb4606ee831866946ee1c1b7e56708a9a5f6538d383"
+  },
+  {
+    "path": "ORCA/ORCA6.1/1509.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA6.1/1509.out",
+    "sha256": "12873a94bf34d6fbd7eb975876f0d95ba9a396ba26cadf355d05e2ee627198d8"
   }
 ]

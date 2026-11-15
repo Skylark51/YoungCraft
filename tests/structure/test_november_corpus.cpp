@@ -97,6 +97,18 @@ void NovemberCorpusTest::publicCorpus() {
             QCOMPARE(output.crystal->packing.atoms.size(), output.crystal->unitCell.atoms.size() * 8);
         } else {
             ++calculations;
+            if (path.contains("ORCA6.1/1509.out")) {
+                QCOMPARE(data.excitedStates.size(), 50);
+                QCOMPARE(data.excitedStates[0].energyEv, 3.412305);
+                QCOMPARE(data.excitedStates[0].wavelengthNm, 363.3);
+                QCOMPARE(data.excitedStates[0].oscillatorStrength, 0.0);
+                QVERIFY(!data.excitedStates[0].transitions.isEmpty());
+            }
+            if (path.contains("Benzene_opt_etsyms.log")) {
+                QCOMPARE(data.excitedStates.size(), 10);
+                QCOMPARE(data.index.sectionOffsets.value("excited_states").size(), 10);
+                QCOMPARE(data.excitedStates[2].oscillatorStrength, 1.087369886);
+            }
             if (path.contains("ansaBPFP2_acetylene_ircf_LQA.out")) {
                 QCOMPARE(data.ircPoints.size(), 103);
                 QCOMPARE(data.ircPoints[1].coordinate, 0.23513);
@@ -160,7 +172,7 @@ void NovemberCorpusTest::publicCorpus() {
                 << "IRC" << data.ircPoints.size() << "TD" << data.excitedStates.size();
         }
     }
-    QCOMPARE(calculations, 22);
+    QCOMPARE(calculations, 24);
     QCOMPARE(crystals, 10);
 }
 
