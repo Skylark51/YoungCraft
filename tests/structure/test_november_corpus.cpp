@@ -1,4 +1,7 @@
 #include "io/FileDispatcher.h"
+#include <gemmi/cif.hpp>
+#include <functional>
+#include <QFile>
 #include <QCoreApplication>
 #include <QDirIterator>
 #include <QFileInfo>
@@ -7,6 +10,40 @@
 #include <cmath>
 
 using namespace youngcraft;
+
+static QMap<QString, QStringList> preservedCifValues(const QString &path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    const auto bytes = file.readAll();
+    auto document = gemmi::cif::read_memory(bytes.constData(), size_t(bytes.size()), "preservation check");
+    QMap<QString, QStringList> values;
+    const auto isCoordinate = [](const std::string &tag) {
+        const auto normalized = QString::fromStdString(tag).toLower().replace('.', '_');
+        return QStringList{"_atom_site_fract_x", "_atom_site_fract_y", "_atom_site_fract_z",
+                           "_atom_site_cartn_x", "_atom_site_cartn_y", "_atom_site_cartn_z"}.contains(normalized);
+    };
+    std::function<void(const gemmi::cif::Block&, const QString&)> visit;
+    visit = [&](const auto &block, const QString &prefix) {
+        values[prefix + "/block"] = {QString::fromStdString(block.name)};
+        for (const auto &item : block.items) {
+            if (item.type == gemmi::cif::ItemType::Pair && !isCoordinate(item.pair[0]))
+                values[prefix + "/pair/" + QString::fromStdString(item.pair[0]).toLower()] =
+                    {QString::fromStdString(gemmi::cif::as_string(item.pair[1]))};
+            if (item.type == gemmi::cif::ItemType::Loop) {
+                for (size_t col = 0; col < item.loop.tags.size(); ++col) {
+                    QStringList column;
+                    for (size_t row = isCoordinate(item.loop.tags[col]) ? 1 : 0; row < item.loop.length(); ++row)
+                        column.push_back(QString::fromStdString(gemmi::cif::as_string(item.loop.values[row * item.loop.width() + col])));
+                    values[prefix + "/loop/" + QString::fromStdString(item.loop.tags[col]).toLower()] = column;
+                }
+            }
+            if (item.type == gemmi::cif::ItemType::Frame)
+                visit(item.frame, prefix + "/save/" + QString::fromStdString(item.frame.name));
+        }
+    };
+    for (size_t i = 0; i < document.blocks.size(); ++i) visit(document.blocks[i], QString::number(i));
+    return values;
+}
 
 class NovemberCorpusTest final : public QObject {
     Q_OBJECT
@@ -35,6 +72,9 @@ void NovemberCorpusTest::publicCorpus() {
             QString error;
             const QString saved = temporary.filePath(QFileInfo(path).fileName());
             QVERIFY2(StructureReader::saveCif(saved, *input.crystal, edited, &error), qPrintable(error));
+            const auto preserved = preservedCifValues(path);
+            QVERIFY(!preserved.isEmpty());
+            QCOMPARE(preservedCifValues(saved), preserved);
             const auto output = FileDispatcher::load(saved);
             QVERIFY2(output.parseResult.success, qPrintable(output.parseResult.error));
             QVERIFY(output.crystal);

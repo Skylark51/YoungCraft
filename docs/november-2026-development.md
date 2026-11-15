@@ -86,3 +86,9 @@ Added a GUI workflow regression for opening CIF, coordinate edit without detachi
 Remote run 43767759353 passed all ten console/calculation suites, including real xTB. Discrete spectrum selection and optimization graph opening passed. The existing optimizationGraphSynchronizes assertion expected the previous incorrect highlighting of another frame for a final frame without energy; corrected it. GUI tests now run in separate processes with individual logs.
 
 ORCA IRC summary parsing attaches the documented full XYZ trajectory only after checking frame count, atom count, element order and finite coordinates. Missing or mismatched sidecars produce warnings and unlinked summary points. The x axis is explicitly a path step, not a mass-weighted reaction coordinate. Synthetic console regression: 14 passes, no failures. Actual-file corpus remains 22 outputs plus 10 CIFs. Initial portable packaging succeeded but must be rebuilt with this IRC change before installation.
+
+## Full CIF metadata comparison and portable preparation
+
+The public corpus now compares parsed values of every CIF data block, save frame, pair and loop column before/after coordinate editing, excluding only the changed atom coordinate tokens. This includes explicit symmetry-operation strings, occupancies, disorder, unknown tags and uncertainty tokens of unchanged coordinates. All 32 files passed the strengthened console corpus test (3 QtTest passes, zero failures). Latest local console CTest: 4/4 passed.
+
+Final-source portable packaging via tools/package_portable.ps1 -ReuseMmRuntime succeeded. Built and packaged Youngcraft.exe SHA256: CDC67CEEDC83613A1D6468337366D67A2AA1FB3F3069B5864C55F34E7ED758BC. The ZIP is 107066193 bytes. Installation and merge remain pending latest remote GUI evidence; no local GUI was launched. README now describes CIF editing/saving, periodic contacts, ORCA analysis support and trajectory requirements.
