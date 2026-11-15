@@ -420,6 +420,18 @@ void MainWindow::onFileLoaded(const youngcraft::LoadedFile &loaded) {
 
 void MainWindow::showCrystalMode(int mode) {
     if (!m_crystal || mode < 0 || mode > 2) return;
+    if (!m_crystal->sourceCif.isEmpty() && m_crystal->displayMode == 0) {
+        QString error;
+        auto rebuilt = StructureReader::rebuildCif(*m_crystal, m_view->molecule(), &error);
+        if (!rebuilt) {
+            const QSignalBlocker blocker(m_crystalMode);
+            m_crystalMode->setCurrentIndex(0);
+            setStatus(QStringLiteral("결정 표시 변경 실패: %1").arg(error));
+            return;
+        }
+        m_crystal = rebuilt;
+    }
+    m_crystal->displayMode = mode;
     stopMMOptimization();
     m_animation->stop();
     m_data.molecule = mode == 0 ? m_crystal->asymmetricUnit

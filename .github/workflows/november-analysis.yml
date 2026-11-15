@@ -1,0 +1,125 @@
+name: November analysis and crystallography regression
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: november-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-regression:
+    runs-on: windows-2022
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache/restore@v4
+        id: corpus_cache
+        with:
+          path: .build/november-corpus
+          key: november-corpus-${{ hashFiles('tests/data/november-corpus-sources.json') }}
+      - name: Fetch checksum-verified public corpus
+        run: python tools/fetch_november_corpus.py .build/november-corpus
+      - uses: actions/cache/save@v4
+        if: steps.corpus_cache.outputs.cache-hit != 'true'
+        with:
+          path: .build/november-corpus
+          key: november-corpus-${{ hashFiles('tests/data/november-corpus-sources.json') }}
+      - name: Prepare verified xTB runtime
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'xtb-win.zip'
+          $extract = Join-Path $env:RUNNER_TEMP 'xtb-win'
+          Invoke-WebRequest -Uri 'https://github.com/grimme-lab/xtb/releases/download/v6.7.1/xtb-6.7.1pre-windows-x86_64.zip' -OutFile $zip
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '043e578da4a7e114a4d584972959a875e3ffb9f2767a86723b95aa6719d28d9c') { throw 'xTB checksum mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+          foreach ($name in @('xtb.exe', 'libiomp5md.dll')) {
+            $binary = Get-ChildItem -LiteralPath $extract -Recurse -File -Filter $name | Select-Object -First 1
+            if (-not $binary) { throw "Missing runtime binary: $name" }
+            Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path 'xtb_runtime' $name) -Force
+          }
+      - uses: actions/cache/restore@v4
+        id: xtb_backend_cache
+        with:
+          path: xtb_runtime/gfnff
+          key: win2022-ucrt64-xtb68fe777a-mctc061-v1
+      - uses: msys2/setup-msys2@v2
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-openblas mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja unzip curl
+      - name: Build explicit-topology xTB backend from pinned sources
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p .build/xtb-backend
+          cd .build/xtb-backend
+          curl -fL https://codeload.github.com/grimme-lab/xtb/zip/68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -o xtb.zip
+          curl -fL https://codeload.github.com/grimme-lab/mctc-lib/zip/refs/tags/v0.6.1 -o mctc.zip
+          echo 'ed92501f770a02bea4d00782f61d0bdcb61981353ee9093578d49a0b0a942bcd  xtb.zip' | sha256sum -c -
+          echo '549477402f38de3a2ffc3d16558b12e177920d7e0c3e3af5067c83cfc2968ba7  mctc.zip' | sha256sum -c -
+          unzip -q xtb.zip
+          unzip -q mctc.zip
+          cmake -S xtb-68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWITH_TBLITE=OFF -DWITH_CPCMX=OFF -DWITH_TESTS=OFF -DFETCHCONTENT_SOURCE_DIR_MCTC-LIB="$PWD/mctc-lib-0.6.1" -DBLAS_LIBRARIES=/ucrt64/lib/libopenblas.dll.a -DLAPACK_LIBRARIES=/ucrt64/lib/libopenblas.dll.a
+          cmake --build build --parallel 4
+          target="$GITHUB_WORKSPACE/xtb_runtime/gfnff"
+          cp build/xtb.exe "$target/xtb.exe"
+          for dll in libgcc_s_seh-1.dll libgfortran-5.dll libgomp-1.dll libopenblas.dll libquadmath-0.dll libwinpthread-1.dll libstdc++-6.dll; do cp "/ucrt64/bin/$dll" "$target/"; done
+      - uses: actions/cache/save@v4
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
+        with:
+          path: xtb_runtime/gfnff
+          key: win2022-ucrt64-xtb68fe777a-mctc061-v1
+      - name: Configure and build Release
+        id: build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
+          cmake --build build --parallel 4
+      - name: Run console and calculation regressions
+        shell: pwsh
+        run: |
+          $env:YOUNGCRAFT_NOVEMBER_CORPUS=(Resolve-Path '.build/november-corpus').Path
+          ctest --test-dir build -C Release --output-on-failure --timeout 180 -E 'gui_smoke|orbital_study'
+          if ($LASTEXITCODE -ne 0) { throw 'Console regression failed' }
+      # Run graphical checks on the remote runner, never on the user's desktop.
+      - name: Verify analysis interaction and existing rendering/editing
+        if: always() && steps.build.outcome == 'success'
+        shell: pwsh
+        run: |
+          $softwareArchive = Join-Path $env:RUNNER_TEMP 'qt-opengl-software.7z'
+          $softwareDirectory = Join-Path $env:RUNNER_TEMP 'qt-opengl-software'
+          Invoke-WebRequest -Uri 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.6/mesa3d-26.2.6-release-mingw.7z' -OutFile $softwareArchive
+          if ((Get-FileHash -LiteralPath $softwareArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388') { throw 'Qt software OpenGL checksum mismatch' }
+          & 7z x $softwareArchive "-o$softwareDirectory" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Qt software OpenGL extraction failed' }
+          $softwareDll = Get-ChildItem -LiteralPath $softwareDirectory -Recurse -File -Filter opengl32.dll | Where-Object { $_.FullName -match '[\\/]x64[\\/]' } | Select-Object -First 1
+          if (-not $softwareDll) { throw 'Qt software OpenGL library missing' }
+          $env:PATH = $softwareDll.DirectoryName + ';' + $env:PATH
+          $env:GALLIUM_DRIVER = 'llvmpipe'
+          $env:QT_OPENGL = 'software'
+          $env:QT_OPENGL_DLL = $softwareDll.FullName
+          $env:QT_LOGGING_RULES = 'qt.qpa.gl=true'
+          $tests = @('linkedIrcAndTddftGeometrySelection', 'cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture')
+          python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 @tests
+          if ($LASTEXITCODE -ne 0) { throw 'GUI regressions failed; see per-case logs and summary' }
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: november-regression-evidence
+          path: |
+            gui-november-*.txt
+            gui-november-summary.json
+            build/Testing/Temporary/LastTest.log
+            .build/november-corpus/provenance.json

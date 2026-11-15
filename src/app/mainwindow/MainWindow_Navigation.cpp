@@ -159,8 +159,13 @@ void MainWindow::showIrcPoint(int index) {
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     if(m_outputDock->isVisible())updateOutputSource("irc",index);
     const int frame = m_data.ircPoints[index].frameIndex;
-    if (frame >= 0 && frame < m_data.frames.size()) showFrame(frame);
-    setStatus(QStringLiteral("IRC 점 %1 표시").arg(index + 1));
+    if (frame >= 0 && frame < m_data.frames.size()) {
+        showFrame(frame);
+        setStatus(QStringLiteral("IRC 점 %1 | E = %2 Hartree").arg(index + 1).arg(m_data.ircPoints[index].energyHartree, 0, 'f', 9));
+    } else {
+        setStatus(QStringLiteral("IRC 점 %1 | 대응 구조 없음: 전체 trajectory 파일을 확인하세요.").arg(index + 1), 0);
+    }
+    m_analysis->setCurrentIrcPoint(index);
 }
 
 void MainWindow::setCarbonHydrogensVisible(bool visible) {

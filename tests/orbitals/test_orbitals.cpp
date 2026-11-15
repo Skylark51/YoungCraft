@@ -188,7 +188,9 @@ private slots:
         GaussianRemoteSettings::initializeDefaults(path);
         QVERIFY(QSettings().value("orbitals/remoteEnabled").toBool());QVERIFY(QSettings().value("orbitals/autoGenerateHomo").toBool());
         QCOMPARE(GaussianRemoteSettings::load().host,QString("user@host"));QCOMPARE(GaussianRemoteSettings::load().port,10022);
-        QVERIFY(GaussianRemoteSettings::load().configFile.isEmpty());
+        const auto existingConfig = QDir::homePath() + "/.ssh/lion.conf";
+        QCOMPARE(GaussianRemoteSettings::load().configFile,
+                 QFileInfo::exists(existingConfig) ? existingConfig : QString());
         QVERIFY(GaussianRemoteSettings::load().passwordAuthentication);
         QSettings().setValue("orbitals/remotePort",20022);GaussianRemoteSettings::initializeDefaults(path);
         QCOMPARE(GaussianRemoteSettings::load().port,20022);

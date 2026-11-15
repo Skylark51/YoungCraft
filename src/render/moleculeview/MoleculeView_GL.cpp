@@ -68,7 +68,11 @@ QVector<MoleculeView::Vertex> makeCylinder(int slices) {
 } // namespace
 
 void MoleculeView::initializeGL() {
-    initializeOpenGLFunctions();
+    if (!initializeOpenGLFunctions()) {
+        m_glReady = false;
+        qWarning("Youngcraft requires an OpenGL 3.3 Core context");
+        return;
+    }
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -103,9 +107,10 @@ void MoleculeView::initializeGL() {
 }
 
 void MoleculeView::resizeGL(int width, int height) {
+    if (m_previewOverlay) m_previewOverlay->setGeometry(rect());
+    if (!m_glReady) return;
     const qreal dpr = devicePixelRatioF();
     glViewport(0, 0, qRound(width * dpr), qRound(height * dpr));
-    if (m_previewOverlay) m_previewOverlay->setGeometry(rect());
 }
 
 bool MoleculeView::createPrograms() {

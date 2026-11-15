@@ -1,4 +1,6 @@
 #include "app/MainWindow.h"
+#include "io/StructureReader.h"
+#include <QComboBox>
 
 #include "analysis/AnalysisEngine.h"
 #include "animation/AnimationController.h"
@@ -122,6 +124,29 @@ void MainWindow::saveStructure() {
     auto *picture=new QPushButton(QStringLiteral("그림 저장"),&choice);picture->setObjectName("SavePictureChoice");
     auto *xyz=new QPushButton(QStringLiteral("XYZ 좌표 저장"),&choice);xyz->setObjectName("SaveXYZChoice");
     layout->addWidget(picture);layout->addWidget(xyz);
+    if (m_crystal && !m_crystal->sourceCif.isEmpty()) {
+        auto *cif = new QPushButton(QStringLiteral("CIF 결정구조 저장"), &choice);
+        cif->setObjectName("SaveCIFChoice");
+        layout->addWidget(cif);
+        connect(cif, &QPushButton::clicked, &choice, [this, &choice] {
+            if (m_crystalMode->currentIndex() != 0) {
+                QMessageBox::warning(this, QStringLiteral("CIF 저장"),
+                    QStringLiteral("비대칭 단위 표시에서 좌표를 편집하고 저장하세요."));
+                return;
+            }
+            const auto path = QFileDialog::getSaveFileName(this, QStringLiteral("CIF 저장"),
+                QStringLiteral("structure.cif"), QStringLiteral("CIF (*.cif)"));
+            if (path.isEmpty()) return;
+            QString error;
+            if (!StructureReader::saveCif(path, *m_crystal, m_view->molecule(), &error)) {
+                QMessageBox::warning(this, QStringLiteral("CIF 저장 실패"), error);
+                return;
+            }
+            setStatus(QStringLiteral("CIF 저장 완료. 원문의 변위·거리·각도 등 파생 데이터는 재계산하지 않았습니다: %1").arg(path));
+            choice.reject();
+        });
+    }
+
     auto *cancel=new QDialogButtonBox(QDialogButtonBox::Cancel,&choice);cancel->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));layout->addWidget(cancel);
     bool coordinates=false;
     connect(picture,&QPushButton::clicked,&choice,&QDialog::accept);

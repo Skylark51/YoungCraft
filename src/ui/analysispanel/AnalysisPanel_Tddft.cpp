@@ -91,8 +91,8 @@ QWidget *AnalysisPanel::makeTddftTab() {
         if (row < 0 || row >= m_data.excitedStates.size()) return;
         const ExcitedState &state = m_data.excitedStates[row];
         emit tddftStateInfoChanged(
-            QStringLiteral("선택 상태 S%1  ·  %2 eV  ·  %3 nm  ·  f = %4")
-                .arg(state.state)
+            QStringLiteral("선택 상태 %1  ·  %2 eV  ·  %3 nm  ·  f = %4")
+                .arg(state.label.isEmpty() ? QString::number(state.state) : state.label)
                 .arg(numberOrDash(state.energyEv, 4))
                 .arg(numberOrDash(state.wavelengthNm, 2))
                 .arg(numberOrDash(state.oscillatorStrength, 5)));
@@ -101,6 +101,8 @@ QWidget *AnalysisPanel::makeTddftTab() {
 }
 
 void AnalysisPanel::fillTddft() {
+    const int selectedRow = m_tddftTable->currentRow();
+    const QSignalBlocker blocker(m_tddftTable);
     m_tddftTable->setRowCount(0);
     QVector<QPointF> bars;
     for (const ExcitedState &state : m_data.excitedStates) {
@@ -111,7 +113,7 @@ void AnalysisPanel::fillTddft() {
             if (!transitions.isEmpty()) transitions += QStringLiteral(", ");
             transitions += QStringLiteral("%1→%2 (%3)").arg(transition.from, transition.to).arg(numberOrDash(transition.coefficient, 3));
         }
-        m_tddftTable->setItem(row, 0, item(QString::number(state.state)));
+        m_tddftTable->setItem(row, 0, item(state.label.isEmpty() ? QString::number(state.state) : state.label));
         m_tddftTable->setItem(row, 1, item(numberOrDash(state.energyEv, 4)));
         m_tddftTable->setItem(row, 2, item(numberOrDash(state.wavelengthNm, 2)));
         m_tddftTable->setItem(row, 3, item(numberOrDash(state.oscillatorStrength, 5)));
@@ -156,6 +158,8 @@ void AnalysisPanel::fillTddft() {
                       .arg(strongest, 0, 'f', 5).arg(shape)
                       .arg(shapeValue >= 0 ? QStringLiteral(" ·  폭 %1 nm").arg(m_broadening->value(), 0, 'f', 1) : QString());
     }
+    if (selectedRow >= 0 && selectedRow < m_tddftTable->rowCount())
+        m_tddftTable->setCurrentCell(selectedRow, 0);
     emit tddftSpectrumChanged(spectrum, bars, summary);
 }
 

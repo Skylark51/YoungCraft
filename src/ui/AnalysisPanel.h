@@ -32,6 +32,7 @@ public:
     void setOrbitalView(MoleculeView *view);
     void setCurrentFrame(int index);
     void setCurrentScanPoint(int index);
+    void setCurrentIrcPoint(int index);
     void setCurrentFrequency(int index);
     int currentFrame() const { return m_frameList ? m_frameList->currentRow() : -1; }
     int currentFrequency() const { return m_frequencyList ? m_frequencyList->currentRow() : -1; }

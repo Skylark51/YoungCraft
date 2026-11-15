@@ -122,12 +122,26 @@ void AnalysisPanel::fillFrameList() {
 
 void AnalysisPanel::setCurrentFrame(int index) {
     if(m_scanResults)m_scanResults->setSelectedFrame(index);
+    if (m_ircList && m_ircPlot) {
+        int irc = -1;
+        for (int i = 0; i < m_data.ircPoints.size(); ++i)
+            if (m_data.ircPoints[i].frameIndex == index) { irc = i; break; }
+        const QSignalBlocker blocker(m_ircList);
+        m_ircList->setCurrentRow(irc);
+        m_ircPlot->setSelectedPoint(irc);
+    }
+    int scan = -1;
+    for (int i = 0; i < m_data.scanPoints.size(); ++i)
+        if (m_data.scanPoints[i].frameIndex == index ||
+            m_data.scanPoints[i].optimizationFrames.contains(index)) { scan = i; break; }
+    if (scan >= 0) setCurrentScanPoint(scan);
+
     if (!m_frameList || index < 0 || index >= m_frameList->count()) return;
     const QSignalBlocker listBlocker(m_frameList), sliderBlocker(m_frameSlider);
     m_frameList->setCurrentRow(index);
     m_frameSlider->setValue(index);
     int point = m_energyFrames.indexOf(index);
-    if (point < 0 && index == m_data.finalFrameIndex() && !m_energyFrames.isEmpty()) point = m_energyFrames.size() - 1;
+
     m_framePlot->setSelectedPoint(point);
     m_framePlot->setToolTip(point >= 0 ? QStringLiteral("프레임 %1 | E = %2 Hartree")
         .arg(m_energyFrames[point] + 1).arg(m_data.frames[m_energyFrames[point]].metrics.energyHartree, 0, 'f', 9) : QString());

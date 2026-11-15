@@ -75,6 +75,7 @@ struct FrequencyMode {
     double ramanActivity = kNaN;
     bool imaginary = false;
     QVector<QVector3D> displacement;
+    QString irIntensityUnit = QStringLiteral("km/mol");
 };
 
 struct ScanPoint {
@@ -109,6 +110,8 @@ struct ExcitedState {
     double wavelengthNm = kNaN;
     double oscillatorStrength = kNaN;
     QVector<OrbitalTransition> transitions;
+    QString label; // e.g. ORCA Singlet 1 / Triplet 1; state is the spectrum row number.
+    int frameIndex = -1;
 };
 
 struct OrbitalInfo {

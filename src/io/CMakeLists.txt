@@ -7,6 +7,7 @@ add_library(youngcraft_parsers STATIC
     CubeParser.cpp
     FchkParser.cpp
     StructureReader.cpp
+    CrystalContacts.cpp
     ${PROJECT_SOURCE_DIR}/third_party/gemmi/symmetry.cpp
 )
 youngcraft_enable_warnings(youngcraft_parsers)

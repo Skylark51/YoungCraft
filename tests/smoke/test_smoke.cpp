@@ -78,6 +78,7 @@
 #include <QWheelEvent>
 #include <QStackedWidget>
 #include <QSurfaceFormat>
+#include <QStatusBar>
 #include <QImageReader>
 #include <QPainter>
 
@@ -111,6 +112,9 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void discreteSpectrumSelection();
+    void linkedIrcAndTddftGeometrySelection();
+    void cifCoordinateEditAndSaveWorkflow();
     void unlimitedSelectionAndHoverElements();
     void sidebarOptimizationFixedSelection();
     void bilingualCategorizedHelp();
@@ -387,6 +391,123 @@ void SmokeTest::selectAllAndFragmentRotation(){
     QVERIFY((view->molecule().atoms[2].position-before.atoms[2].position).length()>0.05f);
     QCOMPARE(view->selection().atoms,QSet<int>({1,2,3,4}));
 }
+void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
+    MainWindow window;
+    window.openFile(QStringLiteral("tests/data/structure/p1.cif"));
+    QTRY_VERIFY_WITH_TIMEOUT(window.m_crystal, 10000);
+    const int tabs = window.m_documentTabs->count();
+    auto original = window.m_view->molecule();
+    auto edited = original;
+    edited.atoms[0].position += QVector3D(0.2f, -0.1f, 0.3f);
+    window.ensureEditableDocument();
+    QCOMPARE(window.m_documentTabs->count(), tabs);
+    window.syncEditedGeometry(edited, {});
+    window.m_crystalMode->setCurrentIndex(1);
+    QCOMPARE(window.m_crystal->displayMode, 1);
+    window.m_crystalMode->setCurrentIndex(0);
+    QVERIFY((window.m_view->molecule().atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    window.undoDrawingEdit();
+    QVERIFY((window.m_view->molecule().atoms[0].position - original.atoms[0].position).length() < 1e-5f);
+    window.redoDrawingEdit();
+    QVERIFY((window.m_view->molecule().atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    QTemporaryDir directory;
+    const auto path = directory.filePath("edited.cif");
+    const bool native = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+    QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+    auto restore = qScopeGuard([&] { QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, native); });
+    bool choseCif = false, choseFile = false, timedOut = false;
+    int ticks = 0;
+    QTimer driver;
+    driver.setInterval(10);
+    connect(&driver, &QTimer::timeout, &window, [&] {
+        auto *dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (++ticks > 500) { timedOut = true; if (dialog) dialog->reject(); return; }
+        if (!dialog) return;
+        if (auto *file = qobject_cast<QFileDialog*>(dialog)) {
+            choseFile = true; file->selectFile(path); QMetaObject::invokeMethod(file, "accept");
+        } else if (dialog->objectName() == "SaveStructureChoice" && !choseCif) {
+            choseCif = true;
+            // Return from this timer callback before entering the nested file dialog.
+            if (auto *button = dialog->findChild<QPushButton*>("SaveCIFChoice"))
+                QTimer::singleShot(0, button, &QPushButton::click);
+            else dialog->reject();
+        }
+    });
+    driver.start();
+    window.saveStructure();
+    driver.stop();
+    QVERIFY(!timedOut); QVERIFY(choseCif); QVERIFY(choseFile);
+    const auto saved = FileDispatcher::load(path);
+    QVERIFY2(saved.parseResult.success, qPrintable(saved.parseResult.error));
+    QVERIFY(saved.crystal);
+    QVERIFY((saved.crystal->asymmetricUnit.atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    QCOMPARE(saved.crystal->a, 10.0);
+}
+
+void SmokeTest::linkedIrcAndTddftGeometrySelection() {
+    MainWindow window;
+    Molecule molecule; molecule.atoms = {{1, 1, "H", {0, 0, 0}}};
+    window.newDrawingDocument(molecule);
+    window.setDrawingMode(false);
+    Frame first, second;
+    first.coordinates = {{1, 0, 0}}; first.metrics.energyHartree = -1.0;
+    second.coordinates = {{2, 0, 0}}; second.metrics.energyHartree = -1.1;
+    window.m_data.frames = {first, second};
+    window.m_data.ircPoints = {{1, -1, -1, 62.75, 0, "reverse"}, {2, 1, -1.1, 0, 1, "forward"}, {3, 2, -1.2, 0, -1, "forward"}};
+    ExcitedState a, b;
+    a.state = 1; a.wavelengthNm = 250; a.oscillatorStrength = 0.1; a.frameIndex = 0;
+    b.state = 2; b.wavelengthNm = 300; b.oscillatorStrength = 0.2; b.frameIndex = 1;
+    window.m_data.excitedStates = {a, b};
+    window.m_analysis->setData(window.m_data);
+    auto *irc = window.m_analysis->findChild<PlotWidget*>("IrcEnergyPlot");
+    auto *list = window.m_analysis->findChild<QListWidget*>("IrcPointList");
+    auto *states = window.m_analysis->findChild<QTableWidget*>("TddftStatesTable");
+    QVERIFY(irc); QVERIFY(list); QVERIFY(states);
+    irc->pointClicked(0);
+    QCOMPARE(window.m_currentFrame, 0);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, first.coordinates[0]);
+    QCOMPARE(list->currentRow(), 0);
+    QCOMPARE(irc->selectedPoint(), 0);
+    window.showFrame(1);
+    QCOMPARE(list->currentRow(), 1);
+    QCOMPARE(irc->selectedPoint(), 1);
+    window.m_tddftWorkspacePlot->pointClicked(0);
+    QCOMPARE(states->currentRow(), 0);
+    QCOMPARE(window.m_currentFrame, 0);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, first.coordinates[0]);
+    states->setCurrentCell(1, 0);
+    QCOMPARE(window.m_tddftWorkspacePlot->selectedPoint(), 1);
+    QCOMPARE(window.m_currentFrame, 1);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, second.coordinates[0]);
+    irc->pointClicked(2);
+    QCOMPARE(list->currentRow(), 2);
+    QCOMPARE(irc->selectedPoint(), 2);
+    QCOMPARE(window.m_currentFrame, 1);
+    QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("대응 구조 없음")));
+
+}
+
+void SmokeTest::discreteSpectrumSelection() {
+    PlotWidget plot;
+    plot.resize(600, 400);
+    plot.show();
+    plot.setSeries({{100, 0}, {200, 1}}, "nm", "intensity");
+    plot.setSelectablePoints({{150, 0.5}, {175, 0.75}});
+    QVERIFY(plot.setManualRange({100, 200, 0, 1}));
+    QSignalSpy selected(&plot, &PlotWidget::pointClicked);
+    const auto area = plot.plotArea();
+    const QPoint first(qRound(area.left() + area.width() * 0.5),
+                       qRound(area.bottom() - area.height() * 0.5));
+    QTest::mouseClick(&plot, Qt::LeftButton, Qt::NoModifier, first);
+    QCOMPARE(selected.size(), 1);
+    QCOMPARE(selected.takeFirst()[0].toInt(), 0);
+    plot.setSelectedPoint(1);
+    QCOMPARE(plot.selectedPoint(), 1);
+    QCOMPARE(plot.selectablePoints()[1], QPointF(175, 0.75));
+    plot.clear();
+    QVERIFY(plot.selectablePoints().isEmpty());
+}
+
 void SmokeTest::optimizationGraphWindow(){
     AnalysisPanel panel;panel.resize(400,700);panel.show();CalculationData data;
     data.molecule.atoms={{1,1,"H",{0,0,0}}};
@@ -396,6 +517,9 @@ void SmokeTest::optimizationGraphWindow(){
     QVERIFY(button);QVERIFY(dialog);QVERIFY(plot);QVERIFY(button->isEnabled());QVERIFY(!dialog->isVisible());QVERIFY(plot->parentWidget()==dialog);
     button->click();QVERIFY(dialog->isVisible());QSignalSpy selected(&panel,&AnalysisPanel::frameRequested);plot->pointClicked(1);QCOMPARE(panel.currentFrame(),1);QCOMPARE(selected.size(),1);
     dialog->close();QVERIFY(!dialog->isVisible());button->click();QVERIFY(dialog->isVisible());
+    data.frames[2].metrics.energyHartree = kNaN;
+    panel.setData(data);panel.setCurrentFrame(2);
+    QCOMPARE(plot->selectedPoint(), -1);
     panel.setData({});QVERIFY(!button->isEnabled());QVERIFY(!dialog->isVisible());
 }
 
@@ -3174,7 +3298,7 @@ void SmokeTest::optimizationGraphSynchronizes() {
     QCOMPARE(plot->series().size(), 2);
     QCOMPARE(plot->series()[0].y(), 2.0 * 627.509474);
     QCOMPARE(plot->series()[1].x(), 3.0);
-    QCOMPARE(plot->selectedPoint(), 1);
+    QCOMPARE(plot->selectedPoint(), -1); // Final frame has no energy; highlight no other frame.
     QSignalSpy requested(&panel, &AnalysisPanel::frameRequested);
     panel.setCurrentFrame(0);
     QCOMPARE(requested.count(), 0); // Playback/display updates must not request another frame.
@@ -3452,7 +3576,7 @@ void SmokeTest::frequencyPagingAndDetails(){
     if(!capture.isEmpty())QVERIFY(window.grab().save(capture+"/frequency-page.png"));
     details->click();auto *dialog=panel->findChild<QDialog*>("FrequencyDetailsDialog");QVERIFY(dialog->isVisible());
     auto *table=dialog->findChild<QTableWidget*>("FrequencyDetailsTable");QCOMPARE(table->rowCount(),12);QCOMPARE(table->columnCount(),5);
-    QCOMPARE(table->item(10,2)->text(),QString("10.2500"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
+    QCOMPARE(table->item(10,2)->text(),QString("10.2500 km/mol"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
     if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+"/frequency-details.png"));
     dialog->hide();window.m_analysis->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());
     for(int tab:{6,7}){
@@ -4780,6 +4904,15 @@ void SmokeTest::periodicTableGrouping() {
 }
 
 int main(int argc, char **argv) {
+    // Match the application's context contract before Qt creates shared contexts.
+    QSurfaceFormat format;
+    format.setRenderableType(QSurfaceFormat::OpenGL);
+    format.setVersion(3, 3);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    format.setSamples(4);
+    format.setAlphaBufferSize(8);
+    format.setSwapInterval(0);
+    QSurfaceFormat::setDefaultFormat(format);
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QApplication application(argc, argv);
     SmokeTest test;

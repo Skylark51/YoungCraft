@@ -39,6 +39,7 @@ void PlotWidget::setSeries(const QVector<QPointF> &series, const QString &xLabel
     m_heatmapXValues.clear();
     m_heatmapYValues.clear();
     m_series = series;
+    m_selectablePoints.reset();
     m_markers.clear();
     m_sticks.clear();
     m_options.xTitle = xLabel;
@@ -190,6 +191,7 @@ void PlotWidget::clear() {
     m_selectedPoint = -1;
     m_approximateTsPoint = -1;
     m_series.clear();
+    m_selectablePoints.reset();
     m_markers.clear();
     m_sticks.clear();
     m_heatmapPoints.clear();
@@ -199,13 +201,20 @@ void PlotWidget::clear() {
     update();
 }
 
+void PlotWidget::setSelectablePoints(const QVector<QPointF> &points) {
+    m_selectablePoints = points;
+    setSelectedPoint(-1);
+}
+
 void PlotWidget::setSelectedPoint(int index) {
     if (m_heatmap) {
         const auto found = std::find_if(m_heatmapPoints.cbegin(), m_heatmapPoints.cend(),
                                         [index](const HeatmapPoint &point) { return point.sourceIndex == index; });
         m_selectedPoint = found == m_heatmapPoints.cend() ? -1 : index;
     } else {
-        m_selectedPoint = index >= 0 && index < m_series.size() ? index : -1;
+        const auto &points = selectablePoints();
+        m_selectedPoint = index >= 0 && index < points.size() &&
+            std::isfinite(points[index].x()) && std::isfinite(points[index].y()) ? index : -1;
     }
     update();
 }
@@ -265,13 +274,14 @@ void PlotWidget::paintPlot(QPainter &painter) {
 
 int PlotWidget::nearestPoint(const QPoint &position) const {
     if (m_heatmap) return heatmapIndexAt(position);
-    if (m_series.isEmpty()) return -1;
+    const auto &points = selectablePoints();
+    if (points.isEmpty()) return -1;
     const QRectF r = plotRect();
     if (m_styled && !r.contains(position)) return -1;
     int index = -1;
     double distance = 14.0;
-    for (int i = 0; i < m_series.size(); ++i) {
-        const QPointF screen = toScreen(m_series[i], r);
+    for (int i = 0; i < points.size(); ++i) {
+        const QPointF screen = toScreen(points[i], r);
         if (m_styled && (!std::isfinite(screen.x()) || !std::isfinite(screen.y()) || !r.contains(screen))) continue;
         const double d = QLineF(position, screen).length();
         if (d < distance) { distance = d; index = i; }
@@ -364,6 +374,7 @@ void PlotWidget::setHeatmapSeries(const QVector<HeatmapPoint> &points, const QSt
     m_heatmap = true;
     m_heatmapPoints.clear();
     m_series.clear();
+    m_selectablePoints.reset();
     for (const auto &point : points) {
         if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) continue;
         m_heatmapPoints.push_back(point);
@@ -729,10 +740,11 @@ void PlotWidget::paintStyledPlot(QPainter &painter) {
         painter.setBrush(m_highlight && p.y() >= m_highlightCutoff ? QColor(190,38,45) : s.pointColor);
         painter.drawEllipse(toScreen(p,r),s.pointSize/2,s.pointSize/2);
     }
-    if (!m_publicationPaint && m_selectedPoint >= 0 && m_selectedPoint < m_series.size() && valid(m_series[m_selectedPoint])) {
+    const auto &selection = selectablePoints();
+    if (!m_publicationPaint && m_selectedPoint >= 0 && m_selectedPoint < selection.size() && valid(selection[m_selectedPoint])) {
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(QColor(50,55,60),1.0,Qt::DashLine));
-        painter.drawEllipse(toScreen(m_series[m_selectedPoint],r),s.pointSize/2+4,s.pointSize/2+4);
+        painter.drawEllipse(toScreen(selection[m_selectedPoint],r),s.pointSize/2+4,s.pointSize/2+4);
     }
     painter.restore();
     paintMechanism(painter, r);

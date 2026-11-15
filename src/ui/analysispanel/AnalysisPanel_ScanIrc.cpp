@@ -76,8 +76,10 @@ QWidget *AnalysisPanel::makeIrcTab() {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     m_ircList = new QListWidget;
+    m_ircList->setObjectName(QStringLiteral("IrcPointList"));
     layout->addWidget(m_ircList, 1);
     m_ircPlot = new PlotWidget;
+    m_ircPlot->setObjectName(QStringLiteral("IrcEnergyPlot"));
     layout->addWidget(m_ircPlot, 3);
     m_ircList->installEventFilter(this);
     m_ircPlot->installEventFilter(this);
@@ -121,15 +123,25 @@ void AnalysisPanel::setCurrentScanPoint(int index) {
     if (m_scanResults) m_scanResults->setSelectedPoint(index);
 }
 
+void AnalysisPanel::setCurrentIrcPoint(int index) {
+    if (!m_ircList || !m_ircPlot) return;
+    if (index < -1 || index >= m_data.ircPoints.size()) return;
+    const QSignalBlocker blocker(m_ircList);
+    m_ircList->setCurrentRow(index);
+    m_ircPlot->setSelectedPoint(index);
+}
+
 void AnalysisPanel::fillIrcPlot() {
     m_ircList->clear();
     QVector<QPointF> series;
     for (const IRCPoint &point : m_data.ircPoints) {
         m_ircList->addItem(QStringLiteral("점 %1  |  %2  |  ΔE %3 kcal/mol")
                                .arg(point.index).arg(point.direction).arg(numberOrDash(point.relativeKcal, 3)));
+        if (point.frameIndex < 0 || point.frameIndex >= m_data.frames.size())
+            m_ircList->item(m_ircList->count() - 1)->setText(m_ircList->item(m_ircList->count() - 1)->text() + QStringLiteral(" | 대응 구조 없음"));
         series.push_back({point.coordinate, point.relativeKcal});
     }
-    m_ircPlot->setSeries(series, QStringLiteral("Reaction coordinate"), QStringLiteral("ΔE (kcal mol⁻¹)"));
+    m_ircPlot->setSeries(series, m_data.format == QStringLiteral("ORCA") ? QStringLiteral("IRC path step (relative to TS)") : QStringLiteral("Reaction coordinate"), QStringLiteral("ΔE (kcal mol⁻¹)"));
     m_ircPlot->setMarkers(series);
 }
 

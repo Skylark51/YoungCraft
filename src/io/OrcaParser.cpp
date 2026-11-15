@@ -1,4 +1,6 @@
 #include "io/OrcaParser.h"
+#include "io/XYZParser.h"
+#include <QDir>
 
 #include "io/ParserCommon.h"
 
@@ -91,6 +93,92 @@ void readMulliken(QFile &file, QVector<Atom> &atoms) {
     }
 }
 
+void readNormalModes(QFile &file, QVector<FrequencyMode> &modes, int atomCount) {
+    const QRegularExpression header(QStringLiteral(R"(^\s*\d+(?:\s+\d+)*\s*$)"));
+    QVector<int> columns;
+    QVector<QVector<QVector3D>> vectors;
+    int nextRow = 0, preamble = 0;
+    bool started = false;
+    while (!file.atEnd()) {
+        const auto offset = file.pos();
+        const auto line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || isSeparator(line)) continue;
+        const auto values = parser::columns(line);
+        if (header.match(line).hasMatch()) {
+            columns.clear(); vectors.clear(); nextRow = 0; started = true;
+            for (const auto &value : values) {
+                columns.push_back(value.toInt());
+                vectors.push_back(QVector<QVector3D>(atomCount));
+            }
+            continue;
+        }
+        if (!started && ++preamble < 20) continue;
+        bool ok = false;
+        const int row = values.value(0).toInt(&ok);
+        if (!ok || row != nextRow || row >= 3 * atomCount || values.size() != columns.size() + 1) {
+            file.seek(offset); break;
+        }
+        for (int i = 0; i < columns.size(); ++i) {
+            double value = kNaN;
+            if (!number(values[i + 1], value)) { file.seek(offset); return; }
+            vectors[i][row / 3][row % 3] = float(value);
+        }
+        if (++nextRow == 3 * atomCount) {
+            for (int i = 0; i < columns.size(); ++i)
+                for (auto &mode : modes)
+                    if (mode.number == columns[i] + 1) mode.displacement = vectors[i];
+        }
+    }
+}
+
+void attachIrcTrajectory(CalculationData &data, const QVector<FrameMetrics> &summary,
+                         int transitionState, const QString &trajectoryPath) {
+    if (summary.isEmpty()) return;
+    QVector<Frame> trajectory;
+    QFile trajectoryFile(trajectoryPath);
+    QString warning;
+    if (!trajectoryFile.open(QIODevice::ReadOnly)) warning = QStringLiteral("ORCA IRC 구조에는 전체 trajectory 파일이 필요합니다: ") + trajectoryPath;
+    else {
+        while (!trajectoryFile.atEnd()) {
+            const auto countLine = trajectoryFile.readLine();
+            if (countLine.trimmed().isEmpty()) continue;
+            bool ok = false; const int count = countLine.trimmed().toInt(&ok);
+            if (!ok || count <= 0 || count > 1000000) { warning = QStringLiteral("IRC trajectory 원자 수가 유효하지 않습니다."); break; }
+            QByteArray block = countLine + trajectoryFile.readLine();
+            for (int atom = 0; atom < count && !trajectoryFile.atEnd(); ++atom) block += trajectoryFile.readLine();
+            const auto parsed = XYZParser::parseText(QString::fromUtf8(block));
+            if (!parsed.success || parsed.data.molecule.atoms.size() != data.molecule.atoms.size()) {
+                warning = QStringLiteral("IRC trajectory 좌표/원자 수가 출력 구조와 일치하지 않습니다."); break;
+            }
+            for (int atom = 0; atom < count; ++atom)
+                if (parsed.data.molecule.atoms[atom].atomicNumber != data.molecule.atoms[atom].atomicNumber) {
+                    warning = QStringLiteral("IRC trajectory 원소 순서가 출력 구조와 일치하지 않습니다."); break;
+                }
+            if (!warning.isEmpty()) break;
+            Frame frame;
+            for (const auto &atom : parsed.data.molecule.atoms) frame.coordinates.push_back(atom.position);
+            trajectory.push_back(frame);
+        }
+        if (warning.isEmpty() && trajectory.size() != summary.size()) warning = QStringLiteral("IRC 요약과 전체 trajectory의 프레임 수가 다릅니다.");
+    }
+    if (!warning.isEmpty()) { trajectory.clear(); data.warningMessage += "\n" + warning; }
+    double minimum = std::numeric_limits<double>::infinity();
+    for (const auto &metrics : summary) minimum = std::min(minimum, metrics.energyHartree);
+    for (int row = 0; row < summary.size(); ++row) {
+        int frame = -1;
+        const double coordinate = transitionState >= 0 ? row - transitionState : row;
+        if (!trajectory.isEmpty()) {
+            frame = data.frames.size();
+            trajectory[row].metrics = summary[row];
+            trajectory[row].metrics.ircCoordinate = coordinate;
+            data.frames.push_back(trajectory[row]);
+        }
+        data.ircPoints.push_back({summary[row].step, coordinate, summary[row].energyHartree,
+            (summary[row].energyHartree - minimum) * 627.509474, frame,
+            transitionState < 0 ? QStringLiteral("path") : row < transitionState ? QStringLiteral("reverse") : row == transitionState ? QStringLiteral("TS") : QStringLiteral("forward")});
+    }
+}
+
 Frame frameFrom(const QVector<Atom> &atoms) {
     Frame frame;
     for (const Atom &atom : atoms) frame.coordinates.push_back(atom.position);
@@ -130,7 +218,26 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     int pendingFrame = -1;
     bool hasContent = false;
     bool inFrequencyTable = false;
+    int vibrationalSpectrum = 0; // 1: IR, 2: Raman
+    bool spectrumHasRows = false;
+    QString irUnit;
+    int intensityColumn = 2;
     int step = 0;
+    bool inIrcSummary = false;
+    QVector<FrameMetrics> ircSummary;
+    int ircTransitionState = -1;
+    QString ircTrajectory = QFileInfo(filePath).completeBaseName() + QStringLiteral("_IRC_Full_trj.xyz");
+    int currentScan = -1;
+    const QRegularExpression scanStepRe(QStringLiteral(R"(RELAXED SURFACE SCAN STEP\s+(\d+))"));
+    const QRegularExpression scanAxisRe(QStringLiteral(R"((Bond|Distance|Angle|Dihedral)\s*\(\s*([0-9, ]+)\)\s*:\s*([+\-0-9.EeDd]+))"));
+    QString excitedMultiplicity;
+    int currentExcited = -1;
+    bool absorptionTable = false;
+    const QRegularExpression stateRe(QStringLiteral(
+        R"(^STATE\s+(\d+):\s+E=\s*([+\-0-9.EeDd]+)\s+au\s+([+\-0-9.EeDd]+)\s+eV)"));
+    const QRegularExpression transitionRe(QStringLiteral(
+        R"(^\s*(\d+[ab]?)\s*->\s*(\d+[ab]?)\s*:\s*[+\-0-9.EeDd]+\s*\(c=\s*([+\-0-9.EeDd]+)\))"));
+
     const QRegularExpression freqRe(QStringLiteral(
         R"(^\s*(\d+)\s*:\s*([+-]?\d+(?:\.\d+)?(?:[EeDd][+-]?\d+)?)\s*cm\*\*-1)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -140,6 +247,8 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression energyRe(QStringLiteral(
         R"(FINAL SINGLE POINT ENERGY\s+([+-]?[0-9.EeDd]+))"));
+    const QRegularExpression convergenceRe(QStringLiteral(
+        R"(^\s*(RMS|MAX)\s+(gradient|step)\s+([+\-0-9.EeDd]+)\s+[+\-0-9.EeDd]+\s+(?:YES|NO)\s*$)"));
     const QRegularExpression scfRe(QStringLiteral(
         R"(^\s*Total Energy\s*:\s*([+-]?[0-9.EeDd]+)\s*Eh)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -149,6 +258,108 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         const QString line = QString::fromUtf8(file.readLine());
         const QString trimmed = line.trimmed();
         if (!trimmed.isEmpty()) hasContent = true;
+        if (trimmed.contains("Storing full IRC trajectory in")) {
+            const auto values = parser::columns(trimmed);
+            if (!values.isEmpty()) ircTrajectory = QFileInfo(values.last()).fileName();
+        }
+        if (trimmed == "IRC PATH SUMMARY") { inIrcSummary = true; ircSummary.clear(); }
+        else if (inIrcSummary) {
+            const auto values = parser::columns(trimmed);
+            bool ok = false; const int stepNumber = values.value(0).toInt(&ok);
+            double energy = kNaN, maxGradient = kNaN, rmsGradient = kNaN;
+            if (ok && values.size() >= 5 && number(values[1], energy) && number(values[3], maxGradient) && number(values[4], rmsGradient)) {
+                FrameMetrics metrics; metrics.step = stepNumber; metrics.energyHartree = energy;
+                metrics.maxForce = maxGradient; metrics.rmsForce = rmsGradient;
+                if (trimmed.contains("TS")) ircTransitionState = ircSummary.size();
+                ircSummary.push_back(metrics);
+            } else if (!ircSummary.isEmpty() && !trimmed.isEmpty() && !isSeparator(trimmed)) inIrcSummary = false;
+        }
+
+        const auto scanStep = scanStepRe.match(line);
+        if (scanStep.hasMatch()) {
+            data.scanDetected = true;
+            ScanPoint point; point.index = scanStep.captured(1).toInt(); point.inProgress = true;
+            data.scanPoints.push_back(point);
+            currentScan = data.scanPoints.size() - 1;
+        }
+        const auto scanAxis = scanAxisRe.match(line);
+        if (currentScan >= 0 && scanAxis.hasMatch()) {
+            double coordinate = kNaN;
+            if (number(scanAxis.captured(3), coordinate)) {
+                auto &point = data.scanPoints[currentScan];
+                const auto type = scanAxis.captured(1);
+                if (!std::isfinite(point.coordinate)) {
+                    point.coordinate = coordinate;
+                    data.scanCoordinateType = type;
+                    data.scanAxisLabel = type + (type == "Bond" || type == "Distance" ? " (Å)" : " (°)");
+                    data.scanAtoms.clear();
+                    for (const auto &atom : scanAxis.captured(2).split(',', Qt::SkipEmptyParts)) data.scanAtoms.push_back(atom.trimmed().toInt());
+                } else {
+                    point.coordinate2 = coordinate; data.scanDimensions = 2; data.scanAxisLabel2 = type;
+                }
+            }
+        }
+        if (currentScan >= 0 && trimmed.contains("THE OPTIMIZATION HAS CONVERGED"))
+            data.scanPoints[currentScan].inProgress = false;
+        if (trimmed == "RELAXED SURFACE SCAN RESULTS") data.scanHasSummary = true;
+
+        if (trimmed.contains("EXCITED STATES") &&
+            (trimmed.startsWith("TD-DFT") || trimmed.startsWith("CIS-EXCITED STATES"))) {
+            const bool triplet = trimmed.contains("TRIPLETS");
+            if (!triplet) {
+                data.excitedStates.clear();
+                data.index.sectionOffsets[QStringLiteral("excited_states")].clear();
+            }
+            excitedMultiplicity = triplet ? QStringLiteral("Triplet") : QStringLiteral("Singlet");
+            currentExcited = -1;
+        }
+        const auto stateMatch = stateRe.match(trimmed);
+        if (!excitedMultiplicity.isEmpty() && stateMatch.hasMatch()) {
+            double ev = kNaN;
+            if (number(stateMatch.captured(3), ev) && ev > 0) {
+                ExcitedState state;
+                state.state = data.excitedStates.size() + 1;
+                state.label = excitedMultiplicity + " " + stateMatch.captured(1);
+                state.energyEv = ev;
+                state.wavelengthNm = 1239.8419843320026 / ev;
+                state.frameIndex = pendingFrame;
+                data.excitedStates.push_back(state);
+                data.index.sectionOffsets[QStringLiteral("excited_states")].push_back(offset);
+                currentExcited = data.excitedStates.size() - 1;
+            }
+        }
+        const auto transitionMatch = transitionRe.match(line);
+        if (currentExcited >= 0 && transitionMatch.hasMatch()) {
+            double coefficient = kNaN;
+            if (number(transitionMatch.captured(3), coefficient))
+                data.excitedStates[currentExcited].transitions.push_back(
+                    {transitionMatch.captured(1), transitionMatch.captured(2), coefficient});
+        }
+        if (trimmed.contains("ABSORPTION SPECTRUM")) {
+            absorptionTable = trimmed.contains("TRANSITION ELECTRIC DIPOLE MOMENTS");
+            currentExcited = -1;
+            excitedMultiplicity.clear();
+        } else if (absorptionTable) {
+            const auto cols = parser::columns(trimmed);
+            bool ok = false;
+            const bool modern = cols.value(1) == QStringLiteral("->");
+            const int row = (modern ? cols.value(2).section('-', 0, 0) : cols.value(0)).toInt(&ok) - 1;
+            const int wavelengthColumn = modern ? 5 : 2;
+            const int strengthColumn = modern ? 6 : 3;
+            double wave = kNaN, strength = kNaN;
+            if (ok && row >= 0 && row < data.excitedStates.size() && cols.size() > strengthColumn &&
+                number(cols[wavelengthColumn], wave) && wave > 0) {
+                auto &state = data.excitedStates[row];
+                state.wavelengthNm = wave;
+                if (modern) {
+                    double energyEv = kNaN;
+                    if (number(cols[3], energyEv) && energyEv > 0) state.energyEv = energyEv;
+                }
+                if (number(cols[strengthColumn], strength)) state.oscillatorStrength = strength;
+                else if (trimmed.contains("spin forbidden")) state.oscillatorStrength = 0.0;
+            }
+        }
+
 
         if (trimmed.contains(QStringLiteral("CARTESIAN COORDINATES (ANGSTROEM)"),
                              Qt::CaseInsensitive) ||
@@ -164,6 +375,7 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                     data.frames.push_back(std::move(frame));
                     data.index.sectionOffsets[QStringLiteral("frame_geometry")].push_back(offset);
                     pendingFrame = data.frames.size() - 1;
+                    if (currentScan >= 0) data.scanPoints[currentScan].optimizationFrames.push_back(pendingFrame);
                 }
             }
             continue;
@@ -181,6 +393,25 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                 data.scfEnergies.push_back(energy);
             if (pendingFrame >= 0) {
                 data.frames[pendingFrame].metrics.energyHartree = energy;
+                if (currentScan >= 0 && energyMatch.hasMatch()) {
+                    auto &point = data.scanPoints[currentScan];
+                    point.energyHartree = energy; point.frameIndex = pendingFrame;
+                    data.frames[pendingFrame].metrics.scanCoordinate = point.coordinate;
+                }
+            }
+        }
+
+        const auto convergence = convergenceRe.match(line);
+        double convergenceValue = kNaN;
+        if (pendingFrame >= 0 && convergence.hasMatch() && number(convergence.captured(3), convergenceValue)) {
+            auto &metrics = data.frames[pendingFrame].metrics;
+            const bool rms = convergence.captured(1) == QStringLiteral("RMS");
+            if (convergence.captured(2) == QStringLiteral("gradient")) {
+                if (rms) metrics.rmsForce = convergenceValue;
+                else metrics.maxForce = convergenceValue;
+            } else {
+                if (rms) metrics.rmsDisplacement = convergenceValue;
+                else metrics.maxDisplacement = convergenceValue;
             }
         }
 
@@ -196,6 +427,39 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
             continue;
         }
 
+        if (trimmed == QStringLiteral("NORMAL MODES")) {
+            inFrequencyTable = false;
+            readNormalModes(file, data.frequencies, atoms.size());
+            continue;
+        }
+        if (trimmed == QStringLiteral("IR SPECTRUM") || trimmed == QStringLiteral("RAMAN SPECTRUM")) {
+            inFrequencyTable = false;
+            vibrationalSpectrum = trimmed.startsWith("IR") ? 1 : 2;
+            spectrumHasRows = false;
+            intensityColumn = 2;
+            irUnit = QStringLiteral("ORCA reported units");
+            continue;
+        }
+        if (vibrationalSpectrum) {
+            if (trimmed.startsWith("Mode") && trimmed.contains("Int")) intensityColumn = 3;
+            if (trimmed.contains("T**2") && !trimmed.contains("Int")) irUnit = QStringLiteral("ORCA T²");
+            if (trimmed.contains("km/mol")) irUnit = QStringLiteral("km/mol");
+            const auto values = parser::columns(trimmed);
+            bool ok = false;
+            QString modeText = values.value(0);
+            if (modeText.endsWith(':')) modeText.chop(1);
+            const int modeIndex = modeText.toInt(&ok);
+            double frequency = kNaN, intensity = kNaN;
+            if (ok && values.size() > intensityColumn && number(values[1], frequency) && number(values[intensityColumn], intensity)) {
+                for (auto &mode : data.frequencies) if (mode.number == modeIndex + 1) {
+                    if (vibrationalSpectrum == 1) { mode.irIntensity = intensity; mode.irIntensityUnit = irUnit; }
+                    else mode.ramanActivity = intensity;
+                }
+                spectrumHasRows = true;
+                continue;
+            }
+            if (spectrumHasRows && !trimmed.isEmpty() && !isSeparator(trimmed)) vibrationalSpectrum = 0;
+        }
         if (trimmed == QStringLiteral("VIBRATIONAL FREQUENCIES")) {
             inFrequencyTable = true;
             data.index.sectionOffsets[QStringLiteral("frequencies")].push_back(offset);
@@ -254,6 +518,12 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     if (std::isfinite(latestEnergy) && !data.frames.isEmpty() &&
         !std::isfinite(data.frames.last().metrics.energyHartree))
         data.frames.last().metrics.energyHartree = latestEnergy;
+    double scanMinimum = std::numeric_limits<double>::infinity();
+    for (const auto &point : data.scanPoints)
+        if (std::isfinite(point.energyHartree)) scanMinimum = std::min(scanMinimum, point.energyHartree);
+    for (auto &point : data.scanPoints)
+        if (std::isfinite(point.energyHartree)) point.relativeKcal = (point.energyHartree - scanMinimum) * 627.509474;
+    attachIrcTrajectory(data, ircSummary, ircTransitionState, QFileInfo(filePath).dir().filePath(ircTrajectory));
     result.success = !data.molecule.atoms.isEmpty();
     if (!result.success)
         result.error = QStringLiteral("ORCA Cartesian 좌표를 찾지 못했습니다.");

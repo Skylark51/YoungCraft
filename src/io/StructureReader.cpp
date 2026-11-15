@@ -1,6 +1,10 @@
 #include "io/StructureReader.h"
 
 #include <gemmi/cif.hpp>
+#include <gemmi/to_cif.hpp>
+#include <sstream>
+#include <QSaveFile>
+#include <QTemporaryDir>
 #include <gemmi/numb.hpp>
 #include <gemmi/symmetry.hpp>
 #include <gemmi/unitcell.hpp>
@@ -191,6 +195,13 @@ void perceiveCrystalBonds(Molecule &molecule, const gemmi::UnitCell &cell) {
         }
 }
 
+double requiredCifCoordinate(const QString &text) {
+    const double value = cifNumber(text, std::numeric_limits<double>::quiet_NaN());
+    if (!std::isfinite(value))
+        throw std::runtime_error("CIF atom coordinate is missing or invalid");
+    return value;
+}
+
 StructureLoad readCif(const QByteArray &bytes) {
     StructureLoad load;
     auto document = gemmi::cif::read_memory(bytes.constData(), size_t(bytes.size()), "Youngcraft CIF");
@@ -204,10 +215,11 @@ StructureLoad readCif(const QByteArray &bytes) {
         const auto cy = column(block, {"_atom_site_Cartn_y", "_atom_site.Cartn_y"});
         const auto cz = column(block, {"_atom_site_Cartn_z", "_atom_site.Cartn_z"});
         if ((!fx || !fy || !fz) && (!cx || !cy || !cz)) continue;
+        const bool fractionalCoordinates = fx && fy && fz;
         const auto occ = column(block, {"_atom_site_occupancy", "_atom_site.occupancy"});
         const auto disorder = column(block, {"_atom_site_disorder_group", "_atom_site.disorder_group",
                                               "_atom_site.label_alt_id"});
-        const int rows = fx ? fx.length() : cx.length();
+        const int rows = fractionalCoordinates ? fx.length() : cx.length();
         const double a = cifNumber(cellValue(block, {"_cell_length_a", "_cell.length_a"}));
         const double b = cifNumber(cellValue(block, {"_cell_length_b", "_cell.length_b"}));
         const double c = cifNumber(cellValue(block, {"_cell_length_c", "_cell.length_c"}));
@@ -217,7 +229,7 @@ StructureLoad readCif(const QByteArray &bytes) {
                      cifNumber(cellValue(block, {"_cell_angle_alpha", "_cell.angle_alpha"}), 90),
                      cifNumber(cellValue(block, {"_cell_angle_beta", "_cell.angle_beta"}), 90),
                      cifNumber(cellValue(block, {"_cell_angle_gamma", "_cell.angle_gamma"}), 90));
-        if (fx && !cell.is_crystal()) throw std::runtime_error("fractional CIF coordinates require a valid unit cell");
+        if (fractionalCoordinates && !cell.is_crystal()) throw std::runtime_error("fractional CIF coordinates require a valid unit cell");
         const QString sgName = cellValue(block, {"_space_group_name_H-M_alt", "_symmetry_space_group_name_H-M",
                                                  "_space_group.name_H-M_alt", "_symmetry.space_group_name_H-M"});
         const int sgNumber = int(cifNumber(cellValue(block, {"_space_group_IT_number", "_symmetry_Int_Tables_number",
@@ -232,13 +244,13 @@ StructureLoad readCif(const QByteArray &bytes) {
             if (z <= 0) throw std::runtime_error("CIF atom has an unknown element");
             gemmi::Fractional f;
             QVector3D position;
-            if (fx) {
-                f = {cifNumber(columnText(fx, row)), cifNumber(columnText(fy, row)),
-                     cifNumber(columnText(fz, row))};
+            if (fractionalCoordinates) {
+                f = {requiredCifCoordinate(columnText(fx, row)), requiredCifCoordinate(columnText(fy, row)),
+                     requiredCifCoordinate(columnText(fz, row))};
                 position = vector3(cell.orthogonalize(f));
             } else {
-                position = {float(cifNumber(columnText(cx, row))), float(cifNumber(columnText(cy, row))),
-                            float(cifNumber(columnText(cz, row)))};
+                position = {float(requiredCifCoordinate(columnText(cx, row))), float(requiredCifCoordinate(columnText(cy, row))),
+                            float(requiredCifCoordinate(columnText(cz, row)))};
                 if (cell.is_crystal()) f = cell.fractionalize(gemmiPosition(position));
             }
             Atom atom = atomAt(z, label, position);
@@ -260,6 +272,8 @@ StructureLoad readCif(const QByteArray &bytes) {
             }
         }
         if (!load.crystal) { load.result.data.molecule = asym; return load; }
+        load.crystal->sourceCif = bytes;
+        load.crystal->sourceBlock = int(&block - document.blocks.data());
         load.crystal->asymmetricUnit = asym;
         std::vector<gemmi::Op> operations;
         const auto symops = column(block, {"_space_group_symop_operation_xyz", "_symmetry_equiv_pos_as_xyz",
@@ -272,6 +286,8 @@ StructureLoad readCif(const QByteArray &bytes) {
             if (!sgName.isEmpty()) group = gemmi::find_spacegroup_by_name(sgName.toStdString());
             if (!group && sgNumber > 0) group = gemmi::find_spacegroup_by_number(sgNumber);
             if (group) operations = group->operations().all_ops_sorted();
+            else if (!sgName.isEmpty() || sgNumber != 0)
+                throw std::runtime_error("CIF space group is not recognized and no explicit symmetry operations are available");
         }
         if (operations.empty()) operations.push_back(gemmi::Op::identity());
         else if (std::none_of(operations.begin(), operations.end(),
@@ -483,6 +499,97 @@ StructureLoad readCssr(const QStringList &lines) {
 }
 
 } // namespace
+
+std::shared_ptr<CrystalData> StructureReader::rebuildCif(const CrystalData &crystal,
+        const Molecule &asymmetricUnit, QString *error) {
+    QTemporaryDir directory;
+    if (!directory.isValid()) {
+        if (error) *error = QStringLiteral("Cannot create temporary CIF workspace");
+        return {};
+    }
+    const auto path = directory.filePath(QStringLiteral("edited.cif"));
+    if (!saveCif(path, crystal, asymmetricUnit, error)) return {};
+    const auto loaded = read(path, QStringLiteral("CIF"));
+    if (!loaded.result.success) {
+        if (error) *error = loaded.result.error;
+        return {};
+    }
+    return loaded.crystal;
+}
+
+bool StructureReader::saveCif(const QString &path, const CrystalData &crystal,
+                              const Molecule &asym, QString *error) {
+    try {
+        if (crystal.sourceCif.isEmpty() || crystal.sourceBlock < 0)
+            throw std::runtime_error("Original CIF document is required for metadata-preserving export");
+        if (asym.atoms.size() != crystal.asymmetricUnit.atoms.size())
+            throw std::runtime_error("CIF export requires unchanged atom count and site order");
+        if (asym.charge != crystal.asymmetricUnit.charge || asym.multiplicity != crystal.asymmetricUnit.multiplicity)
+            throw std::runtime_error("CIF export cannot preserve edited charge or multiplicity");
+        const auto manualBonds = [](const Molecule &molecule) {
+            QMap<QPair<int, int>, QString> result;
+            for (const auto &bond : molecule.bonds) if (bond.manual)
+                result.insert({qMin(bond.first, bond.second), qMax(bond.first, bond.second)},
+                    QString::number(bond.order, 'g', 17) + (bond.coordination ? "c" : "b"));
+            return result;
+        };
+        if (manualBonds(asym) != manualBonds(crystal.asymmetricUnit))
+            throw std::runtime_error("CIF export cannot preserve edited explicit bonds; use a molecular format");
+        auto doc = gemmi::cif::read_memory(crystal.sourceCif.constData(),
+                                         size_t(crystal.sourceCif.size()), "CIF export");
+        auto &block = doc.blocks.at(size_t(crystal.sourceBlock));
+        auto x = column(block, {"_atom_site_fract_x", "_atom_site.fract_x"});
+        auto y = column(block, {"_atom_site_fract_y", "_atom_site.fract_y"});
+        auto z = column(block, {"_atom_site_fract_z", "_atom_site.fract_z"});
+        const bool fractional = x && y && z;
+        if (!fractional) {
+            x = column(block, {"_atom_site_Cartn_x", "_atom_site.Cartn_x"});
+            y = column(block, {"_atom_site_Cartn_y", "_atom_site.Cartn_y"});
+            z = column(block, {"_atom_site_Cartn_z", "_atom_site.Cartn_z"});
+        }
+        if (!x || !y || !z || x.length() != asym.atoms.size())
+            throw std::runtime_error("CIF coordinate columns do not match the asymmetric unit");
+        auto cartX = column(block, {"_atom_site_Cartn_x", "_atom_site.Cartn_x"});
+        auto cartY = column(block, {"_atom_site_Cartn_y", "_atom_site.Cartn_y"});
+        auto cartZ = column(block, {"_atom_site_Cartn_z", "_atom_site.Cartn_z"});
+        if (fractional && (cartX || cartY || cartZ) &&
+            (!cartX || !cartY || !cartZ || cartX.length() != asym.atoms.size() ||
+             cartY.length() != asym.atoms.size() || cartZ.length() != asym.atoms.size()))
+            throw std::runtime_error("Incomplete alternate Cartesian coordinate columns cannot be preserved safely");
+        gemmi::UnitCell cell(crystal.a, crystal.b, crystal.c, crystal.alpha, crystal.beta, crystal.gamma);
+        for (int i = 0; i < asym.atoms.size(); ++i) {
+            const auto &atom = asym.atoms[i];
+            const auto &original = crystal.asymmetricUnit.atoms[i];
+            if (atom.atomicNumber != original.atomicNumber || atom.label != original.label ||
+                atom.occupancy != original.occupancy || atom.disorderGroup != original.disorderGroup ||
+                atom.formalCharge != original.formalCharge)
+                throw std::runtime_error("CIF export currently supports coordinate edits only");
+            if (atom.position == original.position) continue; // retain original precision and uncertainties
+            const auto p = gemmiPosition(atom.position);
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                throw std::runtime_error("Invalid CIF coordinate");
+            const auto f = cell.fractionalize(p);
+            x.at(i) = QString::number(fractional ? f.x : p.x, 'g', 12).toStdString();
+            y.at(i) = QString::number(fractional ? f.y : p.y, 'g', 12).toStdString();
+            z.at(i) = QString::number(fractional ? f.z : p.z, 'g', 12).toStdString();
+            if (fractional && cartX && cartY && cartZ) {
+                cartX.at(i) = QString::number(p.x, 'g', 12).toStdString();
+                cartY.at(i) = QString::number(p.y, 'g', 12).toStdString();
+                cartZ.at(i) = QString::number(p.z, 'g', 12).toStdString();
+            }
+        }
+        std::ostringstream stream;
+        gemmi::cif::write_cif_to_stream(stream, doc);
+        const auto bytes = QByteArray::fromStdString(stream.str());
+        QSaveFile file(path);
+        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
+            throw std::runtime_error(file.errorString().toStdString());
+        return true;
+    } catch (const std::exception &e) {
+        if (error) *error = QString::fromUtf8(e.what());
+        return false;
+    }
+}
 
 StructureLoad StructureReader::read(const QString &path, const QString &format) {
     StructureLoad load;

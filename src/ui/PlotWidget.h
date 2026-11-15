@@ -89,6 +89,9 @@ public:
     QRectF plotArea() const { return plotRect(); }
     void clear();
     void setSelectedPoint(int index);
+    // Pick discrete calculation states independently of a broadened curve.
+    void setSelectablePoints(const QVector<QPointF> &points);
+    const QVector<QPointF> &selectablePoints() const { return m_selectablePoints ? *m_selectablePoints : m_series; }
     int selectedPoint() const { return m_selectedPoint; }
     const QVector<QPointF> &series() const { return m_series; }
 
@@ -132,6 +135,7 @@ private:
     QString m_heatmapZLabel;
     bool m_heatmap = false;
     int m_selectedPoint = -1;
+    std::optional<QVector<QPointF>> m_selectablePoints;
     QVector<QPointF> m_markers;
     QVector<QPointF> m_sticks;
     QString m_xLabel;

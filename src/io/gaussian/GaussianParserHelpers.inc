@@ -520,30 +520,21 @@ void buildScanData(CalculationData &data,
 }
 
 void buildIrcData(CalculationData &data, bool ircDetected,
-                         const QString &ircDirection) {
-    if (data.scfEnergies.isEmpty()) {
-        return;
-    }
-    const int count = std::min(data.frames.size(), data.scfEnergies.size());
-    if (count <= 0) {
-        return;
-    }
-    QVector<double> energies;
-    energies.reserve(count);
-    const int energyOffset = data.scfEnergies.size() - count;
-    for (int i = 0; i < count; ++i) {
-        energies.push_back(data.scfEnergies[energyOffset + i]);
-    }
-    const double reference = *std::min_element(energies.cbegin(), energies.cend());
-    if (ircDetected) {
-        data.ircPoints.clear();
-        for (int i = 0; i < energies.size(); ++i) {
-            const double coordinate = ircDirection.compare(QStringLiteral("reverse"), Qt::CaseInsensitive) == 0
-                                          ? double(energies.size() - i - 1)
-                                          : double(i);
-            data.ircPoints.push_back({i + 1, coordinate, energies[i],
-                                      (energies[i] - reference) * kHartreeToKcal,
-                                      int(data.frames.size() - count + i), ircDirection});
+                  const QString &ircDirection) {
+    if (!ircDetected) return;
+    if (data.ircPoints.isEmpty()) {
+        // Legacy/incomplete outputs without printed path coordinates: use each
+        // frame's own energy, never pair unrelated tails of separate arrays.
+        for (int frame = 0; frame < data.frames.size(); ++frame) {
+            const double energy = data.frames[frame].metrics.energyHartree;
+            if (!std::isfinite(energy)) continue;
+            const int index = data.ircPoints.size();
+            data.ircPoints.push_back({index + 1, double(index), energy, kNaN, frame, ircDirection});
         }
     }
+    double reference = std::numeric_limits<double>::infinity();
+    for (const auto &point : data.ircPoints)
+        if (std::isfinite(point.energyHartree)) reference = std::min(reference, point.energyHartree);
+    for (auto &point : data.ircPoints)
+        point.relativeKcal = (point.energyHartree - reference) * kHartreeToKcal;
 }

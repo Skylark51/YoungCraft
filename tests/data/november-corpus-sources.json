@@ -1,0 +1,172 @@
+[
+  {
+    "path": "Gaussian/Gaussian03/dvb_gopt.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian03/dvb_gopt.out",
+    "sha256": "3e1e3c6140c6dd3d46e3765d0c183ea262d4a2ea4de9b7901d390fdb1231b038"
+  },
+  {
+    "path": "Gaussian/Gaussian03/dvb_ir.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian03/dvb_ir.out",
+    "sha256": "b3d27b00c36b8e248383eb851a59b1c998501e3a0fc13d46146b138785c34cef"
+  },
+  {
+    "path": "Gaussian/Gaussian03/dvb_td.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian03/dvb_td.out",
+    "sha256": "ef87f91aba69a0d1d83458c66e693d0d901d729e0b9e788f3b04888e37da9fbd"
+  },
+  {
+    "path": "Gaussian/Gaussian09/dvb_scan_revA.02.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/dvb_scan_revA.02.log",
+    "sha256": "b67b801e86c117cf1306c83941da833db883280e0ad52817160891af80393bdc"
+  },
+  {
+    "path": "Gaussian/Gaussian09/irc_point.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/irc_point.log",
+    "sha256": "78f02624535f04bf4cd34e9286928daacfeb8e2534b5dd9799b8d2a70ad6ebe9"
+  },
+  {
+    "path": "Gaussian/Gaussian09/benzene_freq.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/benzene_freq.log",
+    "sha256": "20a447187aea91b7dcd00983a1cdfe6957a9ae600092f07ddcd2fd1af290d923"
+  },
+  {
+    "path": "Gaussian/Gaussian09/OPT_td_g09.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/OPT_td_g09.out",
+    "sha256": "f961bce4006facb62556fd92d30a112f4ddadd2380d57c4e84d05298ea486c72"
+  },
+  {
+    "path": "Gaussian/Gaussian09/dvb_gopt_unconverged.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/dvb_gopt_unconverged.log",
+    "sha256": "50d8a104a902c58e5b0de0710f3f46756768384ed46e23bc0ae1c0317e25eecf"
+  },
+  {
+    "path": "Gaussian/Gaussian16/water_neutral_nbo_opt_freq.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian16/water_neutral_nbo_opt_freq.out",
+    "sha256": "9493d24655fb261a2c945d292ad517567f3024996594a25f678199df74017519"
+  },
+  {
+    "path": "Gaussian/Gaussian16/water_cation_nbo_opt.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian16/water_cation_nbo_opt.out",
+    "sha256": "660375668f311f1995ab8efdc520af95018c6ee85a5858bfecdb02c3e72031bb"
+  },
+  {
+    "path": "ORCA/ORCA4.0/1-ttt_td.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/1-ttt_td.out",
+    "sha256": "60a8e750914e7fb79b341314ef0616a4d750e6b6b6ccdbf64e7b2d72c2c3e51a"
+  },
+  {
+    "path": "ORCA/ORCA4.0/CO2_freqs.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/CO2_freqs.out",
+    "sha256": "1e6a6bafc03b4226e04602592694ac6eb1baa4b54702d0b3479dfad7f4913f90"
+  },
+  {
+    "path": "ORCA/ORCA4.0/H2-_CASSCF_opt.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/H2-_CASSCF_opt.out",
+    "sha256": "14e88fa5b7ad50995c922a537d9929b3a11496a766bf8e43ea10935b881b4a65"
+  },
+  {
+    "path": "ORCA/ORCA4.0/IrCl6_sp.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/IrCl6_sp.out",
+    "sha256": "3293efdfff1676b2b6e0f0daeef949b567fcdce5374bd06c81d1ab448e87d48b"
+  },
+  {
+    "path": "ORCA/ORCA4.0/dvb_ir.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/dvb_ir.out",
+    "sha256": "ac8b3d15f6bc0d28fae4ead12131082319d2d022073db19844e265d44aff2397"
+  },
+  {
+    "path": "ORCA/ORCA4.0/dvb_raman.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/dvb_raman.out",
+    "sha256": "c2e9845cea85f275dc441f1e39c46eb58648792b1a381d630079686835ffebed"
+  },
+  {
+    "path": "ORCA/ORCA4.0/dvb_td.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/dvb_td.out",
+    "sha256": "d888bc7279b2bcb0bdadc7eedeb2c3596159dc4f908a86517c9c4d370a74bdd4"
+  },
+  {
+    "path": "ORCA/ORCA4.0/hydrogen_fluoride_numfreq.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/hydrogen_fluoride_numfreq.out",
+    "sha256": "e3569ee690d0c2e16a31212400bc4bc2409ab6cef8387b67413d0b369a61fc97"
+  },
+  {
+    "path": "ORCA/ORCA4.0/hydrogen_fluoride_usesym_anfreq.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/hydrogen_fluoride_usesym_anfreq.out",
+    "sha256": "66a05342f4389d760f6ab0f277bea609ab1640503f20d9b69ee65c88bdc0fff3"
+  },
+  {
+    "path": "ORCA/ORCA4.0/dvb_sp.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.0/dvb_sp.out",
+    "sha256": "9bbe9799d04f6f240b599aa88082093dfa6b54fcca8da5b61728ca2ddc8c76b1"
+  },
+  {
+    "path": "CIF/1000041.cif",
+    "url": "https://www.crystallography.net/cod/1000041.cif",
+    "sha256": "02d4f4fa315f7b97147256118acc7f9f20190d7246c3ea7209cfb8bd5d6e1fed"
+  },
+  {
+    "path": "CIF/1000042.cif",
+    "url": "https://www.crystallography.net/cod/1000042.cif",
+    "sha256": "60a0c2a097e37706110e50d0144b5903645d9817bde4664da89fdcfcbde6219d"
+  },
+  {
+    "path": "CIF/1000043.cif",
+    "url": "https://www.crystallography.net/cod/1000043.cif",
+    "sha256": "ed4fc6d25246923cf64ea4346cefd9f57073d05f00feba581fc5b378666e89a1"
+  },
+  {
+    "path": "CIF/1000044.cif",
+    "url": "https://www.crystallography.net/cod/1000044.cif",
+    "sha256": "fc31d071e2068e77e10c857e35eab7dfa5ffbca57a843d46f88007086c05a23f"
+  },
+  {
+    "path": "CIF/1000045.cif",
+    "url": "https://www.crystallography.net/cod/1000045.cif",
+    "sha256": "fc11cd5f0644a8114e1d1baa82e98453d332914ad9d72c69d97a0c01a1c84220"
+  },
+  {
+    "path": "CIF/1000046.cif",
+    "url": "https://www.crystallography.net/cod/1000046.cif",
+    "sha256": "c0e1619da33b606cd3efcb4dbf2d5b60774bfb9e2d8c47a20defa814ad70d581"
+  },
+  {
+    "path": "CIF/1000047.cif",
+    "url": "https://www.crystallography.net/cod/1000047.cif",
+    "sha256": "a5c4f3c6056e7d31f7fe7d6f3d2944b6789940b53ceed6bb706e5a2e51d78c06"
+  },
+  {
+    "path": "CIF/1000048.cif",
+    "url": "https://www.crystallography.net/cod/1000048.cif",
+    "sha256": "ac08169020b7ce1f61a7786217eca2bbb15a0845fd6fc13a23035f7113142c83"
+  },
+  {
+    "path": "CIF/1000049.cif",
+    "url": "https://www.crystallography.net/cod/1000049.cif",
+    "sha256": "4f1c66c781c3f6792db860cc783d1499c5ef11ff979c2f05609424e549d2ba2f"
+  },
+  {
+    "path": "CIF/1000050.cif",
+    "url": "https://www.crystallography.net/cod/1000050.cif",
+    "sha256": "f142fccc5c2a56e0975c86c1640e4d9e8f9e205c273c745c867cb48ccb6ef760"
+  },
+  {
+    "path": "Gaussian/Gaussian09/ansaBPFP2_acetylene_ircf_LQA.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/Gaussian/Gaussian09/ansaBPFP2_acetylene_ircf_LQA.out",
+    "sha256": "ca71eddb3a95d93bcb0031da6cf1b41c0e86e85c86da51dc27f9f4f4b20e0592"
+  },
+  {
+    "path": "ORCA/ORCA4.2/dvb_scan.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA4.2/dvb_scan.out",
+    "sha256": "6a40af7bf073e3f3c9ccc3f6c3f8304a4c221b34d3623d1f74b95c31ecfc9d9c"
+  },
+  {
+    "path": "ORCA/ORCA5.0/Benzene_opt_etsyms.log",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA5.0/Benzene_opt_etsyms.log",
+    "sha256": "0cc81388f21704531ea5ecb4606ee831866946ee1c1b7e56708a9a5f6538d383"
+  },
+  {
+    "path": "ORCA/ORCA6.1/1509.out",
+    "url": "https://raw.githubusercontent.com/cclib/cclib-data/2aafcd411329005cda9a436e23efddfe1ab92f66/ORCA/ORCA6.1/1509.out",
+    "sha256": "12873a94bf34d6fbd7eb975876f0d95ba9a396ba26cadf355d05e2ee627198d8"
+  }
+]

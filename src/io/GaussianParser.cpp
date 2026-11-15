@@ -44,6 +44,10 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
     QVector<int> pointFrames;
     bool ircDetected = false;
     QString ircDirection;
+    int ircPointNumber = 0;
+    const QRegularExpression ircDirectionRe(QStringLiteral(R"(Point Number\s+(\d+)\s+in\s+(FORWARD|REVERSE)\s+path direction)"), QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression ircCoordinateRe(QStringLiteral(R"(NET REACTION COORDINATE UP TO THIS POINT\s*=\s*([+\-0-9.EeDd]+))"));
+
     QVector<int> frequencyGroup;
     bool readingDisplacements = false;
     int currentExcitedState = -1;
@@ -266,6 +270,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
 
         ExcitedState excitedState;
         if (parseExcitedState(line, excitedState)) {
+            excitedState.frameIndex = result.data.frames.size() - 1;
             result.data.index.sectionOffsets[QStringLiteral("excited_states")].push_back(offset);
             result.data.excitedStates.push_back(excitedState);
             currentExcitedState = result.data.excitedStates.size() - 1;
@@ -323,6 +328,24 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
             if (trimmed.contains(QStringLiteral("Solvent:"), Qt::CaseInsensitive)) {
                 result.data.solvent = trimmed;
             }
+        }
+
+        const auto pathDirection = ircDirectionRe.match(line);
+        if (pathDirection.hasMatch()) {
+            ircDetected = true;
+            ircPointNumber = pathDirection.captured(1).toInt();
+            ircDirection = pathDirection.captured(2).toLower();
+            if (result.data.ircPoints.isEmpty() && pointFrame >= 0 && std::isfinite(pointEnergy))
+                result.data.ircPoints.push_back({0, 0, pointEnergy, kNaN, pointFrame, ircDirection});
+        }
+        double ircCoordinate = kNaN;
+        if (matchNumber(line, ircCoordinateRe, ircCoordinate) && pointFrame >= 0 && std::isfinite(pointEnergy)) {
+            ircDetected = true;
+            if (ircDirection.isEmpty()) ircDirection = QStringLiteral("forward");
+            ircCoordinate = ircDirection == QStringLiteral("reverse") ? -std::abs(ircCoordinate) : ircCoordinate;
+            result.data.ircPoints.push_back({ircPointNumber, ircCoordinate, pointEnergy, kNaN, pointFrame, ircDirection});
+            frames[pointFrame].metrics.ircCoordinate = ircCoordinate;
+            result.data.index.sectionOffsets[QStringLiteral("irc")].push_back(offset);
         }
 
         if (trimmed.contains(QStringLiteral("IRC"), Qt::CaseInsensitive) &&
