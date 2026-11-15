@@ -286,6 +286,8 @@ StructureLoad readCif(const QByteArray &bytes) {
             if (!sgName.isEmpty()) group = gemmi::find_spacegroup_by_name(sgName.toStdString());
             if (!group && sgNumber > 0) group = gemmi::find_spacegroup_by_number(sgNumber);
             if (group) operations = group->operations().all_ops_sorted();
+            else if (!sgName.isEmpty() || sgNumber != 0)
+                throw std::runtime_error("CIF space group is not recognized and no explicit symmetry operations are available");
         }
         if (operations.empty()) operations.push_back(gemmi::Op::identity());
         else if (std::none_of(operations.begin(), operations.end(),
@@ -522,6 +524,17 @@ bool StructureReader::saveCif(const QString &path, const CrystalData &crystal,
             throw std::runtime_error("Original CIF document is required for metadata-preserving export");
         if (asym.atoms.size() != crystal.asymmetricUnit.atoms.size())
             throw std::runtime_error("CIF export requires unchanged atom count and site order");
+        if (asym.charge != crystal.asymmetricUnit.charge || asym.multiplicity != crystal.asymmetricUnit.multiplicity)
+            throw std::runtime_error("CIF export cannot preserve edited charge or multiplicity");
+        const auto manualBonds = [](const Molecule &molecule) {
+            QMap<QPair<int, int>, QString> result;
+            for (const auto &bond : molecule.bonds) if (bond.manual)
+                result.insert({qMin(bond.first, bond.second), qMax(bond.first, bond.second)},
+                    QString::number(bond.order, 'g', 17) + (bond.coordination ? "c" : "b"));
+            return result;
+        };
+        if (manualBonds(asym) != manualBonds(crystal.asymmetricUnit))
+            throw std::runtime_error("CIF export cannot preserve edited explicit bonds; use a molecular format");
         auto doc = gemmi::cif::read_memory(crystal.sourceCif.constData(),
                                          size_t(crystal.sourceCif.size()), "CIF export");
         auto &block = doc.blocks.at(size_t(crystal.sourceBlock));
@@ -548,7 +561,8 @@ bool StructureReader::saveCif(const QString &path, const CrystalData &crystal,
             const auto &atom = asym.atoms[i];
             const auto &original = crystal.asymmetricUnit.atoms[i];
             if (atom.atomicNumber != original.atomicNumber || atom.label != original.label ||
-                atom.occupancy != original.occupancy || atom.disorderGroup != original.disorderGroup)
+                atom.occupancy != original.occupancy || atom.disorderGroup != original.disorderGroup ||
+                atom.formalCharge != original.formalCharge)
                 throw std::runtime_error("CIF export currently supports coordinate edits only");
             if (atom.position == original.position) continue; // retain original precision and uncertainties
             const auto p = gemmiPosition(atom.position);

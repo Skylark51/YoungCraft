@@ -112,6 +112,7 @@ class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
     void discreteSpectrumSelection();
+    void cifCoordinateEditAndSaveWorkflow();
     void unlimitedSelectionAndHoverElements();
     void sidebarOptimizationFixedSelection();
     void bilingualCategorizedHelp();
@@ -388,6 +389,57 @@ void SmokeTest::selectAllAndFragmentRotation(){
     QVERIFY((view->molecule().atoms[2].position-before.atoms[2].position).length()>0.05f);
     QCOMPARE(view->selection().atoms,QSet<int>({1,2,3,4}));
 }
+void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
+    MainWindow window;
+    window.openFile(QStringLiteral("tests/data/structure/p1.cif"));
+    QTRY_VERIFY_WITH_TIMEOUT(window.m_crystal, 10000);
+    const int tabs = window.m_documentTabs->count();
+    auto original = window.m_view->molecule();
+    auto edited = original;
+    edited.atoms[0].position += QVector3D(0.2f, -0.1f, 0.3f);
+    window.ensureEditableDocument();
+    QCOMPARE(window.m_documentTabs->count(), tabs);
+    window.syncEditedGeometry(edited, {});
+    window.m_crystalMode->setCurrentIndex(1);
+    QCOMPARE(window.m_crystal->displayMode, 1);
+    window.m_crystalMode->setCurrentIndex(0);
+    QVERIFY((window.m_view->molecule().atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    window.undoDrawingEdit();
+    QVERIFY((window.m_view->molecule().atoms[0].position - original.atoms[0].position).length() < 1e-5f);
+    window.redoDrawingEdit();
+    QVERIFY((window.m_view->molecule().atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    QTemporaryDir directory;
+    const auto path = directory.filePath("edited.cif");
+    const bool native = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+    QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+    auto restore = qScopeGuard([&] { QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, native); });
+    bool choseCif = false, choseFile = false, timedOut = false;
+    int ticks = 0;
+    QTimer driver;
+    driver.setInterval(10);
+    connect(&driver, &QTimer::timeout, &window, [&] {
+        auto *dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (++ticks > 500) { timedOut = true; if (dialog) dialog->reject(); return; }
+        if (!dialog) return;
+        if (auto *file = qobject_cast<QFileDialog*>(dialog)) {
+            choseFile = true; file->selectFile(path); QMetaObject::invokeMethod(file, "accept");
+        } else if (dialog->objectName() == "SaveStructureChoice" && !choseCif) {
+            choseCif = true;
+            if (auto *button = dialog->findChild<QPushButton*>("SaveCIFChoice")) button->click();
+            else dialog->reject();
+        }
+    });
+    driver.start();
+    window.saveStructure();
+    driver.stop();
+    QVERIFY(!timedOut); QVERIFY(choseCif); QVERIFY(choseFile);
+    const auto saved = FileDispatcher::load(path);
+    QVERIFY2(saved.parseResult.success, qPrintable(saved.parseResult.error));
+    QVERIFY(saved.crystal);
+    QVERIFY((saved.crystal->asymmetricUnit.atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
+    QCOMPARE(saved.crystal->a, 10.0);
+}
+
 void SmokeTest::discreteSpectrumSelection() {
     PlotWidget plot;
     plot.resize(600, 400);

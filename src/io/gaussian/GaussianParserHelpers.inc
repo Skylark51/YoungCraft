@@ -538,4 +538,3 @@ void buildIrcData(CalculationData &data, bool ircDetected,
     for (auto &point : data.ircPoints)
         point.relativeKcal = (point.energyHartree - reference) * kHartreeToKcal;
 }
-

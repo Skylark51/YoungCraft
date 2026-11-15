@@ -11,6 +11,7 @@ class StructureTest final : public QObject {
     Q_OBJECT
 private slots:
     void cifCellAndSymmetry();
+    void unknownSymmetryIsNotAssumedP1();
     void dualCoordinateColumns();
     void periodicContacts();
     void molecularFormats();
@@ -68,6 +69,27 @@ void StructureTest::dualCoordinateColumns() {
     QCOMPARE(reloaded.crystal->asymmetricUnit.atoms[0].position, QVector3D(2, 3, 4));
 }
 
+void StructureTest::unknownSymmetryIsNotAssumedP1() {
+    QTemporaryDir dir;
+    const auto path = dir.filePath("unknown.cif");
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("data_unknown\n_cell_length_a 10\n_cell_length_b 10\n_cell_length_c 10\n"
+        "_space_group_name_H-M_alt 'not a space group'\n"
+        "loop_\n_atom_site_label\n_atom_site_type_symbol\n"
+        "_atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\nC1 C 0.1 0.2 0.3\n");
+    file.close();
+    const auto rejected = FileDispatcher::load(path);
+    QVERIFY(!rejected.parseResult.success);
+    QVERIFY(rejected.parseResult.error.contains("space group"));
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Append));
+    file.write("loop_\n_space_group_symop_operation_xyz\n'x,y,z'\n'-x,-y,-z'\n");
+    file.close();
+    const auto explicitOperations = FileDispatcher::load(path);
+    QVERIFY2(explicitOperations.parseResult.success, qPrintable(explicitOperations.parseResult.error));
+    QCOMPARE(explicitOperations.crystal->unitCell.atoms.size(), 2);
+}
+
 void StructureTest::cifCellAndSymmetry() {
     const auto p1 = FileDispatcher::load(QStringLiteral("tests/data/structure/p1.cif"));
     QVERIFY2(p1.parseResult.success, qPrintable(p1.parseResult.error));
@@ -115,6 +137,14 @@ void StructureTest::cifRoundTrip() {
         QCOMPARE(output.crystal->asymmetricUnit.atoms.size(), molecule.atoms.size());
         QVERIFY((output.crystal->asymmetricUnit.atoms[0].position - molecule.atoms[0].position).length() < 1e-5f);
         QCOMPARE(output.crystal->asymmetricUnit.atoms[0].occupancy, molecule.atoms[0].occupancy);
+        auto unsupported = molecule;
+        unsupported.atoms[0].formalCharge = 1;
+        QVERIFY(!StructureReader::saveCif(path, *input.crystal, unsupported, &error));
+        unsupported = molecule;
+        if (unsupported.atoms.size() > 1) {
+            unsupported.setBond(0, 1, 3.0);
+            QVERIFY(!StructureReader::saveCif(path, *input.crystal, unsupported, &error));
+        }
         molecule.atoms.removeLast();
         QVERIFY(!StructureReader::saveCif(path, *input.crystal, molecule, &error));
     }

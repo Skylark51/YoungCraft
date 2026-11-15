@@ -75,7 +75,7 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         shell: pwsh
         run: |
-          & ./build/test_smoke.exe discreteSpectrumSelection optimizationGraphWindow optimizationGraphSynchronizes scanArrowNavigation scanOptimizationPoints frequencyPagingAndDetails frequencySelectionStartsAnimationAndShowsCoordinates tddftPublicationSpectrum documentsAreIndependent projectLibraryOpensOnDemand geometryEditPreservesCalculation drawingModeCreatesAtomsAndBonds rendersShadowAndTransparentCapture -o gui-november-results.txt,txt
+          & ./build/test_smoke.exe cifCoordinateEditAndSaveWorkflow discreteSpectrumSelection optimizationGraphWindow optimizationGraphSynchronizes scanArrowNavigation scanOptimizationPoints frequencyPagingAndDetails frequencySelectionStartsAnimationAndShowsCoordinates tddftPublicationSpectrum documentsAreIndependent projectLibraryOpensOnDemand geometryEditPreservesCalculation drawingModeCreatesAtomsAndBonds rendersShadowAndTransparentCapture -o gui-november-results.txt,txt
           if ($LASTEXITCODE -ne 0) { throw 'Analysis/rendering regression failed' }
       - name: Upload regression evidence
         if: always()
