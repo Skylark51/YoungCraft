@@ -22,8 +22,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/cache/restore@v4
+        id: corpus_cache
+        with:
+          path: .build/november-corpus
+          key: november-corpus-${{ hashFiles('tests/data/november-corpus-sources.json') }}
       - name: Fetch checksum-verified public corpus
         run: python tools/fetch_november_corpus.py .build/november-corpus
+      - uses: actions/cache/save@v4
+        if: steps.corpus_cache.outputs.cache-hit != 'true'
+        with:
+          path: .build/november-corpus
+          key: november-corpus-${{ hashFiles('tests/data/november-corpus-sources.json') }}
       - name: Prepare verified xTB runtime
         shell: pwsh
         run: |
