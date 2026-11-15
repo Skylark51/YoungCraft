@@ -37,12 +37,19 @@ jobs:
             if (-not $binary) { throw "Missing runtime binary: $name" }
             Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path 'xtb_runtime' $name) -Force
           }
+      - uses: actions/cache/restore@v4
+        id: xtb_backend_cache
+        with:
+          path: xtb_runtime/gfnff
+          key: win2022-ucrt64-xtb68fe777a-mctc061-v1
       - uses: msys2/setup-msys2@v2
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
         with:
           msystem: UCRT64
           update: true
           install: mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-openblas mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja unzip curl
       - name: Build explicit-topology xTB backend from pinned sources
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
           set -euo pipefail
@@ -59,6 +66,11 @@ jobs:
           target="$GITHUB_WORKSPACE/xtb_runtime/gfnff"
           cp build/xtb.exe "$target/xtb.exe"
           for dll in libgcc_s_seh-1.dll libgfortran-5.dll libgomp-1.dll libopenblas.dll libquadmath-0.dll libwinpthread-1.dll libstdc++-6.dll; do cp "/ucrt64/bin/$dll" "$target/"; done
+      - uses: actions/cache/save@v4
+        if: steps.xtb_backend_cache.outputs.cache-hit != 'true'
+        with:
+          path: xtb_runtime/gfnff
+          key: win2022-ucrt64-xtb68fe777a-mctc061-v1
       - name: Configure and build Release
         id: build
         run: |
