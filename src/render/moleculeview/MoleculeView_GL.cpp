@@ -68,7 +68,11 @@ QVector<MoleculeView::Vertex> makeCylinder(int slices) {
 } // namespace
 
 void MoleculeView::initializeGL() {
-    initializeOpenGLFunctions();
+    if (!initializeOpenGLFunctions()) {
+        m_glReady = false;
+        qWarning("Youngcraft requires an OpenGL 3.3 Core context");
+        return;
+    }
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);

@@ -100,3 +100,7 @@ Added a GUI integration test that verifies IRC graph selection updates molecular
 ## Bounded remote GUI execution
 
 Added tools/run_gui_regressions.py for remote-only GUI execution. It runs every named test separately, limits each to 120 seconds and writes per-case text logs plus a JSON status summary. Syntax was checked locally without launching GUI tests. This prevents an indefinitely waiting test from hiding the remaining cases. The already-running remote job 43768672446 remains under observation; it uses the previous unbounded loop. Current-source portable packaging completed again; installation is still gated on remote GUI evidence.
+
+## OpenGL test-context diagnosis
+
+Inspection found that the application requests OpenGL 3.3 Core before QApplication, whereas the GUI test entry point requested only shared contexts. Aligned the test context with the application and added a checked initializeOpenGLFunctions return in MoleculeView so unsupported contexts cannot call uninitialized functions. Application and GUI test Release compilation passed without local GUI execution. Remote Windows rendering now uses Qt-distributed Mesa software OpenGL, pinned to official SHA256 c61f801c1760aa24b02c7a8354323cddf368b86f8f5c34b50b3b224f7d728afd. This is a CI-only graphics selection. Runtime GUI confirmation remains required; these changes address a concrete context mismatch, not a claim that all prior failures were caused by it.
