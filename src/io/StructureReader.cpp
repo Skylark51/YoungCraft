@@ -536,6 +536,13 @@ bool StructureReader::saveCif(const QString &path, const CrystalData &crystal,
         }
         if (!x || !y || !z || x.length() != asym.atoms.size())
             throw std::runtime_error("CIF coordinate columns do not match the asymmetric unit");
+        auto cartX = column(block, {"_atom_site_Cartn_x", "_atom_site.Cartn_x"});
+        auto cartY = column(block, {"_atom_site_Cartn_y", "_atom_site.Cartn_y"});
+        auto cartZ = column(block, {"_atom_site_Cartn_z", "_atom_site.Cartn_z"});
+        if (fractional && (cartX || cartY || cartZ) &&
+            (!cartX || !cartY || !cartZ || cartX.length() != asym.atoms.size() ||
+             cartY.length() != asym.atoms.size() || cartZ.length() != asym.atoms.size()))
+            throw std::runtime_error("Incomplete alternate Cartesian coordinate columns cannot be preserved safely");
         gemmi::UnitCell cell(crystal.a, crystal.b, crystal.c, crystal.alpha, crystal.beta, crystal.gamma);
         for (int i = 0; i < asym.atoms.size(); ++i) {
             const auto &atom = asym.atoms[i];
@@ -551,6 +558,11 @@ bool StructureReader::saveCif(const QString &path, const CrystalData &crystal,
             x.at(i) = QString::number(fractional ? f.x : p.x, 'g', 12).toStdString();
             y.at(i) = QString::number(fractional ? f.y : p.y, 'g', 12).toStdString();
             z.at(i) = QString::number(fractional ? f.z : p.z, 'g', 12).toStdString();
+            if (fractional && cartX && cartY && cartZ) {
+                cartX.at(i) = QString::number(p.x, 'g', 12).toStdString();
+                cartY.at(i) = QString::number(p.y, 'g', 12).toStdString();
+                cartZ.at(i) = QString::number(p.z, 'g', 12).toStdString();
+            }
         }
         std::ostringstream stream;
         gemmi::cif::write_cif_to_stream(stream, doc);

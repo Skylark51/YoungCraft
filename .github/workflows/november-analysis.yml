@@ -20,7 +20,21 @@ jobs:
           python-version: '3.12'
       - name: Fetch checksum-verified public corpus
         run: python tools/fetch_november_corpus.py .build/november-corpus
+      - name: Prepare verified xTB runtime
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'xtb-win.zip'
+          $extract = Join-Path $env:RUNNER_TEMP 'xtb-win'
+          Invoke-WebRequest -Uri 'https://github.com/grimme-lab/xtb/releases/download/v6.7.1/xtb-6.7.1pre-windows-x86_64.zip' -OutFile $zip
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '043e578da4a7e114a4d584972959a875e3ffb9f2767a86723b95aa6719d28d9c') { throw 'xTB checksum mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+          foreach ($name in @('xtb.exe', 'libiomp5md.dll')) {
+            $binary = Get-ChildItem -LiteralPath $extract -Recurse -File -Filter $name | Select-Object -First 1
+            if (-not $binary) { throw "Missing runtime binary: $name" }
+            Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path 'xtb_runtime' $name) -Force
+          }
       - name: Configure and build Release
+        id: build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
           cmake --build build --parallel 4
@@ -32,6 +46,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Console regression failed' }
       # Run graphical checks on the remote runner, never on the user's desktop.
       - name: Verify analysis interaction and existing rendering/editing
+        if: always() && steps.build.outcome == 'success'
         shell: pwsh
         run: |
           & ./build/test_smoke.exe discreteSpectrumSelection optimizationGraphWindow optimizationGraphSynchronizes scanArrowNavigation scanOptimizationPoints frequencyPagingAndDetails frequencySelectionStartsAnimationAndShowsCoordinates tddftPublicationSpectrum documentsAreIndependent projectLibraryOpensOnDemand geometryEditPreservesCalculation drawingModeCreatesAtomsAndBonds rendersShadowAndTransparentCapture -o gui-november-results.txt,txt

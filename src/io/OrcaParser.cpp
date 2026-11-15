@@ -190,6 +190,8 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression energyRe(QStringLiteral(
         R"(FINAL SINGLE POINT ENERGY\s+([+-]?[0-9.EeDd]+))"));
+    const QRegularExpression convergenceRe(QStringLiteral(
+        R"(^\s*(RMS|MAX)\s+(gradient|step)\s+([+\-0-9.EeDd]+)\s+[+\-0-9.EeDd]+\s+(?:YES|NO)\s*$)"));
     const QRegularExpression scfRe(QStringLiteral(
         R"(^\s*Total Energy\s*:\s*([+-]?[0-9.EeDd]+)\s*Eh)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -277,6 +279,20 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                 data.scfEnergies.push_back(energy);
             if (pendingFrame >= 0) {
                 data.frames[pendingFrame].metrics.energyHartree = energy;
+            }
+        }
+
+        const auto convergence = convergenceRe.match(line);
+        double convergenceValue = kNaN;
+        if (pendingFrame >= 0 && convergence.hasMatch() && number(convergence.captured(3), convergenceValue)) {
+            auto &metrics = data.frames[pendingFrame].metrics;
+            const bool rms = convergence.captured(1) == QStringLiteral("RMS");
+            if (convergence.captured(2) == QStringLiteral("gradient")) {
+                if (rms) metrics.rmsForce = convergenceValue;
+                else metrics.maxForce = convergenceValue;
+            } else {
+                if (rms) metrics.rmsDisplacement = convergenceValue;
+                else metrics.maxDisplacement = convergenceValue;
             }
         }
 

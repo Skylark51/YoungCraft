@@ -67,7 +67,7 @@ qt_add_executable(test_xtb tests/xtb/test_xtb.cpp)
 target_link_libraries(test_xtb PRIVATE youngcraft_compute Qt6::Test)
 target_compile_options(test_xtb PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 add_dependencies(test_xtb mock_xtb)
-add_test(NAME xtb_runner COMMAND test_xtb)
+add_test(NAME xtb_runner COMMAND test_xtb -o -,txt)
 set_tests_properties(xtb_runner PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 if(WIN32)
     add_custom_command(TARGET test_xtb POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different

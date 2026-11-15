@@ -66,6 +66,11 @@ void NovemberCorpusTest::publicCorpus() {
                 QVERIFY(!data.excitedStates[0].transitions.isEmpty());
             }
             if (path.contains("1-ttt_td.out")) QCOMPARE(data.excitedStates.size(), 24);
+            if (path.contains("H2-_CASSCF_opt.out")) {
+                QVERIFY(data.frames.size() >= 3);
+                QCOMPARE(data.frames[2].metrics.maxForce, 0.0000012910);
+                QCOMPARE(data.frames[2].metrics.rmsDisplacement, 0.0000782895);
+            }
             if (path.contains("ORCA4.0/dvb_ir.out")) {
                 QCOMPARE(data.frequencies.size(), 60);
                 QCOMPARE(data.frequencies[6].displacement.size(), data.molecule.atoms.size());

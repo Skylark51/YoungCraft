@@ -11,6 +11,7 @@ class StructureTest final : public QObject {
     Q_OBJECT
 private slots:
     void cifCellAndSymmetry();
+    void dualCoordinateColumns();
     void periodicContacts();
     void molecularFormats();
     void invalidCifCoordinates();
@@ -41,6 +42,30 @@ void StructureTest::periodicContacts() {
     QCOMPARE(skew[0].translation[0], 1);
     QCOMPARE(skew[0].translation[1], -1);
     QVERIFY(qAbs(skew[0].distance - 1.0352761804) < 1e-8);
+}
+
+void StructureTest::dualCoordinateColumns() {
+    QTemporaryDir dir;
+    const auto path = dir.filePath("dual.cif");
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("data_dual\n_cell_length_a 10\n_cell_length_b 10\n_cell_length_c 10\n"
+        "loop_\n_atom_site_label\n_atom_site_type_symbol\n"
+        "_atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\n"
+        "_atom_site_Cartn_x\n_atom_site_Cartn_y\n_atom_site_Cartn_z\n"
+        "C1 C 0.1 0.2 0.3 1 2 3\n");
+    file.close();
+    const auto loaded = FileDispatcher::load(path);
+    QVERIFY(loaded.parseResult.success);
+    auto edited = loaded.crystal->asymmetricUnit;
+    edited.atoms[0].position = {2, 3, 4};
+    QString error;
+    QVERIFY2(StructureReader::saveCif(path, *loaded.crystal, edited, &error), qPrintable(error));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QVERIFY(file.readAll().contains("0.2 0.3 0.4 2 3 4"));
+    const auto reloaded = FileDispatcher::load(path);
+    QVERIFY(reloaded.parseResult.success);
+    QCOMPARE(reloaded.crystal->asymmetricUnit.atoms[0].position, QVector3D(2, 3, 4));
 }
 
 void StructureTest::cifCellAndSymmetry() {

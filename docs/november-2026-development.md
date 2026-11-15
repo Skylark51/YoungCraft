@@ -60,3 +60,9 @@ Added a GUI regression that clicks a discrete transition between curve samples a
 Added a crystal-toolbar contact dialog with adjustable cutoff and a read-only atom-pair/lattice-translation/distance table. It uses the symmetry-expanded unit cell, rebuilds an edited asymmetric unit first, and enumerates all translations bounded by reciprocal cell lengths. Thus skew cells and cutoffs spanning multiple short lattice periods are covered. Inverse duplicates are removed. These are geometric atom contacts including covalent neighbors, not automatic hydrogen-bond or interaction-energy assignments.
 
 The Release application and structure target built; console structure tests reported 8 passes, no failures, covering a 1.6 Å cell-boundary contact, a second lattice neighbor at 4 Å and a skew-cell contact. A final incremental rebuild checks the last interactive-search bounds guard. The contact UI has not been run locally. Remote CI for the preceding commit is still building.
+
+## Integrity follow-up
+
+ORCA geometry convergence RMS/MAX gradient and displacement values now attach to their current frame. Synthetic assertions cover all four metrics; the real CASSCF optimization fixture verifies frame 2 against the printed values. CIF export updates both fractional and Cartesian columns when both exist and rejects incomplete alternate coordinate sets. Console runs: ORCA 13 passes; structure 9 passes; public corpus 3 passes, with no failures.
+
+Remote run 43766208458 built successfully and passed nine of ten console/calculation suites. xTB failed: the new workflow lacked the real runtime required by existing integration tests. Added the same SHA256-verified runtime provisioning used by the portable release workflow, explicit xTB text output, and independent remote GUI execution after a successful build even when a separate console suite fails. Subsequent remote verification is required; no GUI success is claimed yet.

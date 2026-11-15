@@ -132,6 +132,10 @@ C   0.000000 0.000000 0.000000
 H   0.000000 0.000000 1.080000
 
 FINAL SINGLE POINT ENERGY      -40.123456789
+          RMS gradient        0.0002      0.00003 NO
+          MAX gradient        0.0003      0.0001 NO
+          RMS step            0.0004      0.0006 YES
+          MAX step            0.0005      0.001 YES
 MULLIKEN ATOMIC CHARGES AND SPIN POPULATIONS
 --------------------------------------------
 0 C : -0.2000 0.8000
@@ -159,6 +163,10 @@ ORCA TERMINATED NORMALLY
     QCOMPARE(data.scfEnergies.size(), 1);
     QCOMPARE(data.scfEnergies.last(), -40.123456789);
     QCOMPARE(data.frames.last().metrics.energyHartree, -40.123456789);
+    QCOMPARE(data.frames.last().metrics.rmsForce, 0.0002);
+    QCOMPARE(data.frames.last().metrics.maxForce, 0.0003);
+    QCOMPARE(data.frames.last().metrics.rmsDisplacement, 0.0004);
+    QCOMPARE(data.frames.last().metrics.maxDisplacement, 0.0005);
     QCOMPARE(data.molecule.atoms.first().charge, -0.2);
     QCOMPARE(data.molecule.atoms.first().spinDensity, 0.8);
     QCOMPARE(data.frequencies.size(), 2);
