@@ -78,6 +78,7 @@
 #include <QWheelEvent>
 #include <QStackedWidget>
 #include <QSurfaceFormat>
+#include <QStatusBar>
 #include <QImageReader>
 #include <QPainter>
 
@@ -450,7 +451,7 @@ void SmokeTest::linkedIrcAndTddftGeometrySelection() {
     first.coordinates = {{1, 0, 0}}; first.metrics.energyHartree = -1.0;
     second.coordinates = {{2, 0, 0}}; second.metrics.energyHartree = -1.1;
     window.m_data.frames = {first, second};
-    window.m_data.ircPoints = {{1, -1, -1, 62.75, 0, "reverse"}, {2, 1, -1.1, 0, 1, "forward"}};
+    window.m_data.ircPoints = {{1, -1, -1, 62.75, 0, "reverse"}, {2, 1, -1.1, 0, 1, "forward"}, {3, 2, -1.2, 0, -1, "forward"}};
     ExcitedState a, b;
     a.state = 1; a.wavelengthNm = 250; a.oscillatorStrength = 0.1; a.frameIndex = 0;
     b.state = 2; b.wavelengthNm = 300; b.oscillatorStrength = 0.2; b.frameIndex = 1;
@@ -476,6 +477,12 @@ void SmokeTest::linkedIrcAndTddftGeometrySelection() {
     QCOMPARE(window.m_tddftWorkspacePlot->selectedPoint(), 1);
     QCOMPARE(window.m_currentFrame, 1);
     QCOMPARE(window.m_view->molecule().atoms[0].position, second.coordinates[0]);
+    irc->pointClicked(2);
+    QCOMPARE(list->currentRow(), 2);
+    QCOMPARE(irc->selectedPoint(), 2);
+    QCOMPARE(window.m_currentFrame, 1);
+    QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("대응 구조 없음")));
+
 }
 
 void SmokeTest::discreteSpectrumSelection() {
