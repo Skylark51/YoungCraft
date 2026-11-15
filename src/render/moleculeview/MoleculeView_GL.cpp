@@ -107,9 +107,10 @@ void MoleculeView::initializeGL() {
 }
 
 void MoleculeView::resizeGL(int width, int height) {
+    if (m_previewOverlay) m_previewOverlay->setGeometry(rect());
+    if (!m_glReady) return;
     const qreal dpr = devicePixelRatioF();
     glViewport(0, 0, qRound(width * dpr), qRound(height * dpr));
-    if (m_previewOverlay) m_previewOverlay->setGeometry(rect());
 }
 
 bool MoleculeView::createPrograms() {
