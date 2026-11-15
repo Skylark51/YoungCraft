@@ -1,5 +1,9 @@
 #include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
+#include "io/CrystalContacts.h"
+#include <QHeaderView>
+#include <QDoubleSpinBox>
+#include <stdexcept>
 #include <cmath>
 #include <algorithm>
 #include "app/DocumentTabs.h"
@@ -269,6 +273,54 @@ void MainWindow::createDocumentUi() {
     m_cellToggle->setObjectName(QStringLiteral("CrystalCellVisible"));
     m_cellToggle->setChecked(true);
     crystalLayout->addWidget(m_cellToggle);
+    auto *contactsButton = new QPushButton(QStringLiteral("주기적 접촉…"), m_crystalBar);
+    contactsButton->setObjectName(QStringLiteral("CrystalContacts"));
+    crystalLayout->addWidget(contactsButton);
+    connect(contactsButton, &QPushButton::clicked, this, [this] {
+        if (!m_crystal) return;
+        auto crystal = m_crystal;
+        if (crystal->displayMode == 0 && !crystal->sourceCif.isEmpty()) {
+            QString error;
+            crystal = StructureReader::rebuildCif(*crystal, m_view->molecule(), &error);
+            if (!crystal) { setStatus(error); return; }
+        }
+        QDialog dialog(this);
+        dialog.setWindowTitle(QStringLiteral("주기적 원자 접촉"));
+        dialog.resize(700, 500);
+        auto *layout = new QVBoxLayout(&dialog);
+        auto *note = new QLabel(QStringLiteral("단위격자 기준 원자쌍과 격자 이동입니다. 결합을 포함한 기하학적 접촉이며 수소결합·에너지 판정은 수행하지 않습니다."));
+        note->setWordWrap(true);
+        layout->addWidget(note);
+        auto *cutoff = new QDoubleSpinBox;
+        cutoff->setRange(0.1, 10); cutoff->setValue(3.5); cutoff->setSuffix(QStringLiteral(" Å"));
+        layout->addWidget(cutoff);
+        auto *refresh = new QPushButton(QStringLiteral("접촉 계산"));
+        layout->addWidget(refresh);
+        auto *table = new QTableWidget(0, 4);
+        table->setHorizontalHeaderLabels({QStringLiteral("원자 1"), QStringLiteral("원자 2"), QStringLiteral("격자 이동 a,b,c"), QStringLiteral("거리 (Å)")});
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        layout->addWidget(table);
+        connect(refresh, &QPushButton::clicked, &dialog, [=] {
+            table->setRowCount(0);
+            try {
+                const auto contacts = crystalContacts(*crystal, cutoff->value());
+                for (const auto &contact : contacts) {
+                    const int row = table->rowCount(); table->insertRow(row);
+                    const auto label = [&](int index) {
+                        const auto &atom = crystal->unitCell.atoms[index];
+                        return QStringLiteral("%1 [%2]").arg(atom.label.isEmpty() ? atom.element : atom.label).arg(index + 1);
+                    };
+                    table->setItem(row, 0, new QTableWidgetItem(label(contact.first)));
+                    table->setItem(row, 1, new QTableWidgetItem(label(contact.second)));
+                    table->setItem(row, 2, new QTableWidgetItem(QStringLiteral("%1, %2, %3").arg(contact.translation[0]).arg(contact.translation[1]).arg(contact.translation[2])));
+                    table->setItem(row, 3, new QTableWidgetItem(QString::number(contact.distance, 'f', 5)));
+                }
+                note->setText(QStringLiteral("접촉 %1개 · 결합 포함 · 동일 접촉의 역방향 중복 제외").arg(contacts.size()));
+            } catch (const std::exception &e) { note->setText(QString::fromUtf8(e.what())); }
+        });
+        dialog.exec();
+    });
     crystalLayout->addStretch();
     m_crystalBar->hide();
     moleculeLayout->addWidget(m_crystalBar);

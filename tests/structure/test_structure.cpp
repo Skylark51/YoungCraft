@@ -1,6 +1,8 @@
 #include "io/FileDispatcher.h"
+#include "io/CrystalContacts.h"
 
 #include <QtTest>
+#include <stdexcept>
 #include <QTemporaryFile>
 
 using namespace youngcraft;
@@ -9,11 +11,37 @@ class StructureTest final : public QObject {
     Q_OBJECT
 private slots:
     void cifCellAndSymmetry();
+    void periodicContacts();
     void molecularFormats();
     void invalidCifCoordinates();
     void cifRoundTrip();
     void cifMetadataAndAtomicFailure();
 };
+
+void StructureTest::periodicContacts() {
+    const auto loaded = FileDispatcher::load("tests/data/structure/boundary.cif");
+    QVERIFY(loaded.parseResult.success);
+    const auto contacts = crystalContacts(*loaded.crystal, 2.0);
+    QCOMPARE(contacts.size(), 1);
+    QVERIFY(qAbs(contacts[0].distance - 1.6) < 1e-5);
+    QCOMPARE(contacts[0].translation[0], 1);
+    // Short cell: include the second lattice neighbor, without inverse duplicates.
+    CrystalData shortCell;
+    shortCell.a = 2; shortCell.b = 10; shortCell.c = 10;
+    Atom atom; atom.position = {0, 0, 0};
+    shortCell.unitCell.atoms.push_back(atom);
+    const auto repeated = crystalContacts(shortCell, 4.1);
+    QCOMPARE(repeated.size(), 2);
+    QCOMPARE(repeated[0].distance, 2.0);
+    QCOMPARE(repeated[1].distance, 4.0);
+    QVERIFY_EXCEPTION_THROWN(crystalContacts(shortCell, -1), std::runtime_error);
+    shortCell.b = 2; shortCell.gamma = 30;
+    const auto skew = crystalContacts(shortCell, 1.1);
+    QCOMPARE(skew.size(), 1);
+    QCOMPARE(skew[0].translation[0], 1);
+    QCOMPARE(skew[0].translation[1], -1);
+    QVERIFY(qAbs(skew[0].distance - 1.0352761804) < 1e-8);
+}
 
 void StructureTest::cifCellAndSymmetry() {
     const auto p1 = FileDispatcher::load(QStringLiteral("tests/data/structure/p1.cif"));
