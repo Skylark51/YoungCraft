@@ -3,10 +3,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: november-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-regression:
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
@@ -33,6 +37,28 @@ jobs:
             if (-not $binary) { throw "Missing runtime binary: $name" }
             Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path 'xtb_runtime' $name) -Force
           }
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-openblas mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja unzip curl
+      - name: Build explicit-topology xTB backend from pinned sources
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p .build/xtb-backend
+          cd .build/xtb-backend
+          curl -fL https://codeload.github.com/grimme-lab/xtb/zip/68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -o xtb.zip
+          curl -fL https://codeload.github.com/grimme-lab/mctc-lib/zip/refs/tags/v0.6.1 -o mctc.zip
+          echo 'ed92501f770a02bea4d00782f61d0bdcb61981353ee9093578d49a0b0a942bcd  xtb.zip' | sha256sum -c -
+          echo '549477402f38de3a2ffc3d16558b12e177920d7e0c3e3af5067c83cfc2968ba7  mctc.zip' | sha256sum -c -
+          unzip -q xtb.zip
+          unzip -q mctc.zip
+          cmake -S xtb-68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWITH_TBLITE=OFF -DWITH_CPCMX=OFF -DWITH_TESTS=OFF -DFETCHCONTENT_SOURCE_DIR_MCTC-LIB="$PWD/mctc-lib-0.6.1" -DBLAS_LIBRARIES=/ucrt64/lib/libopenblas.dll.a -DLAPACK_LIBRARIES=/ucrt64/lib/libopenblas.dll.a
+          cmake --build build --parallel 4
+          target="$GITHUB_WORKSPACE/xtb_runtime/gfnff"
+          cp build/xtb.exe "$target/xtb.exe"
+          for dll in libgcc_s_seh-1.dll libgfortran-5.dll libgomp-1.dll libopenblas.dll libquadmath-0.dll libwinpthread-1.dll libstdc++-6.dll; do cp "/ucrt64/bin/$dll" "$target/"; done
       - name: Configure and build Release
         id: build
         run: |
