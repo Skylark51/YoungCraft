@@ -59,10 +59,16 @@ void MainWindow::toggleFrameAnimation() {
 
 void MainWindow::toggleFrequencyAnimation() {
     if (m_animation->isPlaying()) { m_animation->stop(); return; }
-    if (m_currentFrequency < 0 && !m_data.frequencies.isEmpty()) showFrequency(0);
+    if (m_currentFrequency < 0 && !m_data.frequencies.isEmpty()) {
+        showFrequency(qMax(0, m_analysis->currentFrequency()));
+        return;
+    }
     if (m_currentFrequency < 0 || m_currentFrequency >= m_data.frequencies.size()) { setStatus(QStringLiteral("재생할 진동 모드가 없습니다")); return; }
-    const QVector<QVector3D> base = m_data.frames.isEmpty() ? [&] { QVector<QVector3D> values; for (const Atom &a : m_data.molecule.atoms) values.push_back(a.position); return values; }() : m_data.frames.last().coordinates;
-    if(m_animation->kind()!=AnimationController::Kind::Frequency)m_animation->setFrequency(base, m_data.frequencies[m_currentFrequency]);
+    if (m_animation->kind() != AnimationController::Kind::Frequency ||
+        !m_view->hasFrequencyMode()) {
+        showFrequency(m_currentFrequency);
+        return;
+    }
     m_animation->startFrequency();
 }
 
@@ -73,6 +79,8 @@ void MainWindow::restoreFrequencyGeometry() {
     m_animation->setFrequency(base, m_data.frequencies[m_currentFrequency]);
     m_view->setCoordinates(base);
     m_view->setBonds(m_data.molecule.bonds);
+    m_view->setFrequencyMode(nullptr);
+    updateAtomVisibility();
     setStatus(QStringLiteral("원래 구조를 표시했습니다"));
 }
 

@@ -12,29 +12,57 @@
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QPushButton>
 #include <cmath>
 
 namespace youngcraft {
 
 void MainWindow::arrangeScanApproach() {
-    const auto ids=m_geometrySelection;
-    if(ids.size()!=2) { setStatus(QStringLiteral("접근시킬 반응 원자 두 개를 순서대로 클릭하세요."),8000); return; }
-    QDialog dialog(this); dialog.setWindowTitle(QStringLiteral("Scan용 구조 조정"));
+    const int atomCount = m_view->molecule().atoms.size();
+    if (atomCount < 2) {
+        setStatus(QStringLiteral("구조 조정에는 원자가 두 개 이상 필요합니다."), 8000);
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("ScanApproachDialog"));
+    dialog.setWindowTitle(QStringLiteral("Scan용 구조 조정"));
     QFormLayout form(&dialog);
-    QLabel note(QStringLiteral("원자 %1 → %2\n각 fragment의 내부 구조를 유지하며 반응 자리가 마주 보게 회전·이동합니다.\n축 주위 회전을 탐색하여 비결합 접촉을 줄입니다. 전체 구조 최적화는 별도로 실행하세요.")
-        .arg(ids[0]+1).arg(ids[1]+1)); note.setWordWrap(true); form.addRow(&note);
+    QLabel note(QStringLiteral("접근시킬 반응 원자 두 개를 지정하세요. 화면에서 선택한 원자는 자동으로 입력됩니다.\n각 fragment의 내부 구조를 유지하며 반응 자리가 마주 보게 회전·이동합니다.\n축 주위 회전을 탐색하여 비결합 접촉을 줄입니다. 전체 구조 최적화는 별도로 실행하세요."));
+    note.setWordWrap(true); form.addRow(&note);
+    QSpinBox first, second;
+    first.setObjectName(QStringLiteral("ApproachFirstAtom"));
+    second.setObjectName(QStringLiteral("ApproachSecondAtom"));
+    first.setRange(1, atomCount); second.setRange(1, atomCount);
+    first.setValue(m_geometrySelection.size() >= 1 ? m_geometrySelection[0] + 1 : 1);
+    second.setValue(m_geometrySelection.size() >= 2 ? m_geometrySelection[1] + 1 : (first.value() == 1 ? 2 : 1));
+    form.addRow(QStringLiteral("첫 번째 원자 번호"), &first);
+    form.addRow(QStringLiteral("두 번째 원자 번호"), &second);
     QDoubleSpinBox separation; separation.setRange(0.5,100); separation.setDecimals(3);
     separation.setSuffix(QStringLiteral(" Å")); separation.setValue(3.0);
     separation.setObjectName(QStringLiteral("ApproachDistance")); form.addRow(QStringLiteral("목표 반응 원자 거리"),&separation);
+    QLabel feedback; feedback.setWordWrap(true);
+    feedback.setObjectName(QStringLiteral("ApproachFeedback")); form.addRow(&feedback);
     QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);form.addRow(&buttons);
     connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
     connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
-    if(dialog.exec()!=QDialog::Accepted)return;
-    Molecule edited=m_view->molecule();QString error;
-    if(!GeometryEditor::arrangeApproach(edited,ids[0],ids[1],separation.value(),&error)){setStatus(error,10000);return;}
-    ensureEditableDocument();m_animation->stop();
+    Molecule edited;
+    QString error;
+    QVector<int> ids;
+    while (true) {
+        if (dialog.exec() != QDialog::Accepted) return;
+        ids = {first.value() - 1, second.value() - 1};
+        edited = m_view->molecule();
+        if (GeometryEditor::arrangeApproach(edited, ids[0], ids[1], separation.value(), &error)) break;
+        feedback.setText(error);
+    }
+    ensureEditableDocument();
+    setDrawingMode(false);
+    m_animation->stop();
+    m_view->setFrequencyMode(nullptr);
     syncEditedGeometry(edited, {});
+    m_geometrySelection = ids;
+    m_view->setGeometrySelection(ids);
     updateGeometryReadout();
     m_view->bestView();
     setStatus(error.isEmpty()?QStringLiteral("Scan 시작 배치를 적용했습니다. Ctrl+Z로 되돌릴 수 있습니다."):error,10000);

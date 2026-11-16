@@ -42,6 +42,7 @@ public:
     void setEditedMolecule(const Molecule &molecule);
     void setCoordinates(const QVector<QVector3D> &coordinates);
     void setFrequencyMode(const FrequencyMode *mode);
+    bool hasFrequencyMode() const { return !m_frequencyDisplacements.isEmpty(); }
     void setCubeGrid(const std::shared_ptr<const CubeGrid> &grid, float isoValue = -1.0f);
     void clearCubeGrid();
     void setPotentialGrid(std::shared_ptr<const CubeGrid> grid, double minimum, double maximum, QColor low, QColor high);
