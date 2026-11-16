@@ -91,6 +91,7 @@ void MainWindow::showFrame(int index) {
     m_view->setCoordinates(m_data.frames[index].coordinates);
     updateGeometryReadout();
     m_view->setFrequencyMode(nullptr);
+    updateAtomVisibility();
     m_analysis->setCurrentFrame(index);
     if(m_outputDock->isVisible())updateOutputSource("frame_geometry",index);
     setStatus(QStringLiteral("프레임 %1 표시").arg(index + 1));
@@ -101,6 +102,7 @@ void MainWindow::showFrequency(int index) {
     m_animation->stop();
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     m_currentFrequency = index;
+    updateAtomVisibility();
     if(m_outputDock->isVisible())updateOutputSource("frequency_modes",index);
     const FrequencyMode &mode = m_data.frequencies[index];
     const QVector<QVector3D> base = m_data.frames.isEmpty() ? [&] { QVector<QVector3D> values; for (const Atom &a : m_data.molecule.atoms) values.push_back(a.position); return values; }() : m_data.frames.last().coordinates;
@@ -120,6 +122,13 @@ void MainWindow::showFrequency(int index) {
     m_animation->setCycleTime(m_analysis->frequencyCycleTime());
     m_view->setCoordinates(base);
     m_view->setFrequencyMode(&mode);
+    // C-H atoms are hidden by default. Reveal moving hydrogens only in the
+    // live view so methyl rotations and H-localized modes remain visible.
+    Molecule appearance = m_data.molecule;
+    for (int i = 0; i < appearance.atoms.size() && i < mode.displacement.size(); ++i)
+        if (appearance.atoms[i].atomicNumber == 1 && mode.displacement[i].lengthSquared() > 1.0e-12f)
+            appearance.atoms[i].visible = true;
+    m_view->setAtomDisplay(appearance);
     m_view->rebuildBonds(m_style.recountCutoffScale, m_style.recountHydrogen, m_style.recountMetalCoordination);
     const QVector<QVector3D> firstCoordinates = AnimationController::coordinatesAtPhase(
         base, mode, m_analysis->frequencyAmplitude(), 0.5);

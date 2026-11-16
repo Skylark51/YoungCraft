@@ -791,6 +791,9 @@ void MainWindow::connectDocumentUi() {
     m_documentConnections.push_back(connect(m_animation, &AnimationController::playingChanged, this, [this,frequencyControls,frequencyToggle](bool playing) {
         const bool frequency=m_animation->kind()==AnimationController::Kind::Frequency&&m_currentFrequency>=0;
         frequencyControls->setVisible(frequency);
+        if (auto *play = m_analysis->findChild<QPushButton *>("FrequencyPlay"))
+            setSidebarButtonIcon(play, frequency && playing ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay,
+                                 frequency && playing ? QStringLiteral("진동 일시정지") : QStringLiteral("진동 재생"));
         setSidebarButtonIcon(frequencyToggle, playing ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay,
                              playing ? QStringLiteral("진동 일시정지") : QStringLiteral("진동 재개"));
         setStatus(playing ? QStringLiteral("애니메이션 재생 중") : QStringLiteral("애니메이션 일시정지"));

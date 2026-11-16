@@ -184,6 +184,7 @@ private slots:
     void labLigandBrowserBuildsSelectedMetal();
     void continuousSketchClicksStrokeRingAndUndo();
     void themesEmptySidebarAndScanApproach();
+    void scanApproachOpensWithoutSelection();
     void atomVisibilityPreservesViewAndScroll_data();
     void atomVisibilityPreservesViewAndScroll();
     void topPanelToolbarFollowsDocuments();
@@ -207,6 +208,8 @@ private slots:
     void styleEditorAdjustsAtomAndBondSizes();
     void frequencyAnimationEmitsDisplacedCoordinates();
     void frequencySelectionStartsAnimationAndShowsCoordinates();
+    void frequencyPlaybackControls();
+    void frequencyRevealsHiddenMovingHydrogens();
     void copiesCurrentElementCoordinates();
     void geometryMeasureBarWorks();
     void geometryEditsFromOrdinarySelection();
@@ -3032,6 +3035,79 @@ void SmokeTest::frequencySelectionStartsAnimationAndShowsCoordinates() {
     QVERIFY(coordinates->toPlainText().contains(QStringLiteral("O")));
 }
 
+void SmokeTest::frequencyPlaybackControls() {
+    QString path = qEnvironmentVariable("YOUNGCRAFT_FREQUENCY_INPUT");
+    if (path.isEmpty()) path = QFINDTESTDATA("tests/data/mvp.out");
+    MainWindow window;
+    window.show();
+    window.openFile(path);
+    QTRY_VERIFY_WITH_TIMEOUT(window.m_workspace->property("loadFinished").toBool(), 15000);
+    auto *panel = window.m_analysis;
+    auto *play = panel->findChild<QPushButton *>("FrequencyPlay");
+    auto *restore = panel->findChild<QPushButton *>("FrequencyRestore");
+    QVERIFY(play && restore);
+    play->click();
+    QVERIFY(window.m_animation->isPlaying());
+    int moving = 0;
+    const auto &mode = window.m_data.frequencies[window.m_currentFrequency];
+    for (int i = 1; i < mode.displacement.size(); ++i)
+        if (mode.displacement[i].lengthSquared() > mode.displacement[moving].lengthSquared()) moving = i;
+    const auto first = window.m_view->molecule().atoms[moving].position;
+    QTRY_VERIFY_WITH_TIMEOUT(window.m_view->molecule().atoms[moving].position != first, 1000);
+    QCOMPARE(play->toolTip(), QStringLiteral("진동 일시정지"));
+    if (QGuiApplication::platformName() != "offscreen") {
+        const auto image = window.m_view->grabFramebuffer();
+        QVERIFY(!image.isNull());
+        QTRY_VERIFY_WITH_TIMEOUT(window.m_view->grabFramebuffer() != image, 2000);
+    }
+    play->click();
+    QVERIFY(!window.m_animation->isPlaying());
+    QCOMPARE(play->toolTip(), QStringLiteral("진동 재생"));
+    play->click();
+    QVERIFY(window.m_animation->isPlaying());
+    restore->click();
+    QVERIFY(!window.m_animation->isPlaying());
+    play->click();
+    QVERIFY(window.m_animation->isPlaying());
+}
+
+void SmokeTest::frequencyRevealsHiddenMovingHydrogens() {
+    MainWindow window;
+    window.show();
+    // A hydrogen-localized mode with a stationary visible heavy atom reproduces
+    // the methyl rotation in the reported TS without depending on a private file.
+    Molecule molecule;
+    molecule.atoms = {{1, 6, QStringLiteral("C"), {0, 0, 0}},
+                      {2, 1, QStringLiteral("H"), {1.1f, 0, 0}},
+                      {3, 1, QStringLiteral("H"), {0, 1.1f, 0}}};
+    molecule.atoms[1].visible = false;
+    molecule.atoms[2].visible = false;
+    window.m_data.molecule = molecule;
+    window.m_data.frames.clear();
+    FrequencyMode mode;
+    mode.number = 1;
+    mode.wavenumber = -41.7281;
+    mode.imaginary = true;
+    mode.displacement = {{}, {0, .6f, 0}, {}};
+    window.m_data.frequencies = {mode};
+    window.m_view->setMolecule(molecule);
+    window.m_analysis->setData(window.m_data);
+    window.showFrequency(0);
+    QVERIFY(window.m_view->molecule().atoms[1].visible);
+    QVERIFY(!window.m_view->molecule().atoms[2].visible);
+    QVERIFY(!window.m_data.molecule.atoms[1].visible);
+    if (QGuiApplication::platformName() != "offscreen") {
+        const auto frame = window.m_view->grabFramebuffer();
+        QVERIFY(!frame.isNull());
+        QTRY_VERIFY_WITH_TIMEOUT(window.m_view->grabFramebuffer() != frame, 2000);
+    }
+    window.restoreFrequencyGeometry();
+    QVERIFY(!window.m_view->molecule().atoms[1].visible);
+    window.toggleFrequencyAnimation();
+    QVERIFY(window.m_animation->isPlaying());
+    QVERIFY(window.m_view->molecule().atoms[1].visible);
+}
+
 void SmokeTest::copiesCurrentElementCoordinates() {
     AnalysisPanel panel;
     auto *button = panel.findChild<QPushButton *>(QStringLiteral("CopyCoordinateButton"));
@@ -3813,6 +3889,61 @@ void SmokeTest::patternTemplatesWorkflow(){
     {MainWindow restored;QCOMPARE(restored.findChild<QToolBar*>("MainToolBar")->property("patternTemplate").toInt(),5);}
     window.findChild<QAction *>("PatternTemplate5")->trigger();
     QCOMPARE(top->property("patternTemplate").toInt(),-1);
+}
+
+void SmokeTest::scanApproachOpensWithoutSelection() {
+    MainWindow window;
+    window.show();
+    Molecule molecule;
+    molecule.atoms = {{1, 6, "C", {0, 0, 0}}, {2, 1, "H", {1, 0, 0}},
+                      {3, 8, "O", {6, 0, 0}}, {4, 1, "H", {6, 1, 0}}};
+    molecule.setBond(0, 1, 1); molecule.setBond(2, 3, 1);
+    for (auto &atom : molecule.atoms) atom.autoHydrogenLocked = true;
+    window.newDrawingDocument(molecule);
+    window.setDrawingMode(false);
+    Frame sourceFrame;
+    for (const auto &atom : molecule.atoms) sourceFrame.coordinates.push_back(atom.position);
+    window.m_data.frames = {sourceFrame};
+    const int source = window.m_documentTabs->currentIndex();
+    const int tabs = window.m_documentTabs->count();
+    QVERIFY(window.m_geometrySelection.isEmpty());
+    bool opened = false;
+    QTimer::singleShot(0, &window, [&] {
+        auto *dialog = window.findChild<QDialog *>("ScanApproachDialog");
+        QVERIFY(dialog);
+        opened = true;
+        dialog->findChild<QSpinBox *>("ApproachFirstAtom")->setValue(1);
+        dialog->findChild<QSpinBox *>("ApproachSecondAtom")->setValue(3);
+        dialog->findChild<QDoubleSpinBox *>("ApproachDistance")->setValue(2.8);
+        dialog->accept();
+    });
+    window.m_workspace->findChild<QPushButton *>("ScanApproachButton")->click();
+    QVERIFY(opened);
+    QCOMPARE(window.m_documentTabs->count(), tabs + 1);
+    QVERIFY(!window.m_drawingMode);
+    QCOMPARE(window.m_geometrySelection, QVector<int>({0, 2}));
+    QVERIFY(qAbs(GeometryEditor::distance(window.m_view->molecule(), 0, 2) - 2.8) < 1e-5);
+    window.undoDrawingEdit();
+    for (int i = 0; i < molecule.atoms.size(); ++i)
+        QCOMPARE(window.m_view->molecule().atoms[i].position, molecule.atoms[i].position);
+    window.m_documentTabs->setCurrentIndex(source);
+    QCOMPARE(window.m_data.frames.size(), 1);
+    QCOMPARE(window.m_data.frames.first().coordinates, sourceFrame.coordinates);
+    QCOMPARE(window.m_view->molecule().atoms[2].position, molecule.atoms[2].position);
+    QTimer::singleShot(0, &window, [&] {
+        auto *dialog = window.findChild<QDialog *>("ScanApproachDialog");
+        QVERIFY(dialog);
+        dialog->findChild<QSpinBox *>("ApproachSecondAtom")->setValue(1);
+        QTimer::singleShot(0, &window, [&] {
+            auto *retry = window.findChild<QDialog *>("ScanApproachDialog");
+            QVERIFY(retry);
+            QVERIFY(!retry->findChild<QLabel *>("ApproachFeedback")->text().isEmpty());
+            retry->reject();
+        });
+        dialog->accept();
+    });
+    window.arrangeScanApproach();
+    QCOMPARE(window.m_documentTabs->count(), tabs + 1);
 }
 
 void SmokeTest::themesEmptySidebarAndScanApproach(){
