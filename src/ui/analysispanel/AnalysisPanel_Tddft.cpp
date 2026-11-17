@@ -2,6 +2,8 @@
 
 #include "analysis/AnalysisEngine.h"
 #include "ui/PlotWidget.h"
+#include "ui/TransitionAnalysisDialog.h"
+#include "ui/TransitionAnalysisIcon.h"
 
 #include <QDoubleSpinBox>
 #include <QCheckBox>
@@ -19,6 +21,8 @@
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QToolButton>
+#include <QStyle>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -68,12 +72,19 @@ QWidget *AnalysisPanel::makeTddftTab() {
     form->addRow(QStringLiteral("폭"), m_broadening);
     form->addRow(m_normalizeSpectrum);
     form->addRow(m_showSpectrumSticks);
+    auto *nto=new QPushButton(transitionAnalysisIcon(),QStringLiteral("NTO · Hole / Particle 분석"));
+    nto->setObjectName(QStringLiteral("TddftTransitionAnalysis"));
+    nto->setToolTip(QStringLiteral("선택한 TD 상태의 NTO 쌍과 hole / particle 기여도 및 3D 분석"));
+    connect(nto,&QPushButton::clicked,this,[this]{showTransitionAnalysis();});
+    form->addRow(nto);
     layout->addLayout(form);
     m_tddftTable = new QTableWidget;
     m_tddftTable->setObjectName(QStringLiteral("TddftStatesTable"));
-    m_tddftTable->setColumnCount(5);
-    m_tddftTable->setHorizontalHeaderLabels({QStringLiteral("상태"), QStringLiteral("에너지 (eV)"), QStringLiteral("파장 (nm)"), QStringLiteral("진동자 세기"), QStringLiteral("주요 전이")});
-    m_tddftTable->horizontalHeader()->setStretchLastSection(true);
+    m_tddftTable->setColumnCount(6);
+    m_tddftTable->setHorizontalHeaderLabels({QStringLiteral("상태"), QStringLiteral("에너지 (eV)"), QStringLiteral("파장 (nm)"), QStringLiteral("진동자 세기"), QStringLiteral("주요 전이"),QStringLiteral("NTO / h–p")});
+    m_tddftTable->horizontalHeader()->setSectionResizeMode(4,QHeaderView::Stretch);
+    m_tddftTable->horizontalHeader()->setSectionResizeMode(5,QHeaderView::ResizeToContents);
+    m_tddftTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_tddftTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     layout->addWidget(m_tddftTable, 2);
     connect(m_broadening, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double value) {
@@ -118,6 +129,15 @@ void AnalysisPanel::fillTddft() {
         m_tddftTable->setItem(row, 2, item(numberOrDash(state.wavelengthNm, 2)));
         m_tddftTable->setItem(row, 3, item(numberOrDash(state.oscillatorStrength, 5)));
         m_tddftTable->setItem(row, 4, item(transitions));
+        auto *analyze=new QToolButton;
+        analyze->setObjectName(QStringLiteral("AnalyzeTransition_%1").arg(row));
+        analyze->setIcon(transitionAnalysisIcon());
+        analyze->setAccessibleName(QStringLiteral("상태 %1 NTO · Hole / Particle 분석").arg(state.state));
+        analyze->setToolTip(state.transitions.isEmpty()?QStringLiteral("전이 계수가 없어 분석할 수 없습니다. 계수를 포함한 TD 출력이 필요합니다."):
+                            QStringLiteral("이 상태의 NTO · Hole / Particle 분석"));
+        analyze->setEnabled(!state.transitions.isEmpty());
+        connect(analyze,&QToolButton::clicked,this,[this,row]{m_tddftTable->setCurrentCell(row,0);showTransitionAnalysis(row);});
+        m_tddftTable->setCellWidget(row,5,analyze);
         if(std::isfinite(state.wavelengthNm)&&state.wavelengthNm>0&&std::isfinite(state.oscillatorStrength)&&state.oscillatorStrength>=0)
             bars.push_back({state.wavelengthNm, state.oscillatorStrength});
     }
@@ -161,6 +181,15 @@ void AnalysisPanel::fillTddft() {
     if (selectedRow >= 0 && selectedRow < m_tddftTable->rowCount())
         m_tddftTable->setCurrentCell(selectedRow, 0);
     emit tddftSpectrumChanged(spectrum, bars, summary);
+    if(auto *button=findChild<QPushButton*>(QStringLiteral("TddftTransitionAnalysis")))
+        button->setEnabled(!m_data.excitedStates.isEmpty());
+}
+
+void AnalysisPanel::showTransitionAnalysis(int row) {
+    if(row<0)row=qMax(0,m_tddftTable->currentRow());
+    if(row>=m_data.excitedStates.size())return;
+    auto *dialog=new TransitionAnalysisDialog(m_data,row,this);
+    dialog->show();
 }
 
 } // namespace youngcraft

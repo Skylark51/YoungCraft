@@ -50,6 +50,7 @@ public:
     QStringList tabTitles() const;
     bool hasTabData(int index) const;
     void setTabBarVisible(bool visible);
+    void showTransitionAnalysis(int row = -1);
 
 signals:
     void dataChanged();

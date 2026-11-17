@@ -1,4 +1,5 @@
 #include "ui/SidebarButton.h"
+#include "ui/TransitionAnalysisIcon.h"
 #include "app/MainWindow.h"
 #include "io/CrystalContacts.h"
 #include <QHeaderView>
@@ -500,6 +501,12 @@ void MainWindow::createDocumentUi() {
     makeSidebarIconButton(sourceResult, QStyle::SP_FileIcon);
     spectrumButtons->addWidget(sourceResult);
     connect(sourceResult,&QPushButton::clicked,this,[this]{updateOutputSource("excited_states",qMax(0,m_analysis->findChild<QTableWidget*>("TddftStatesTable")->currentRow()),true);});
+    auto *ntoAnalysis=new QPushButton(QStringLiteral("NTO · Hole / Particle 분석"),m_tddftWorkspace);
+    ntoAnalysis->setObjectName(QStringLiteral("TddftNtoAnalysis"));
+    makeSidebarIconButton(ntoAnalysis,QStyle::SP_ComputerIcon);
+    ntoAnalysis->setIcon(transitionAnalysisIcon());
+    spectrumButtons->addWidget(ntoAnalysis);
+    connect(ntoAnalysis,&QPushButton::clicked,this,[this]{m_analysis->showTransitionAnalysis();});
 
     spectrumButtons->addStretch();
     auto *saveSpectrum = new QPushButton(QStringLiteral("내보내기…"), m_tddftWorkspace);

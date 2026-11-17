@@ -2,6 +2,8 @@
 #include <QScreen>
 #include "compute/GaussianConnection.h"
 #include "analysis/AnalysisEngine.h"
+#include "analysis/TransitionAnalysis.h"
+#include "io/OrcaParser.h"
 #include <QVector2D>
 #include <QGroupBox>
 #include "ui/OutputSourceView.h"
@@ -112,6 +114,8 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void transitionAnalysisNumerics();
+    void transitionAnalysisWorkflow();
     void discreteSpectrumSelection();
     void linkedIrcAndTddftGeometrySelection();
     void tddftSummaryStructureLink();
@@ -5140,6 +5144,85 @@ void SmokeTest::periodicTableGrouping() {
     });
     w.m_drawBar->findChild<QPushButton *>("DrawPeriodicTable")->click();
     QVERIFY(inspected);QCOMPARE(w.m_drawElement->currentText(),QString("Cl"));
+}
+
+void SmokeTest::transitionAnalysisNumerics() {
+    // Rank-one mixing retains interference; a list of squared transitions would give two pairs.
+    ExcitedState state;state.transitions={{"1","3",0.6},{"2","3",-0.8}};
+    auto a=TransitionAnalysis::calculate(state);QVERIFY2(a.error.isEmpty(),qPrintable(a.error));
+    QCOMPARE(a.pairs.size(),1);QVERIFY(std::abs(a.pairs[0].weight-1)<1e-10);
+    QVERIFY(std::abs(a.holePopulation[0]-0.36)<1e-10);
+    QVERIFY(a.pairs[0].hole[0]*a.pairs[0].hole[1]<0);
+    // Non-diagonal SVD: reconstruct the original signed transition matrix.
+    state.transitions={{"1a","3a",0.4},{"1a","4a",-0.3},{"2a","3a",0.2},{"2a","4a",0.7}};
+    a=TransitionAnalysis::calculate(state);QVERIFY(a.error.isEmpty());QCOMPARE(a.pairs.size(),2);
+    const double matrix[2][2]={{0.4,-0.3},{0.2,0.7}};
+    double total=0;
+    for(const auto &pair:a.pairs)total+=pair.weight;
+    QVERIFY(std::abs(total-1)<1e-10);
+    for(int i=0;i<2;++i)for(int j=0;j<2;++j) {
+        double value=0;for(const auto &pair:a.pairs)value+=std::sqrt(pair.weight*a.printedNorm)*pair.hole[i]*pair.particle[j];
+        QVERIFY(std::abs(value-matrix[i][j])<1e-10);
+    }
+    auto cube=[](float value){auto g=std::make_shared<CubeGrid>();g->valid=true;g->nx=g->ny=g->nz=1;
+        g->axisX={1,0,0};g->axisY={0,1,0};g->axisZ={0,0,1};g->values={value};return g;};
+    state.transitions={{"1","3",0.6},{"2","3",-0.8}};a=TransitionAnalysis::calculate(state);
+    QString error;auto h=a.grid({cube(1),cube(1)},false,-1,&error);QVERIFY(h);
+    QVERIFY(std::abs(h->values[0]-0.04f)<1e-6f); // (0.6 - 0.8)^2, including cross term.
+    auto bad=cube(1);bad->origin={1,0,0};QVERIFY(!a.grid({cube(1),bad},false,-1,&error));QVERIFY(!error.isEmpty());
+    bad=cube(std::numeric_limits<float>::quiet_NaN());QVERIFY(!a.grid({cube(1),bad},false,-1,&error));
+    QVERIFY(!TransitionAnalysis::calculate(ExcitedState{}).error.isEmpty());
+    state.transitions={{"1","2",0}};QVERIFY(!TransitionAnalysis::calculate(state).error.isEmpty());
+    state.transitions={{"1b","3b",1},{"1a","3a",1}};a=TransitionAnalysis::calculate(state);
+    QCOMPARE(a.pairs.size(),2);QVERIFY(std::abs(a.pairs[0].weight-0.5)<1e-10);
+    // Degenerate channels retain independent alpha / beta populations.
+    for(const auto &pair:a.pairs)QVERIFY(std::abs(pair.hole[0]*pair.hole[1])<1e-12);
+    state.transitions.clear();
+    for(int i=0;i<3;++i)for(int j=0;j<5;++j)state.transitions.append({QString::number(i+1),QString::number(j+4),std::sin(2.0*i+3.0*j)+0.1*i*j});
+    a=TransitionAnalysis::calculate(state);QVERIFY2(a.error.isEmpty(),qPrintable(a.error));
+    for(int i=0;i<3;++i)for(int j=0;j<5;++j) {
+        double value=0;for(const auto &pair:a.pairs)value+=std::sqrt(pair.weight*a.printedNorm)*pair.hole[i]*pair.particle[j];
+        QVERIFY(std::abs(value-state.transitions[i*5+j].coefficient)<1e-9);
+    }
+}
+
+void SmokeTest::transitionAnalysisWorkflow() {
+    QTemporaryDir directory;QVERIFY(directory.isValid());
+    const QString source=directory.filePath("excitation.out");
+    QFile output(source);QVERIFY(output.open(QIODevice::WriteOnly));
+    output.write(" Excited State   1: Singlet-A  4.0000 eV  309.96 nm  f=0.1000\n    1 -> 3  0.60000\n    2 -> 3 -0.80000\n Excited State   2: Singlet-A  5.0000 eV  247.97 nm  f=0.2000\n");output.close();
+    auto parsed=FileDispatcher::load(source).parseResult;QCOMPARE(parsed.data.excitedStates.size(),2);
+    auto original=CubeParser::parse(QStringLiteral("tests/data/density.cube"));QVERIFY(original.valid);
+    parsed.data.molecule=original.molecule;
+    for(const auto &label:{"1","2","3"})QVERIFY(QFile::copy(QStringLiteral("tests/data/density.cube"),directory.filePath(QString("excitation.mo.%1.cube").arg(label))));
+    AnalysisPanel panel;panel.setData(parsed.data);
+    auto *icon=panel.findChild<QToolButton*>("AnalyzeTransition_0");QVERIFY(icon);QVERIFY(icon->isEnabled());
+    auto *missing=panel.findChild<QToolButton*>("AnalyzeTransition_1");QVERIFY(missing);QVERIFY(!missing->isEnabled());
+    icon->click();
+    auto *dialog=panel.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);
+    auto *pairs=dialog->findChild<QTableWidget*>("NtoPairsTable");QVERIFY(pairs);QCOMPARE(pairs->rowCount(),1);
+    auto *generate=dialog->findChild<QPushButton*>("GenerateNtoSurfaces");QVERIFY(generate);generate->click();
+    auto *status=dialog->findChild<QLabel*>("NtoAnalysisStatus");QVERIFY(status);QVERIFY2(status->text().contains(QString::fromUtf8("밀도")),qPrintable(status->text()));
+    auto *mode=dialog->findChild<QComboBox*>("NtoSurfaceMode");QVERIFY(mode);mode->setCurrentIndex(1);
+    QVERIFY(status->text().contains(QString::fromUtf8("위상")));
+    if(!qEnvironmentVariable("YOUNGCRAFT_NTO_SCREENSHOT").isEmpty()) {
+        QTest::qWait(500);QVERIFY(dialog->grab().save(qEnvironmentVariable("YOUNGCRAFT_NTO_SCREENSHOT")));
+    }
+    dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    panel.showTransitionAnalysis(1);dialog=panel.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);
+    QVERIFY(!dialog->findChild<QPushButton*>("GenerateNtoSurfaces")->isEnabled());dialog->close();
+    QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    QFile orca(directory.filePath("orca.out"));QVERIFY(orca.open(QIODevice::WriteOnly));
+    orca.write("TD-DFT/TDA EXCITED STATES (SINGLETS)\nSTATE 1: E= 0.196686 au 5.352 eV\n 0a -> 2a : 0.36 (c= 0.6)\n 1a -> 2a : 0.64 (c= -0.8)\n");orca.close();
+    auto orcaResult=OrcaParser::parse(orca.fileName());QCOMPARE(orcaResult.data.excitedStates.size(),1);
+    QCOMPARE(orcaResult.data.excitedStates[0].transitions.size(),2);orcaResult.data.molecule=original.molecule;
+    for(const auto &label:{"0a","1a","2a"})QVERIFY(QFile::copy("tests/data/density.cube",directory.filePath(QString("orca.mo.%1.cube").arg(label))));
+    panel.setData(orcaResult.data);panel.showTransitionAnalysis(0);
+    dialog=panel.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);
+    dialog->findChild<QPushButton*>("GenerateNtoSurfaces")->click();
+    status=dialog->findChild<QLabel*>("NtoAnalysisStatus");QVERIFY(status->text().contains(QString::fromUtf8("밀도")));dialog->close();
+    // Result reload replaces icons and data rather than retaining a stale transition.
+    panel.setData(CalculationData{});QCOMPARE(panel.findChild<QTableWidget*>("TddftStatesTable")->rowCount(),0);
 }
 
 int main(int argc, char **argv) {
