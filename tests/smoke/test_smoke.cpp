@@ -903,6 +903,7 @@ void SmokeTest::tddftPublicationSpectrum() {
     QVERIFY(!data.excitedStates.isEmpty());
     const auto base=data.excitedStates.first();data.excitedStates.clear();
     for(int i=0;i<4;++i){auto state=base;state.state=i+1;state.wavelengthNm=285+65*i;state.energyEv=1239.84/state.wavelengthNm;state.oscillatorStrength=i==1?0.65:0.12+0.08*i;data.excitedStates.push_back(state);}
+    window.newDrawingDocument(data.molecule);
     window.onFileLoaded(loaded);
     auto *plot=window.m_tddftWorkspacePlot;QVERIFY(plot);
     QCOMPARE(window.m_workspace->currentWidget(),window.m_tddftWorkspace);
@@ -917,11 +918,11 @@ void SmokeTest::tddftPublicationSpectrum() {
         dialog->findChild<QDoubleSpinBox*>("PlotXStep")->setValue(100);dialog->findChild<QDoubleSpinBox*>("PlotYStep")->setValue(.2);
         dialog->accept();
     });
-    window.findChild<QPushButton*>("TddftAxisSettings")->click();
+    window.m_workspace->findChild<QPushButton*>("TddftAxisSettings")->click();
     QCOMPARE(plot->axisRange().xMin,200.0);QCOMPARE(plot->axisRange().xMax,700.0);QCOMPARE(plot->axisRange().yMax,1.4);
     const auto ticks=plot->axisTicks(true);QVERIFY(ticks.size()>2);QCOMPARE(ticks[1]-ticks[0],100.0);
     const auto yticks=plot->axisTicks(false);QVERIFY(yticks.size()>2);QVERIFY(qAbs(yticks[1]-yticks[0]-.2)<1e-10);
-    window.findChild<QPushButton*>("TddftAutoRange")->click();QVERIFY(plot->axisRange().xMax!=700);
+    window.m_workspace->findChild<QPushButton*>("TddftAutoRange")->click();QVERIFY(plot->axisRange().xMax!=700);
 
     double maximum=0;for(const auto &point:plot->series()){QVERIFY(std::isfinite(point.y()));maximum=std::max(maximum,point.y());}
     QVERIFY(qAbs(maximum-1)<1e-8);
@@ -937,6 +938,34 @@ void SmokeTest::tddftPublicationSpectrum() {
     QCOMPARE(image.width(),qRound(options.widthMm/25.4*600));QCOMPARE(image.pixelColor(0,0).alpha(),0);
     QString error;QVERIFY2(plot->savePublication(directory.filePath("spectrum.pdf"),options,&error),qPrintable(error));
     QFile pdf(directory.filePath("spectrum.pdf"));QVERIFY(pdf.open(QIODevice::ReadOnly));QVERIFY(pdf.read(5)=="%PDF-");
+    auto *clipboard=QApplication::clipboard();
+    auto *previous=new QMimeData;
+    if(const auto *mime=clipboard->mimeData())for(const auto &format:mime->formats())previous->setData(format,mime->data(format));
+    const auto restoreClipboard=qScopeGuard([&]{clipboard->setMimeData(previous);});
+    auto *copy=window.m_workspace->findChild<QPushButton*>("Document_copySpectrum");QVERIFY(copy);
+    QVERIFY(!copy->text().isEmpty());QVERIFY(copy->isVisible());copy->click();
+    const auto copied=clipboard->image();QCOMPARE(copied.size(),image.size());
+    QCOMPARE(copied.pixelColor(0,0).alpha(),0);
+    QVERIFY(clipboard->mimeData()->hasFormat("image/png"));
+    const auto png=QImage::fromData(clipboard->mimeData()->data("image/png"),"PNG");
+    QCOMPARE(png.size(),copied.size());QCOMPARE(png.pixelColor(0,0).alpha(),0);
+    QVERIFY(window.statusBar()->currentMessage().contains("600 dpi"));
+    QVERIFY2(plot->savePublication(directory.filePath("spectrum.png"),options,&error),qPrintable(error));
+    QCOMPARE(QImage(directory.filePath("spectrum.png")).size(),image.size());
+    QTimer::singleShot(0,[&]{
+        auto *dialog=window.findChild<QDialog*>("PublicationExportDialog");QVERIFY(dialog);
+        auto *transparent=dialog->findChild<QCheckBox*>();QVERIFY(transparent);QVERIFY(transparent->isChecked());
+        auto *buttons=dialog->findChild<QDialogButtonBox*>();QVERIFY(buttons);
+        for(auto *button:buttons->buttons())if(button->text()==QStringLiteral("그림 복사"))button->click();
+        QVERIFY(clipboard->mimeData()->hasFormat("image/png"));
+        dialog->reject();
+    });
+    auto *save=window.m_workspace->findChild<QPushButton*>("Document_saveSpectrum");QVERIFY(save);
+    QVERIFY(!save->text().isEmpty());QVERIFY(save->isVisible());save->click();
+    // Rebinding a document must keep both graph actions connected.
+    window.newDrawingDocument(data.molecule);window.m_documentTabs->setCurrentIndex(0);
+    QCOMPARE(window.m_workspace->currentWidget(),window.m_tddftWorkspace);
+    clipboard->setText("before graph copy");copy->click();QVERIFY(clipboard->mimeData()->hasFormat("image/png"));
     const auto capture=qEnvironmentVariable("YOUNGCRAFT_REVIEW_DIR");
     if(!capture.isEmpty()){QDir().mkpath(capture);QTest::qWait(150);QVERIFY(window.grab().save(capture+"/tddft-workspace.png"));QVERIFY(image.save(capture+"/spectrum-600dpi.png"));QVERIFY(plot->savePublication(capture+"/spectrum.pdf",options,&error));}
 }
