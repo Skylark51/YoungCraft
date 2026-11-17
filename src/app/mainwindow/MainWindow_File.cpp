@@ -346,6 +346,37 @@ void MainWindow::openFile(const QString &path) {
     thread->start();
 }
 
+bool MainWindow::attachResultStructure(const QString &path) {
+    if (!m_data.molecule.isEmpty() || !m_data.frames.isEmpty()) return false;
+    const auto loaded = FileDispatcher::load(path, {});
+    const auto &source = loaded.parseResult.data;
+    if (!loaded.parseResult.success || source.molecule.isEmpty()) {
+        setStatus(QStringLiteral("선택한 파일에서 원자 좌표를 읽을 수 없습니다: %1").arg(QFileInfo(path).fileName()), 0);
+        return false;
+    }
+    m_data.molecule = source.molecule;
+    Frame frame;
+    frame.metrics.step = 1;
+    if (!source.frames.isEmpty() && source.frames.last().coordinates.size() == source.molecule.atoms.size())
+        frame.coordinates = source.frames.last().coordinates;
+    else for (const auto &atom : source.molecule.atoms) frame.coordinates.push_back(atom.position);
+    m_data.frames = {frame};
+    m_data.structureFilePath = QFileInfo(path).absoluteFilePath();
+    for (auto &state : m_data.excitedStates) state.frameIndex = 0;
+    m_animation->stop();
+    m_animation->setFrames(m_data.frames);
+    m_view->setMolecule(m_data.molecule);
+    m_analysis->setData(m_data);
+    populateExplorer();
+    showFrame(0);
+    m_analysis->setCurrentTab(0);
+    m_workspace->setCurrentWidget(m_moleculeWorkspace);
+    updatePanelActions();
+    setStatus(QStringLiteral("구조 연결: %1 · 원자 %2개 · TD-DFT 결과 유지")
+        .arg(QFileInfo(path).fileName()).arg(m_data.molecule.atoms.size()), 0);
+    return true;
+}
+
 void MainWindow::onFileLoaded(const youngcraft::LoadedFile &loaded) {
     if (!loaded.parseResult.success) {
         setStatus(QStringLiteral("파일 열기 실패: %1").arg(loaded.parseResult.error), 0);

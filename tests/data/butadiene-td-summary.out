@@ -1,0 +1,18 @@
+WSL EDUCATIONAL SIMULATION — NOT GAUSSIAN OUTPUT
+Reference: PySCF 2.15.0 | B3LYP/def2-SVP
+No new quantum chemistry calculation is performed by this g16 command.
+Simulated .chk files are JSON markers, not Gaussian binary checkpoints.
+
+Gaussian-style teaching summary of PySCF singlet excitations:
+ Excited State   1: Singlet  5.941028 eV  208.691 nm  f=0.6715059
+ Excited State   2: Singlet  7.087887 eV  174.924 nm  f=0.0000000
+ Excited State   3: Singlet  7.158502 eV  173.199 nm  f=0.0004924
+ Excited State   4: Singlet  7.449098 eV  166.442 nm  f=0.0000151
+ Excited State   5: Singlet  7.730465 eV  160.384 nm  f=0.0000000
+ Excited State   6: Singlet  8.010404 eV  154.779 nm  f=0.0034139
+ Excited State   7: Singlet  8.237562 eV  150.511 nm  f=0.0000000
+ Excited State   8: Singlet  8.328558 eV  148.866 nm  f=0.0004093
+Largest oscillator strength among these 8 states: S1
+This is a vertical electronic stick spectrum, not a vibronic experimental spectrum.
+
+Simulation completed successfully.

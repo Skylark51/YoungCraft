@@ -86,6 +86,7 @@ void AnalysisPanel::selectDefaultTab() {
 bool AnalysisPanel::hasTabData(int index) const {
     switch (index) {
     case 0:
+        return !m_data.molecule.isEmpty() || !m_data.frames.isEmpty() || hasTabData(4);
     case 5:
     case 7: return !m_data.molecule.isEmpty() || !m_data.frames.isEmpty();
     case 1: return !m_data.frequencies.isEmpty() || hasRouteKeyword(m_data.route, QStringLiteral("freq"));

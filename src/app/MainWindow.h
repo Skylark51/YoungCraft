@@ -211,6 +211,7 @@ private:
     QLabel *m_statusLabel = nullptr;
     AnimationController *m_animation = nullptr;
     CalculationData m_data;
+    bool attachResultStructure(const QString &path);
     RenderStyle m_style;
     QAction *m_atomLabelsAction = nullptr;
     QAction *m_syncViewsAction = nullptr;

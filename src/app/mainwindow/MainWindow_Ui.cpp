@@ -726,6 +726,11 @@ void MainWindow::connectDocumentUi() {
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::coordinateViewRequested, this, [this] {
         m_analysis->setCoordinateMolecule(m_view->molecule());
     }));
+    m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::structureFileRequested, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("계산에 사용한 구조 파일 연결"),
+            QFileInfo(m_currentFile).absolutePath(), QStringLiteral("구조 및 계산 파일 (*.xyz *.out *.log *.fchk *.fch *.mol *.sdf);;모든 파일 (*)"));
+        if (!path.isEmpty()) attachResultStructure(path);
+    }));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::workspaceModeRequested, this, [this](bool tddft) {
         m_workspace->setCurrentWidget(tddft ? m_tddftWorkspace : m_moleculeWorkspace);
     }));
