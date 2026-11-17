@@ -112,6 +112,8 @@ struct ExcitedState {
     QVector<OrbitalTransition> transitions;
     QString label; // e.g. ORCA Singlet 1 / Triplet 1; state is the spectrum row number.
     int frameIndex = -1;
+    struct NativeNtoPair { QString hole, particle; double weight = 0; };
+    QVector<NativeNtoPair> nativeNtoPairs; // Gaussian SaveNTO eigenvalues; MO numbers refer to saved NTOs.
 };
 
 struct OrbitalInfo {

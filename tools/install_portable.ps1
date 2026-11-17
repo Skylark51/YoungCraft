@@ -44,5 +44,11 @@ foreach ($path in $shortcutPaths) {
     $shortcut.Save()
 }
 if ((Get-FileHash -LiteralPath $executable).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Source 'Youngcraft.exe')).Hash) { throw 'Installed executable mismatch.' }
+# Repair an existing Open With registration that may still point at a source-tree build.
+# Keep the user's default program for every file extension unchanged.
+$openWithCommand = 'HKCU:\Software\Classes\Applications\Youngcraft.exe\shell\open\command'
+if (Test-Path -LiteralPath $openWithCommand) {
+    Set-Item -LiteralPath $openWithCommand -Value ('"' + $executable + '" "%1"')
+}
 Write-Output "Installed: $executable"
 Write-Output "Desktop shortcuts: $($shortcutPaths -join ', ')"

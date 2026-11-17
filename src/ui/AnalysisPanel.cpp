@@ -76,6 +76,8 @@ void AnalysisPanel::selectDefaultTab() {
     for (int index : {2, 3, 4, 1}) {
         if (hasTabData(index)) {
             setCurrentTab(index);
+            if(index==4 && !m_data.excitedStates.isEmpty() && !m_data.excitedStates.first().nativeNtoPairs.isEmpty()
+               && !std::isfinite(m_data.excitedStates.first().wavelengthNm)) showTransitionAnalysis(0);
             return;
         }
     }

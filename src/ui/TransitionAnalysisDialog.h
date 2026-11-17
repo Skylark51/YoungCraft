@@ -22,6 +22,7 @@ private:
     QString m_source;
     QStringList m_pending;
     int m_next=0;
+    bool m_native=false;
     QMap<QString,std::shared_ptr<const CubeGrid>> m_grids;
     GaussianTools *m_runner;
     QLabel *m_status, *m_sourceLabel;

@@ -1,6 +1,7 @@
 #include "ui/SidebarButton.h"
 #include "ui/SidebarFlowLayout.h"
 #include "app/MainWindow.h"
+#include "ui/TransitionAnalysisIcon.h"
 
 #include "export/ReactionCapture.h"
 #include "render/MoleculeView.h"
@@ -267,6 +268,16 @@ void MainWindow::createToolBar() {
         auto *button = addButton(action, m_analysisShortcuts);
         button->setObjectName(QStringLiteral("AnalysisShortcut%1").arg(i));
         analysisGrid->addWidget(button);
+        if(i==4) {
+            auto *ntoAction=m_analysisMenu->addAction(transitionAnalysisIcon(),QStringLiteral("NTO · Hole / Particle"),this,[this]{
+                m_explorerDock->show();m_analysis->showTransitionAnalysis();
+            });
+            ntoAction->setObjectName(QStringLiteral("NtoAnalysisShortcutAction"));
+            ntoAction->setToolTip(QStringLiteral("NTO 분석 · Hole / Particle · 저장 NTO 또는 TD 전이 계수"));
+            auto *ntoButton=addButton(ntoAction,m_analysisShortcuts);
+            ntoButton->setObjectName(QStringLiteral("NtoAnalysisShortcut"));
+            analysisGrid->addWidget(ntoButton);
+        }
     }
     auto *output = m_outputDock->toggleViewAction();
     output->setObjectName(QStringLiteral("ToggleOutputSource"));
@@ -616,6 +627,13 @@ void MainWindow::updatePanelActions() {
         button->setVisible(visible);
     };
     for (auto *action : m_analysisMenu->actions()) {
+        if(action->objectName()==QStringLiteral("NtoAnalysisShortcutAction")) {
+            const bool available=!m_data.excitedStates.isEmpty();
+            action->setEnabled(available);
+            auto *button=m_analysisShortcuts->findChild<QToolButton*>(QStringLiteral("NtoAnalysisShortcut"));
+            placeShortcut(button,available);
+            continue;
+        }
         const int index = action->property("analysisTab").toInt();
         action->setChecked(index == m_analysis->currentTab());
         auto *button = m_analysisShortcuts->findChild<QToolButton *>(QStringLiteral("AnalysisShortcut%1").arg(index));

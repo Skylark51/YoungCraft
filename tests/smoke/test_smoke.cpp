@@ -114,6 +114,7 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void nativeNtoSidebarWorkflow();
     void transitionAnalysisNumerics();
     void transitionAnalysisWorkflow();
     void discreteSpectrumSelection();
@@ -5223,6 +5224,40 @@ void SmokeTest::transitionAnalysisWorkflow() {
     status=dialog->findChild<QLabel*>("NtoAnalysisStatus");QVERIFY(status->text().contains(QString::fromUtf8("밀도")));dialog->close();
     // Result reload replaces icons and data rather than retaining a stale transition.
     panel.setData(CalculationData{});QCOMPARE(panel.findChild<QTableWidget*>("TddftStatesTable")->rowCount(),0);
+}
+
+void SmokeTest::nativeNtoSidebarWorkflow() {
+    QTemporaryDir temporary;QVERIFY(temporary.isValid());
+    QString source=qEnvironmentVariable("YOUNGCRAFT_NATIVE_NTO_FILE");
+    const bool real=!source.isEmpty();
+    if(!real) {
+        source=temporary.filePath("saved-nto.out");QFile file(source);QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(" Saving Alpha spin NTOs for state 1 to file 20524.\n Alpha occ. eigenvalues -- 0.00 0.04 0.96\n Alpha virt. eigenvalues -- 0.96 0.04 0.00\n Natural Transition Orbital Coefficients:\n");file.close();
+        QVERIFY(QFile::copy("tests/data/density.cube",temporary.filePath("saved-nto.mo.3a.cube")));
+        QVERIFY(QFile::copy("tests/data/density.cube",temporary.filePath("saved-nto.mo.4a.cube")));
+    }
+    auto loaded=FileDispatcher::load(source);QVERIFY2(loaded.parseResult.success,qPrintable(loaded.parseResult.error));
+    QCOMPARE(loaded.parseResult.data.excitedStates.size(),1);
+    auto analysis=TransitionAnalysis::calculate(loaded.parseResult.data.excitedStates.first());QVERIFY(analysis.error.isEmpty());
+    QVERIFY(std::abs(analysis.pairs.first().weight-(real?0.96916:0.96))<0.0001);
+    MainWindow window;window.resize(1400,900);window.show();window.onFileLoaded(loaded);
+    auto *shortcut=window.findChild<QToolButton*>("NtoAnalysisShortcut");QVERIFY(shortcut);
+    QTRY_VERIFY(!shortcut->isHidden());QVERIFY(shortcut->isEnabled());QVERIFY(!shortcut->icon().isNull());
+    auto *dialog=window.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);
+    auto *mode=dialog->findChild<QComboBox*>("NtoSurfaceMode");QVERIFY(mode);QCOMPARE(mode->currentIndex(),1);
+    auto views=dialog->findChildren<MoleculeView*>();QCOMPARE(views.size(),2);
+    auto *status=dialog->findChild<QLabel*>("NtoAnalysisStatus");QVERIFY(status);
+    QTRY_VERIFY_WITH_TIMEOUT(status->text().contains(QString::fromUtf8("Gaussian 저장 NTO")),10000);
+    for(auto *view:views) {QVERIFY(view->m_cubeGrid);QVERIFY(view->m_cubeGrid->valid);}
+    const auto screenshot=qEnvironmentVariable("YOUNGCRAFT_NATIVE_NTO_PREVIEW");
+    if(!screenshot.isEmpty()) {
+        QTest::qWait(500);QVERIFY(dialog->grab().save(screenshot+"-dialog.png"));
+        QVERIFY(window.m_analysisShortcuts->grab().save(screenshot+"-sidebar.png"));
+    }
+    dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    window.m_analysis->setCurrentTab(7);QVERIFY(!shortcut->isHidden());shortcut->click();
+    dialog=window.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);dialog->close();
+    window.m_analysis->setData({});window.m_data={};window.updatePanelActions();QVERIFY(shortcut->isHidden());
 }
 
 int main(int argc, char **argv) {

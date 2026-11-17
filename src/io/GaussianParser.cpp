@@ -15,6 +15,7 @@ namespace youngcraft {
 
 namespace {
 #include "io/gaussian/GaussianParserHelpers.inc"
+#include "io/gaussian/GaussianNativeNto.inc"
 } // namespace
 
 ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &options) {
@@ -53,6 +54,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
     int currentExcitedState = -1;
     bool sawAnyContent = false;
     bool previousOrbitalLine = false, previousOrbitalOccupied = false;
+    NativeNtoCollector nativeNto;
     QString previousOrbitalSpin;
     const QRegularExpression orbitalLineRe(QStringLiteral(R"(^\s*(Alpha|Beta)\s+(occ\.|virt\.)\s+eigenvalues\s*--)"));
 
@@ -77,6 +79,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
         const qint64 offset = file.pos();
         const QString line = QString::fromUtf8(file.readLine());
         const QString trimmed = line.trimmed();
+        nativeNto.observe(line,offset,result.data);
         if (!trimmed.isEmpty()) {
             sawAnyContent = true;
         }
@@ -282,7 +285,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
         }
 
         const auto orbitalMatch=orbitalLineRe.match(line);
-        if (orbitalMatch.hasMatch()) {
+        if (orbitalMatch.hasMatch() && nativeNto.state<0) {
             result.data.index.sectionOffsets["orbital_energies"].push_back(offset);
             const QString spin=orbitalMatch.captured(1);
             const bool occupied=orbitalMatch.captured(2)=="occ.";
@@ -293,7 +296,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
             for(double value:values)result.data.orbitals.push_back({++number,value*27.211386245988,occupied?(spin=="Beta"?1.0:2.0):0.0,{},spin});
             previousOrbitalSpin=spin;previousOrbitalOccupied=occupied;
         }
-        previousOrbitalLine=orbitalMatch.hasMatch();
+        previousOrbitalLine=orbitalMatch.hasMatch() && nativeNto.state<0;
 
         if (trimmed.contains(QStringLiteral("Dipole moment"), Qt::CaseInsensitive)) {
             while (!file.atEnd()) {
@@ -369,6 +372,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
         }
     }
 
+    nativeNto.finish(result.data);
     if (!lastAtoms.isEmpty()) {
         applyCharges(lastAtoms, mullikenCharges);
         applySpins(lastAtoms, spinDensities);
