@@ -245,6 +245,12 @@ Figure 번호와 구조 이름을 입력하면 `Figure SX. Optimized structures 
 
 ## TD-DFT 그래프와 Output 원문 (2026-10-30)
 
+TD 파일을 열면 상태 표 옆의 **NTO / h–p 아이콘** 또는 그래프 상단의 **NTO · Hole / Particle 분석**으로 선택 상태를 분석합니다. 출력된 정방향 전이 계수 X를 SVD하여 NTO 쌍의 기여도와 부호를 포함한 MO 조합, hole / particle MO별 기여도를 표시합니다. 출력에서 생략된 작은 전이와 역방향 계수 Y를 포함하지 않는 **근사 분석**이며, 기여도는 읽은 계수 내에서 정규화합니다. 전이 계수가 없는 요약 파일은 분석에 필요한 데이터를 안내합니다.
+
+**3D 분석**은 같은 이름의 `.fchk` / `.fch` / `.chk`를 자동으로 찾고 기존 Gaussian `cubegen` 설정(로컬/원격)을 사용합니다. 동일 계산의 **canonical MO 체크포인트**가 필요하며, `SaveNTO`로 원래 MO를 바꾼 체크포인트를 사용하면 안 됩니다. 체크포인트 선택으로 직접 연결할 수도 있습니다. 전체 hole / particle 밀도는 모든 NTO 쌍에 대해 `Σ wₖ |NTOₖ(r)|²`로 계산하고, 개별 쌍은 양/음 위상 등가면으로 표시합니다. Iso 값을 조절할 수 있습니다. MO 생성은 취소할 수 있으며 기존 오비탈 캐시를 재사용합니다.
+
+Gaussian과 ORCA 모두 미리 생성한 MO cube를 `TD파일이름.mo.<출력 MO 번호>.cube`로 두면 읽습니다. 예: Gaussian `sample.mo.12.cube`, ORCA `sample.mo.0a.cube`. 번호는 출력에 나온 값을 그대로 사용합니다(ORCA는 0부터 시작). 원래 canonical MO 위상과 번호를 유지하고, 모든 cube의 원점·축·격자 및 분자 구조가 같아야 합니다. ORCA의 `.gbw` / `.nto` 바이너리를 직접 변환하지는 않습니다. 3D 생성은 최대 64개 MO, 수치 분석은 각 방향 최대 256개 MO를 지원합니다.
+
 TD-DFT 그래프 상단의 **내보내기…**로 PNG 또는 벡터 PDF를 저장합니다. 크기·해상도·투명 배경을 설정하고 미리보기를 확인할 수 있습니다. **그림 복사**는 현재 축·선폭·정규화·막대 설정을 반영한 600 dpi 이미지를 클립보드에 복사하며, 기본 투명 배경을 유지한 PNG도 함께 제공합니다. 내보내기 창의 **그림 복사**는 창에서 지정한 크기와 해상도를 사용합니다.
 
 TD-DFT 스펙트럼은 기본 투명 배경, 빨간 곡선(2.5), 굵은 축(1.8), Times New Roman Bold 14 pt 축 제목을 사용합니다. 정규화 시 `Normalized absorption (a.u.)`, 정규화 해제 시 `Calculated absorption (a.u.)`로 표시합니다. 현재 곡선은 진동자 세기에 파장 기준 Gaussian/Lorentzian 선폭을 적용한 상대 흡수 스펙트럼이며 절대 몰흡광계수가 아닙니다. 참고: https://veloxchem.org/docs/uv-vis/

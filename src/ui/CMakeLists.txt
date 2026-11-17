@@ -14,6 +14,7 @@ add_library(youngcraft_ui STATIC
     PlotWidget.cpp
     PlotWidget_Export.cpp
     AnalysisPanel.cpp
+    TransitionAnalysisDialog.cpp
     analysispanel/AnalysisPanel_Geometry.cpp
     analysispanel/AnalysisPanel_Frequency.cpp
     analysispanel/AnalysisPanel_Coordinates.cpp
