@@ -11,6 +11,7 @@ using namespace youngcraft;
 class GaussianParserTest final : public QObject {
     Q_OBJECT
 private slots:
+    void savedNtoWithoutTdTransitions();
     void extractsGeometryEnergyFrequencyAndProperties();
     void parsesScanAndIrcFixture();
     void toleratesIncompleteOutput();
@@ -309,6 +310,24 @@ void GaussianParserTest::scanCoordinatesAndJobs() {
     QCOMPARE(r.data.scanPoints.size(), 2);
     QCOMPARE(r.data.scanPoints[1].index, 3);
     QCOMPARE(r.data.scanPoints[1].energyHartree, -0.79979);
+}
+
+void GaussianParserTest::savedNtoWithoutTdTransitions() {
+    QTemporaryFile file;QVERIFY(file.open());
+    file.write("# B3LYP/def2SVP Guess=(Read,Only) Density=(Check,Transition=1) Pop=SaveNTO\n"
+        " Saving Alpha spin NTOs for state 1 to file 20524.\n"
+        " Alpha occ. eigenvalues -- 0.00000 0.04000 0.96000\n"
+        " Alpha virt. eigenvalues -- 0.96000 0.04000 0.00000 0.00000\n"
+        " Natural Transition Orbital Coefficients:\n"
+        " Normal termination of Gaussian\n");file.flush();
+    auto parsed=GaussianParser::parse(file.fileName());QVERIFY(parsed.success);
+    QCOMPARE(parsed.data.excitedStates.size(),1);const auto &state=parsed.data.excitedStates.first();
+    QVERIFY(state.transitions.isEmpty());QCOMPARE(state.nativeNtoPairs.size(),2);
+    QCOMPARE(state.nativeNtoPairs[0].hole,QString("3a"));QCOMPARE(state.nativeNtoPairs[0].particle,QString("4a"));
+    QCOMPARE(state.nativeNtoPairs[0].weight,0.96);QVERIFY(std::isnan(state.energyEv));
+    QVERIFY(parsed.data.orbitals.isEmpty());QCOMPARE(parsed.data.index.sectionOffsets["excited_states"].size(),1);
+    file.resize(0);file.seek(0);file.write(" Saving Alpha spin NTOs for state 1 to file 20524.\n Alpha occ. eigenvalues -- 0.04 0.96\n");file.flush();
+    QVERIFY(GaussianParser::parse(file.fileName()).data.excitedStates.isEmpty());
 }
 
 QTEST_APPLESS_MAIN(GaussianParserTest)

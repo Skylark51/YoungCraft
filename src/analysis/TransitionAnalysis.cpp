@@ -7,6 +7,22 @@
 namespace youngcraft {
 TransitionAnalysis TransitionAnalysis::calculate(const ExcitedState &state) {
     TransitionAnalysis result;
+    if(!state.nativeNtoPairs.isEmpty()) {
+        for(const auto &p:state.nativeNtoPairs) {
+            if(!std::isfinite(p.weight) || p.weight<=0 || result.occupied.contains(p.hole) || result.virtuals.contains(p.particle)) {
+                result.error=QStringLiteral("유효하지 않은 저장 NTO 쌍입니다.");return result;
+            }
+            result.occupied.append(p.hole);result.virtuals.append(p.particle);result.printedNorm+=p.weight;
+        }
+        const int count=int(state.nativeNtoPairs.size());
+        for(int i=0;i<count;++i) {
+            NtoPair pair;pair.weight=state.nativeNtoPairs[i].weight/result.printedNorm;
+            pair.hole.fill(0,count);pair.particle.fill(0,count);pair.hole[i]=pair.particle[i]=1;
+            result.pairs.append(pair);result.holePopulation.append(pair.weight);result.particlePopulation.append(pair.weight);
+        }
+        std::stable_sort(result.pairs.begin(),result.pairs.end(),[](const auto &a,const auto &b){return a.weight>b.weight;});
+        return result;
+    }
     static const QRegularExpression label(QStringLiteral("^\\d+[ab]?$"));
     for (const auto &t : state.transitions) {
         const auto from=t.from.toLower(), to=t.to.toLower();
@@ -69,10 +85,14 @@ std::shared_ptr<CubeGrid> TransitionAnalysis::grid(const QVector<std::shared_ptr
     const int count=int(particle?virtuals.size():occupied.size());
     if(!this->error.isEmpty() || pairs.isEmpty() || mos.size()!=count || !count || pair>=pairs.size() || pair< -1)
         return fail(QStringLiteral("MO 그리드 또는 NTO 쌍이 부족합니다."));
-    const auto &base=mos.first();
+    const auto needed=[&](int i){return pair<0 || (particle?pairs[pair].particle[i]:pairs[pair].hole[i])!=0;};
+    std::shared_ptr<const CubeGrid> base;
+    for(int i=0;i<count;++i)if(needed(i) && mos[i]){base=mos[i];break;}
     if(!base || !base->valid || base->nx<=0 || base->ny<=0 || base->nz<=0 || base->values.size()!=qint64(base->nx)*base->ny*base->nz)
         return fail(QStringLiteral("유효하지 않은 MO 그리드입니다."));
-    for(const auto &g:mos) {
+    for(int index=0;index<count;++index) {
+        if(!needed(index))continue;
+        const auto &g=mos[index];
         if(!g || !g->valid || g->nx!=base->nx || g->ny!=base->ny || g->nz!=base->nz || g->values.size()!=base->values.size()
            || (g->origin-base->origin).length()>1e-6f || (g->axisX-base->axisX).length()>1e-6f
            || (g->axisY-base->axisY).length()>1e-6f || (g->axisZ-base->axisZ).length()>1e-6f)
@@ -90,7 +110,7 @@ std::shared_ptr<CubeGrid> TransitionAnalysis::grid(const QVector<std::shared_ptr
     for(int p=first;p<last;++p) {
         amplitude.fill(0);
         const auto &coeff=particle?pairs[p].particle:pairs[p].hole;
-        for(int i=0;i<count;++i) for(qsizetype k=0;k<amplitude.size();++k) amplitude[k]+=coeff[i]*mos[i]->values[k];
+        for(int i=0;i<count;++i) if(coeff[i]!=0) for(qsizetype k=0;k<amplitude.size();++k) amplitude[k]+=coeff[i]*mos[i]->values[k];
         for(qsizetype k=0;k<amplitude.size();++k)
             out->values[k]+=float(pair<0?pairs[p].weight*amplitude[k]*amplitude[k]:amplitude[k]);
     }

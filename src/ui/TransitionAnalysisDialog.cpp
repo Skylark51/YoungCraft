@@ -31,13 +31,16 @@ TransitionAnalysisDialog::TransitionAnalysisDialog(const CalculationData &data,i
     setWindowTitle(QStringLiteral("NTO · Hole / Particle 분석")); resize(1120,800);
     auto *layout=new QVBoxLayout(this);
     const auto state=data.excitedStates.value(row);
+    m_native=!state.nativeNtoPairs.isEmpty();
     m_analysis=TransitionAnalysis::calculate(state);
     if(state.frameIndex>=0 && state.frameIndex<data.frames.size() && data.frames[state.frameIndex].coordinates.size()==m_data.molecule.atoms.size())
         for(int i=0;i<m_data.molecule.atoms.size();++i)m_data.molecule.atoms[i].position=data.frames[state.frameIndex].coordinates[i];
     auto *title=new QLabel(QStringLiteral("%1 · 상태 %2 · %3 eV")
         .arg(QFileInfo(data.filePath).fileName(),state.label.isEmpty()?QString::number(state.state):state.label)
-        .arg(state.energyEv,0,'f',4)); layout->addWidget(title);
-    auto *notice=new QLabel(QStringLiteral("출력된 정방향 전이 계수(X)의 SVD 근사입니다. 생략된 전이 및 역방향 계수(Y)는 포함하지 않습니다. "
+        .arg(std::isfinite(state.energyEv)?QString::number(state.energyEv,'f',4):QStringLiteral("—"))); layout->addWidget(title);
+    auto *notice=new QLabel(m_native?QStringLiteral("Gaussian SaveNTO에 저장된 NTO 쌍과 고유값을 직접 읽었습니다. 기여도는 출력된 고유값의 합으로 정규화합니다. "
+        "3D 분석에는 이 SaveNTO 계산에서 생성한 NTO 체크포인트 또는 해당 NTO cube를 사용합니다. Hole은 전자가 빠지는 쪽, Particle은 이동하는 쪽입니다."):
+        QStringLiteral("출력된 정방향 전이 계수(X)의 SVD 근사입니다. 생략된 전이 및 역방향 계수(Y)는 포함하지 않습니다. "
         "기여도는 읽은 계수 내에서 정규화합니다. 전체 전이밀도 기반의 엄밀한 TD-DFT NTO와 다를 수 있습니다. "
         "Hole은 전자가 빠지는 쪽, Particle은 전자가 이동하는 쪽입니다."));
     notice->setWordWrap(true); layout->addWidget(notice);
@@ -71,13 +74,15 @@ TransitionAnalysisDialog::TransitionAnalysisDialog(const CalculationData &data,i
         if(QFileInfo::exists(candidate)) {m_source=candidate;break;}
     }
     m_sourceLabel=new QLabel; m_sourceLabel->setWordWrap(true); layout->addWidget(m_sourceLabel);
-    m_sourceLabel->setText(m_source.isEmpty()?QStringLiteral("3D: 같은 이름의 FCHK/FCH/CHK가 없습니다. MO cube 또는 원래 canonical MO 체크포인트가 필요합니다."):m_source);
+    m_sourceLabel->setText(m_source.isEmpty()?(m_native?QStringLiteral("3D: 같은 이름의 NTO FCHK/FCH/CHK 또는 저장 NTO cube가 필요합니다."):
+        QStringLiteral("3D: 같은 이름의 FCHK/FCH/CHK가 없습니다. MO cube 또는 원래 canonical MO 체크포인트가 필요합니다.")):m_source);
     auto *controls=new QHBoxLayout;
     auto *source=new QPushButton(QStringLiteral("체크포인트 선택…")); controls->addWidget(source);
-    source->setToolTip(QStringLiteral("동일 TD 계산의 canonical MO 파일을 선택하세요. SaveNTO로 MO가 치환된 파일은 사용하지 마세요."));
+    source->setToolTip(m_native?QStringLiteral("이 SaveNTO 계산에서 생성한 NTO 체크포인트를 선택하세요."):
+        QStringLiteral("동일 TD 계산의 canonical MO 파일을 선택하세요. SaveNTO로 MO가 치환된 파일은 사용하지 마세요."));
     connect(source,&QPushButton::clicked,this,[this]{
         if(m_runner->busy())return;
-        const auto path=QFileDialog::getOpenFileName(this,QStringLiteral("동일 계산의 canonical MO 체크포인트"),QFileInfo(m_data.filePath).absolutePath(),"Gaussian (*.fchk *.fch *.chk)");
+        const auto path=QFileDialog::getOpenFileName(this,m_native?QStringLiteral("동일 SaveNTO 계산의 NTO 체크포인트"):QStringLiteral("동일 계산의 canonical MO 체크포인트"),QFileInfo(m_data.filePath).absolutePath(),"Gaussian (*.fchk *.fch *.chk)");
         if(!path.isEmpty()){m_source=path;m_sourceLabel->setText(path);m_grids.clear();m_hole->clearCubeGrid();m_particle->clearCubeGrid();}
     });
     m_mode=new QComboBox; m_mode->setObjectName("NtoSurfaceMode");
@@ -97,7 +102,8 @@ TransitionAnalysisDialog::TransitionAnalysisDialog(const CalculationData &data,i
         view->setMinimumSize(200,220);view->setMolecule(data.molecule);column->addWidget(view,1);views->addLayout(column,1);
     }
     layout->addLayout(views,3);
-    m_status=new QLabel(m_analysis.error.isEmpty()?QStringLiteral("정규화 전 ΣX² = %1 · NTO %2쌍. 3D 분석은 동일 계산의 MO 데이터가 필요합니다.")
+    m_status=new QLabel(m_analysis.error.isEmpty()?(m_native?QStringLiteral("저장 NTO 고유값 합 = %1 · NTO %2쌍. 3D 분석으로 선택 쌍을 표시합니다."):
+        QStringLiteral("정규화 전 ΣX² = %1 · NTO %2쌍. 3D 분석은 동일 계산의 MO 데이터가 필요합니다."))
         .arg(m_analysis.printedNorm,0,'g',8).arg(m_analysis.pairs.size()):m_analysis.error);
     m_status->setObjectName("NtoAnalysisStatus");m_status->setWordWrap(true);layout->addWidget(m_status);
     connect(m_generate,&QPushButton::clicked,this,[this]{generate();});
@@ -111,11 +117,24 @@ TransitionAnalysisDialog::TransitionAnalysisDialog(const CalculationData &data,i
         if(m_next<m_pending.size())m_grids[m_pending[m_next++]]=grid;
         QTimer::singleShot(0,this,[this]{nextGrid();});
     });
+    if(m_native && m_mode->count()>1) {
+        m_mode->setCurrentIndex(1);
+        const auto &first=m_analysis.pairs.first();bool companions=true;
+        for(int i=0;i<m_analysis.occupied.size();++i)if(first.hole[i]!=0)
+            companions=companions && QFileInfo::exists(input.dir().filePath(input.completeBaseName()+".mo."+m_analysis.occupied[i]+".cube"));
+        for(int i=0;i<m_analysis.virtuals.size();++i)if(first.particle[i]!=0)
+            companions=companions && QFileInfo::exists(input.dir().filePath(input.completeBaseName()+".mo."+m_analysis.virtuals[i]+".cube"));
+        if(companions)QTimer::singleShot(0,this,[this]{generate();});
+    }
 }
 void TransitionAnalysisDialog::generate() {
     if(m_runner->busy())return;
-    m_pending=m_analysis.occupied;
-    for(const auto &label:m_analysis.virtuals) if(!m_pending.contains(label))m_pending.append(label);
+    m_pending.clear();const int selected=m_mode->currentData().toInt();
+    for(int side=0;side<2;++side) {
+        const auto &labels=side?m_analysis.virtuals:m_analysis.occupied;
+        for(int i=0;i<labels.size();++i)
+            if((selected<0 || (side?m_analysis.pairs[selected].particle[i]:m_analysis.pairs[selected].hole[i])!=0) && !m_pending.contains(labels[i]))m_pending.append(labels[i]);
+    }
     if(m_pending.size()>64) {m_status->setText(QStringLiteral("3D 생성은 최대 64 MO까지 지원합니다. NTO 계수 분석은 위 표에서 확인할 수 있습니다."));return;}
     // Deterministic companions only; never assign unrelated cubes by directory order.
     const QFileInfo input(m_data.filePath);
@@ -139,7 +158,7 @@ void TransitionAnalysisDialog::nextGrid() {
     if(m_next>=m_pending.size()) {
         m_generate->setEnabled(true);m_cancel->setEnabled(false);
         if(!m_pending.isEmpty()) {
-            m_sourceLabel->setText(QStringLiteral("3D: %1개 canonical MO 그리드 연결됨 · %2")
+            m_sourceLabel->setText(QStringLiteral("3D: %1개 오비탈 그리드 연결됨 · %2")
                 .arg(m_grids.size()).arg(m_source.isEmpty()?QFileInfo(m_data.filePath).absolutePath():m_source));
             showGrids();
         }
@@ -149,9 +168,19 @@ void TransitionAnalysisDialog::nextGrid() {
     m_runner->generate(m_source,(beta?"BMO=":"AMO=")+label,40,"SCF");
 }
 void TransitionAnalysisDialog::showGrids() {
+    if(m_analysis.pairs.isEmpty())return;
     QVector<std::shared_ptr<const CubeGrid>> holes,particles;
-    for(const auto &label:m_analysis.occupied) {if(!m_grids.contains(label))return;holes.append(m_grids[label]);}
-    for(const auto &label:m_analysis.virtuals) {if(!m_grids.contains(label))return;particles.append(m_grids[label]);}
+    const int selected=m_mode->currentData().toInt();
+    for(int i=0;i<m_analysis.occupied.size();++i) {
+        auto grid=m_grids.value(m_analysis.occupied[i]);if(!grid && (selected<0 || m_analysis.pairs[selected].hole[i]!=0)) {
+            m_status->setText(QStringLiteral("이 표시에 필요한 오비탈을 3D 분석으로 불러오세요."));return;
+        }holes.append(grid);
+    }
+    for(int i=0;i<m_analysis.virtuals.size();++i) {
+        auto grid=m_grids.value(m_analysis.virtuals[i]);if(!grid && (selected<0 || m_analysis.pairs[selected].particle[i]!=0)) {
+            m_status->setText(QStringLiteral("이 표시에 필요한 오비탈을 3D 분석으로 불러오세요."));return;
+        }particles.append(grid);
+    }
     QString error;const int pair=m_mode->currentData().toInt();
     auto h=m_analysis.grid(holes,false,pair,&error);
     if(!h){m_status->setText(error);return;}
@@ -178,7 +207,7 @@ void TransitionAnalysisDialog::showGrids() {
         style.positiveSurfaceColor=side?QColor("#257fce"):QColor("#df7733");style.negativeSurfaceColor=QColor("#ad40a0");
         view->setStyle(style);view->setCubeGrid(grid,float(m_iso->value()));
     }
-    m_status->setText(pair<0?QStringLiteral("Hole / Particle: Σ wₖ |NTOₖ(r)|² · 출력 X 계수 기준 근사 밀도"):
-        QStringLiteral("선택 NTO 쌍 · 양/음 위상 등가면 · 출력 X 계수 기준 근사"));
+    m_status->setText((pair<0?QStringLiteral("Hole / Particle 밀도: Σ wₖ |NTOₖ(r)|²"):QStringLiteral("선택 NTO 쌍 · 양/음 위상 등가면"))+
+        (m_native?QStringLiteral(" · Gaussian 저장 NTO"):QStringLiteral(" · 출력 X 계수 기준 근사")));
 }
 }

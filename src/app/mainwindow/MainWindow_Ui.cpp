@@ -501,10 +501,10 @@ void MainWindow::createDocumentUi() {
     makeSidebarIconButton(sourceResult, QStyle::SP_FileIcon);
     spectrumButtons->addWidget(sourceResult);
     connect(sourceResult,&QPushButton::clicked,this,[this]{updateOutputSource("excited_states",qMax(0,m_analysis->findChild<QTableWidget*>("TddftStatesTable")->currentRow()),true);});
-    auto *ntoAnalysis=new QPushButton(QStringLiteral("NTO · Hole / Particle 분석"),m_tddftWorkspace);
+    auto *ntoAnalysis=new QPushButton(QStringLiteral("NTO 분석"),m_tddftWorkspace);
     ntoAnalysis->setObjectName(QStringLiteral("TddftNtoAnalysis"));
-    makeSidebarIconButton(ntoAnalysis,QStyle::SP_ComputerIcon);
     ntoAnalysis->setIcon(transitionAnalysisIcon());
+    ntoAnalysis->setToolTip(QStringLiteral("선택 상태의 NTO · Hole / Particle 분석"));
     spectrumButtons->addWidget(ntoAnalysis);
     connect(ntoAnalysis,&QPushButton::clicked,this,[this]{m_analysis->showTransitionAnalysis();});
 
@@ -778,7 +778,7 @@ void MainWindow::connectDocumentUi() {
         if (auto *states = m_analysis->findChild<QTableWidget*>("TddftStatesTable"))
             m_tddftWorkspacePlot->setSelectedPoint(states->currentRow());
         m_tddftWorkspacePlot->setEmptyMessage(
-            summary == QStringLiteral("TD-DFT 데이터 없음")
+            summary == QStringLiteral("TD-DFT 데이터 없음") || summary.startsWith(QStringLiteral("Gaussian 저장 NTO"))
                 ? summary
                 : QStringLiteral("표시할 스펙트럼이 없습니다(막대 표시를 켜세요)."));
         m_tddftWorkspaceInfo->setText(summary);

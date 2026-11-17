@@ -124,6 +124,9 @@ void AnalysisPanel::fillTddft() {
             if (!transitions.isEmpty()) transitions += QStringLiteral(", ");
             transitions += QStringLiteral("%1→%2 (%3)").arg(transition.from, transition.to).arg(numberOrDash(transition.coefficient, 3));
         }
+        if(!state.nativeNtoPairs.isEmpty()) {
+            transitions=QStringLiteral("저장 NTO %1쌍").arg(state.nativeNtoPairs.size());
+        }
         m_tddftTable->setItem(row, 0, item(state.label.isEmpty() ? QString::number(state.state) : state.label));
         m_tddftTable->setItem(row, 1, item(numberOrDash(state.energyEv, 4)));
         m_tddftTable->setItem(row, 2, item(numberOrDash(state.wavelengthNm, 2)));
@@ -133,9 +136,9 @@ void AnalysisPanel::fillTddft() {
         analyze->setObjectName(QStringLiteral("AnalyzeTransition_%1").arg(row));
         analyze->setIcon(transitionAnalysisIcon());
         analyze->setAccessibleName(QStringLiteral("상태 %1 NTO · Hole / Particle 분석").arg(state.state));
-        analyze->setToolTip(state.transitions.isEmpty()?QStringLiteral("전이 계수가 없어 분석할 수 없습니다. 계수를 포함한 TD 출력이 필요합니다."):
+        analyze->setToolTip(state.transitions.isEmpty() && state.nativeNtoPairs.isEmpty()?QStringLiteral("전이 계수가 없어 분석할 수 없습니다. 계수를 포함한 TD 출력이 필요합니다."):
                             QStringLiteral("이 상태의 NTO · Hole / Particle 분석"));
-        analyze->setEnabled(!state.transitions.isEmpty());
+        analyze->setEnabled(!state.transitions.isEmpty() || !state.nativeNtoPairs.isEmpty());
         connect(analyze,&QToolButton::clicked,this,[this,row]{m_tddftTable->setCurrentCell(row,0);showTransitionAnalysis(row);});
         m_tddftTable->setCellWidget(row,5,analyze);
         if(std::isfinite(state.wavelengthNm)&&state.wavelengthNm>0&&std::isfinite(state.oscillatorStrength)&&state.oscillatorStrength>=0)
@@ -177,6 +180,8 @@ void AnalysisPanel::fillTddft() {
                       .arg(m_data.excitedStates.size()).arg(strongestState)
                       .arg(strongest, 0, 'f', 5).arg(shape)
                       .arg(shapeValue >= 0 ? QStringLiteral(" ·  폭 %1 nm").arg(m_broadening->value(), 0, 'f', 1) : QString());
+        if(std::all_of(m_data.excitedStates.cbegin(),m_data.excitedStates.cend(),[](const auto &s){return !s.nativeNtoPairs.isEmpty() && !std::isfinite(s.wavelengthNm);}))
+            summary=QStringLiteral("Gaussian 저장 NTO 결과 · 상태 옆 또는 그래프 상단의 주황·파랑 NTO 아이콘으로 분석하세요. 스펙트럼은 원래 TD 출력에서 확인합니다.");
     }
     if (selectedRow >= 0 && selectedRow < m_tddftTable->rowCount())
         m_tddftTable->setCurrentCell(selectedRow, 0);
