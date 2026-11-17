@@ -12,7 +12,7 @@ internal static class YoungcraftPatcher
     private static int Main()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), "Youngcraft-Patch-" + Guid.NewGuid().ToString("N") + ".ps1");
-        Console.WriteLine("[YoungCraft Patch] Project Library / Reaction Pathway update");
+        Console.WriteLine("[YoungCraft Patch] Youngcraft portable update");
         int exitCode = 1;
         try
         {
@@ -25,6 +25,9 @@ internal static class YoungcraftPatcher
             string arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + tempFile + "\" -PatchExecutable \"" + executable + "\"";
             ProcessStartInfo info = new ProcessStartInfo("powershell.exe", arguments);
             info.UseShellExecute = false;
+            // Let Windows PowerShell build its own module path when launched
+            // from PowerShell 7, whose inherited modules are incompatible.
+            info.EnvironmentVariables.Remove("PSModulePath");
             using (Process child = Process.Start(info))
             {
                 if (child == null) throw new InvalidOperationException("Could not start PowerShell.");
