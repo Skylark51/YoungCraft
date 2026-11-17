@@ -1731,6 +1731,37 @@ void SmokeTest::atomVisibilityPreservesViewAndScroll() {
     }
     for (const auto &a : v->molecule().atoms) QVERIFY(a.visible);
     QVERIFY(v->style().showHydrogen);
+    auto *keepHydrogens = w.findChild<QAction *>("HideUnselectedHydrogens");
+    QVERIFY(keepHydrogens);
+    // A heavy-atom-only selection must leave visibility unchanged.
+    keepHydrogens->trigger();
+    for (const auto &a : v->molecule().atoms) QVERIFY(a.visible);
+    QVERIFY(trigger(QStringLiteral("모든 수소 숨기기")));
+    w.m_data.molecule.atoms[4].visible = false;
+    w.updateAtomVisibility();
+    w.applyAtomSelection({0,1});
+    keepHydrogens->trigger();
+    QVERIFY(v->style().showHydrogen);
+    QVERIFY(v->molecule().atoms[1].visible);
+    QVERIFY(!v->molecule().atoms[3].visible);
+    QVERIFY(!v->molecule().atoms[4].visible);
+    QCOMPARE(v->selection().atoms, QSet<int>({0,1}));
+    w.applyAtomSelection({1,3});
+    keepHydrogens->trigger();
+    QVERIFY(v->molecule().atoms[1].visible);
+    QVERIFY(v->molecule().atoms[3].visible);
+    w.applyAtomSelection({}); w.showAtom(3);
+    keepHydrogens->trigger();
+    QVERIFY(!v->molecule().atoms[1].visible);
+    QVERIFY(v->molecule().atoms[3].visible);
+    QCOMPARE(v->molecule().atoms.size(), m.atoms.size());
+    QCOMPARE(v->molecule().bonds.size(), m.bonds.size());
+    QCOMPARE(v->m_rotation, rotation); QCOMPARE(v->m_target, target);
+    QCOMPARE(v->viewProjection(), projection);
+    QCOMPARE(scroll->value(), scrollValue);
+    for (int i=0; i<live.size(); ++i) QCOMPARE(v->molecule().atoms[i].position, live[i]);
+    QVERIFY(trigger(QStringLiteral("숨긴 원자 모두 복원")));
+    for (const auto &a : v->molecule().atoms) QVERIFY(a.visible);
     // The result tree and atom table select a single atom without a selection set.
     w.applyAtomSelection({}); w.showAtom(3);
     QVERIFY(trigger(QStringLiteral("선택 원자 숨기기")));

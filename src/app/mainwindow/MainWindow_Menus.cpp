@@ -255,6 +255,27 @@ void MainWindow::createMenus() {
     auto *focusReset = add(m_atomFocusMenu, QStringLiteral("원자 표시·불투명도 모두 복원"), {}, [this] { emphasizeSelectedAtoms(2); });
     focusReset->setObjectName(QStringLiteral("AtomFocusRestore"));
     QMenu *hideAtoms = view->addMenu(QStringLiteral("특정 원자 숨기기"));
+    add(hideAtoms, QStringLiteral("선택한 수소 제외 숨기기"), {}, [this, showHydrogen] {
+        auto selected = m_view->selection().atoms;
+        const int picked = m_view->selectedAtom();
+        if (selected.isEmpty() && picked >= 0) selected.insert(picked);
+        QSet<int> keptHydrogens;
+        for (int index : selected)
+            if (index >= 0 && index < m_data.molecule.atoms.size() &&
+                m_data.molecule.atoms[index].atomicNumber == 1) keptHydrogens.insert(index);
+        if (keptHydrogens.isEmpty()) {
+            setStatus(QStringLiteral("남길 수소를 먼저 선택하세요. Shift/Ctrl로 여러 수소를 선택할 수 있습니다."));
+            return;
+        }
+        for (int i = 0; i < m_data.molecule.atoms.size(); ++i)
+            if (m_data.molecule.atoms[i].atomicNumber == 1)
+                m_data.molecule.atoms[i].visible = keptHydrogens.contains(i);
+        updateAtomVisibility();
+        m_style.showHydrogen = true;
+        applyStyle(m_style);
+        showHydrogen->setChecked(true);
+        setStatus(QStringLiteral("선택한 수소 %1개를 제외한 수소를 숨겼습니다.").arg(keptHydrogens.size()));
+    })->setObjectName(QStringLiteral("HideUnselectedHydrogens"));
     add(hideAtoms, QStringLiteral("모든 수소 숨기기"), {}, [this, showHydrogen] {
         m_style.showHydrogen = false;
         applyStyle(m_style);
