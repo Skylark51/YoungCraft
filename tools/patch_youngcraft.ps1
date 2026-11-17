@@ -40,6 +40,7 @@ if($TargetDir){
         $marker=Join-Path $env:LOCALAPPDATA 'Youngcraft\install-location.txt'
         if(Test-Path -LiteralPath $marker){Candidate (Get-Content -LiteralPath $marker -TotalCount 1) 850}
         Candidate (Join-Path $env:LOCALAPPDATA 'Programs\Youngcraft') 400
+        Candidate (Join-Path $env:LOCALAPPDATA 'Programs\Youngcraft Portable') 450
     }
     foreach($proc in @(Get-Process Youngcraft -ErrorAction SilentlyContinue)){
         try{Candidate (Split-Path -Parent $proc.Path) 950}catch{}

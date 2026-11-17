@@ -84,7 +84,7 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     case 8: p.drawEllipse(QPointF(16,16),8,8);p.drawLine(16,2,16,11);p.drawLine(16,21,16,30);p.drawLine(2,16,11,16);p.drawLine(21,16,30,16);break;
     case 9: {QPainterPath path;path.moveTo(2,16);path.quadTo(16,-2,30,16);path.quadTo(16,34,2,16);p.drawPath(path);p.drawEllipse(QPointF(16,16),5,5);break;}
     case 11: case 23: p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(12,4,12,28);p.drawLine(6,10,9,10);p.drawLine(6,15,9,15);p.drawLine(6,20,9,20);break;
-    case 12: p.drawLine(4,4,4,28);p.drawLine(4,28,29,28);p.drawPolyline(QPolygonF{{7,7},{12,16},{17,22},{23,24},{28,24}});break;
+    case 12: p.drawLine(8,23,16,9);p.drawLine(16,9,26,21);p.drawLine(8,23,26,21);p.drawEllipse(QPointF(8,23),3,3);p.drawEllipse(QPointF(16,9),4,4);p.drawEllipse(QPointF(26,21),3,3);break;
     case 13: {QPainterPath path;path.moveTo(2,16);for(int x=2;x<=30;++x)path.lineTo(x,16+8*std::sin((x-2)*3.141592653589793/7));p.drawPath(path);break;}
     case 14: p.drawLine(4,4,4,28);p.drawLine(4,28,29,28);p.drawPolyline(QPolygonF{{7,9},{12,21},{17,24},{22,21},{28,9}});for(const auto &point:QPolygonF{{7,9},{17,24},{28,9}})p.drawEllipse(point,2,2);break;
     case 15: {QPainterPath path;path.moveTo(3,25);path.cubicTo(10,25,10,7,16,7);path.cubicTo(22,7,22,25,29,25);p.drawPath(path);p.drawEllipse(QPointF(16,7),2,2);break;}
@@ -249,7 +249,7 @@ void MainWindow::createToolBar() {
     analysisGrid->setObjectName("AnalysisShortcutFlow");
     analysisGrid->setContentsMargins(0, 0, 0, 0);
     analysisGrid->setSpacing(4);
-    const QStringList labels = {QStringLiteral("Opt"), QStringLiteral("Freq"),
+    const QStringList labels = {QStringLiteral("구조"), QStringLiteral("Freq"),
         QStringLiteral("Scan"), QStringLiteral("IRC"), QStringLiteral("TD-DFT"),
         QStringLiteral("원자 속성"), QStringLiteral("Orbitals"), QStringLiteral("XYZ")};
     const auto titles = m_analysis->tabTitles();
@@ -259,7 +259,7 @@ void MainWindow::createToolBar() {
             m_analysis->setCurrentTab(i);
         });
         action->setObjectName(QStringLiteral("AnalysisPanelTab%1").arg(i));
-        action->setToolTip(titles[i]);
+        action->setToolTip(i == 0 ? QStringLiteral("분자 구조 보기 / 최적화 결과") : titles[i]);
         action->setProperty("analysisTab", i);
         action->setProperty("toolbarIconId", 12 + i);
         action->setCheckable(true);

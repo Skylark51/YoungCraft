@@ -449,6 +449,7 @@ void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
 
 void SmokeTest::linkedIrcAndTddftGeometrySelection() {
     MainWindow window;
+    window.show();
     Molecule molecule; molecule.atoms = {{1, 1, "H", {0, 0, 0}}};
     window.newDrawingDocument(molecule);
     window.setDrawingMode(false);
@@ -482,6 +483,26 @@ void SmokeTest::linkedIrcAndTddftGeometrySelection() {
     QCOMPARE(window.m_tddftWorkspacePlot->selectedPoint(), 1);
     QCOMPARE(window.m_currentFrame, 1);
     QCOMPARE(window.m_view->molecule().atoms[0].position, second.coordinates[0]);
+    // The structure shortcut must remain discoverable from TD-DFT results.
+    window.updatePanelActions();
+    auto *structureAction = window.findChild<QAction *>("AnalysisPanelTab0");
+    auto *tdAction = window.findChild<QAction *>("AnalysisPanelTab4");
+    QVERIFY(structureAction); QVERIFY(tdAction);
+    auto *structureButton = toolButtonForAction(window.m_explorerDock, structureAction);
+    auto *tdButton = toolButtonForAction(window.m_explorerDock, tdAction);
+    QVERIFY(structureButton); QVERIFY(tdButton);
+    tdButton->click();
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_tddftWorkspace);
+    QVERIFY(structureButton->isVisible());
+    QCOMPARE(structureAction->text(), QStringLiteral("구조"));
+    structureButton->click();
+    QCOMPARE(window.m_analysis->currentTab(), 0);
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_moleculeWorkspace);
+    QCOMPARE(window.m_view->molecule().atoms[0].position, second.coordinates[0]);
+    tdButton->click();
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_tddftWorkspace);
+    QCOMPARE(states->currentRow(), 1);
+    QCOMPARE(window.m_tddftWorkspacePlot->selectedPoint(), 1);
     irc->pointClicked(2);
     QCOMPARE(list->currentRow(), 2);
     QCOMPARE(irc->selectedPoint(), 2);

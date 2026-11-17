@@ -6,6 +6,8 @@ On Windows with Qt 6, MSVC, Python, RDKit and PyInstaller installed, run:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/package_portable.ps1
 
+After packaging, run `tools/create_desktop_patch.ps1`. It compiles the patch launcher and copies the current package to the Windows Desktop as `Youngcraft-Patch.exe` and `Youngcraft-portable.zip`. Every run overwrites these same filenames without a date or version suffix. Keep both files together so the launcher applies this local package.
+
 The output is Youngcraft-portable.zip. It contains the executable, Qt and VC runtime dependencies, the independent RDKit MM worker, xTB executables (including gfnff), runtime data, license notices, and lab fragments. It omits xTB source archives and duplicate copies of fragments already compiled into Qt resources.
 
 The ZIP includes package-manifest.json with the relative path, size and SHA-256 hash of each file.
