@@ -1,6 +1,7 @@
 #include "ui/PlotWidget.h"
 
 #include <QApplication>
+#include <QBuffer>
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
@@ -15,6 +16,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QPageLayout>
 #include <QPainter>
 #include <QPdfWriter>
@@ -99,6 +101,19 @@ bool PlotWidget::savePublication(const QString &path, const ExportOptions &o, QS
     return true;
 }
 
+bool PlotWidget::copyPublication(const ExportOptions &options) {
+    const auto result = publicationImage(options);
+    if (result.isNull()) return false;
+    QByteArray png;
+    QBuffer buffer(&png);
+    if (!buffer.open(QIODevice::WriteOnly) || !result.save(&buffer, "PNG")) return false;
+    auto *mime = new QMimeData;
+    mime->setImageData(result);
+    mime->setData(QStringLiteral("image/png"), png);
+    QApplication::clipboard()->setMimeData(mime);
+    return true;
+}
+
 void PlotWidget::showExportDialog() {
     QDialog dialog(this);
     dialog.setObjectName(QStringLiteral("PublicationExportDialog"));
@@ -165,8 +180,9 @@ void PlotWidget::showExportDialog() {
     dpi->setEnabled(false);
     connect(transparent,&QCheckBox::toggled,&dialog,refresh);
     connect(copy,&QPushButton::clicked,&dialog,[&] {
-        const auto result=publicationImage(options());
-        if (!result.isNull()) { QApplication::clipboard()->setImage(result); status->setText(QStringLiteral("논문용 그림을 클립보드에 복사했습니다.")); }
+        status->setText(copyPublication(options())
+            ? QStringLiteral("논문용 그림을 클립보드에 복사했습니다.")
+            : QStringLiteral("그림을 복사하지 못했습니다. 크기 또는 해상도를 줄여 주세요."));
     });
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     connect(buttons,&QDialogButtonBox::accepted,&dialog,[&] {
@@ -189,7 +205,7 @@ void PlotWidget::contextMenuEvent(QContextMenuEvent *event) {
     const auto *action=menu.exec(event->globalPos());
     if(action==axes)showAxisSettings();
     else if(action==publish)showExportDialog();
-    else if(action==copy)QApplication::clipboard()->setImage(publicationImage(ExportOptions{}));
+    else if(action==copy) { ExportOptions options; options.transparent=m_options.background.alpha()==0; copyPublication(options); }
 }
 
 void PlotWidget::showAxisSettings() {

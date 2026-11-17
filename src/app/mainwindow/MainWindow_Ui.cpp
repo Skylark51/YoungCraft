@@ -502,18 +502,20 @@ void MainWindow::createDocumentUi() {
     connect(sourceResult,&QPushButton::clicked,this,[this]{updateOutputSource("excited_states",qMax(0,m_analysis->findChild<QTableWidget*>("TddftStatesTable")->currentRow()),true);});
 
     spectrumButtons->addStretch();
-    auto *saveSpectrum = new QPushButton(QStringLiteral("출판용 저장…"), m_tddftWorkspace);
+    auto *saveSpectrum = new QPushButton(QStringLiteral("내보내기…"), m_tddftWorkspace);
     saveSpectrum->setObjectName(QStringLiteral("Document_saveSpectrum"));
-    auto *copySpectrum = new QPushButton(QStringLiteral("고해상도 복사"), m_tddftWorkspace);
+    auto *copySpectrum = new QPushButton(QStringLiteral("그림 복사"), m_tddftWorkspace);
     copySpectrum->setObjectName(QStringLiteral("Document_copySpectrum"));
-    makeSidebarIconButton(saveSpectrum, QStyle::SP_DialogSaveButton);
+    saveSpectrum->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    saveSpectrum->setToolTip(QStringLiteral("현재 TD-DFT 그래프를 PNG 또는 PDF로 저장합니다. 크기·해상도·투명 배경을 설정할 수 있습니다."));
     spectrumButtons->addWidget(saveSpectrum);
-    makeSidebarIconButton(copySpectrum, sidebarCopyIcon());
+    copySpectrum->setIcon(sidebarCopyIcon());
+    copySpectrum->setToolTip(QStringLiteral("현재 TD-DFT 그래프를 600 dpi 이미지로 클립보드에 복사합니다."));
     spectrumButtons->addWidget(copySpectrum);
     spectrumLayout->addWidget(spectrumTitle);
     spectrumLayout->addWidget(m_tddftWorkspaceInfo);
-    spectrumLayout->addWidget(m_tddftWorkspacePlot, 1);
     spectrumLayout->addLayout(spectrumButtons);
+    spectrumLayout->addWidget(m_tddftWorkspacePlot, 1);
 
     m_workspace->addWidget(m_tddftWorkspace);
     auto *contextSplitter = new QSplitter(Qt::Vertical, m_sidebars);
@@ -633,7 +635,11 @@ void MainWindow::connectDocumentUi() {
         m_tddftWorkspacePlot->showExportDialog();
     }));
     m_documentConnections.push_back(connect(copySpectrum, &QPushButton::clicked, this, [this] {
-        QApplication::clipboard()->setImage(m_tddftWorkspacePlot->publicationImage(PlotWidget::ExportOptions{}));
+        PlotWidget::ExportOptions options;
+        options.transparent=m_tddftWorkspacePlot->styleOptions().background.alpha()==0;
+        setStatus(m_tddftWorkspacePlot->copyPublication(options)
+            ? QStringLiteral("TD-DFT 그래프를 클립보드에 복사했습니다 (600 dpi).")
+            : QStringLiteral("TD-DFT 그래프를 복사하지 못했습니다."));
     }));
     m_documentConnections.push_back(connect(m_analysis, &AnalysisPanel::dataChanged, this, [this, panel = m_analysis] {
         if (panel == m_analysis) updatePanelActions();

@@ -84,6 +84,7 @@ public:
     QImage publicationImage(const ExportOptions &options);
     bool savePublication(const QString &path, const ExportOptions &options, QString *error = nullptr);
     void showExportDialog();
+    bool copyPublication(const ExportOptions &options);
     void showAxisSettings();
     QVector<double> axisTicks(bool xAxis) const;
     QRectF plotArea() const { return plotRect(); }
