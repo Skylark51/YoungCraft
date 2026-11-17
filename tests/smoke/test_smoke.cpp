@@ -114,6 +114,7 @@ class SmokeTest final : public QObject {
 private slots:
     void discreteSpectrumSelection();
     void linkedIrcAndTddftGeometrySelection();
+    void tddftSummaryStructureLink();
     void cifCoordinateEditAndSaveWorkflow();
     void unlimitedSelectionAndHoverElements();
     void sidebarOptimizationFixedSelection();
@@ -445,6 +446,63 @@ void SmokeTest::cifCoordinateEditAndSaveWorkflow() {
     QVERIFY(saved.crystal);
     QVERIFY((saved.crystal->asymmetricUnit.atoms[0].position - edited.atoms[0].position).length() < 1e-5f);
     QCOMPARE(saved.crystal->a, 10.0);
+}
+
+void SmokeTest::tddftSummaryStructureLink() {
+    const bool native = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+    QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+    const auto restore = qScopeGuard([&] { QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, native); });
+    MainWindow window; window.show();
+    const auto loaded = FileDispatcher::load("tests/data/butadiene-td-summary.out", {});
+    QVERIFY(loaded.parseResult.success);
+    QVERIFY(loaded.parseResult.data.molecule.isEmpty());
+    QCOMPARE(loaded.parseResult.data.excitedStates.size(), 8);
+    window.newDrawingDocument(Molecule{});
+    window.onFileLoaded(loaded);
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_tddftWorkspace);
+    window.m_explorerDock->show();
+    auto *structure = window.findChild<QToolButton*>("AnalysisShortcut0");
+    auto *td = window.findChild<QToolButton*>("AnalysisShortcut4");
+    QVERIFY(structure); QVERIFY(td); QVERIFY(structure->isVisible());
+    structure->click();
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_moleculeWorkspace);
+    auto *notice = window.m_analysis->findChild<QLabel*>("ResultStructureNotice");
+    auto *attach = window.m_analysis->findChild<QPushButton*>("AttachResultStructure");
+    QVERIFY(notice); QVERIFY(attach); QVERIFY(notice->isVisible()); QVERIFY(attach->isVisible());
+    QVERIFY(notice->text().contains(QStringLiteral("원자 좌표가 없습니다")));
+    QVERIFY(!window.attachResultStructure("tests/data/butadiene-td-summary.out"));
+    QCOMPARE(window.m_data.excitedStates.size(), 8);
+    const auto capture = qEnvironmentVariable("YOUNGCRAFT_REVIEW_DIR");
+    if (!capture.isEmpty()) { QDir().mkpath(capture); QTest::qWait(100); QVERIFY(window.grab().save(capture + "/missing-structure.png")); }
+    bool selected = false;
+    QTimer::singleShot(0, &window, [&] {
+        auto *dialog = window.findChild<QFileDialog*>();
+        if (!dialog) return;
+        selected = true;
+        dialog->selectFile(QFileInfo("tests/data/butadiene.xyz").absoluteFilePath());
+        QMetaObject::invokeMethod(dialog, "accept");
+    });
+    attach->click();
+    QVERIFY(selected);
+    QCOMPARE(window.m_data.molecule.atoms.size(), 10);
+    QCOMPARE(window.m_data.frames.size(), 1);
+    QVERIFY(!std::isfinite(window.m_data.frames[0].metrics.energyHartree));
+    QCOMPARE(window.m_data.filePath, loaded.parseResult.data.filePath);
+    QVERIFY(window.m_data.structureFilePath.endsWith("butadiene.xyz"));
+    QCOMPARE(window.m_data.excitedStates.size(), 8);
+    QCOMPARE(window.m_data.excitedStates[0].energyEv, loaded.parseResult.data.excitedStates[0].energyEv);
+    QCOMPARE(window.m_view->molecule().atoms.size(), 10);
+    QVERIFY(!attach->isVisible());
+    QVERIFY(notice->text().contains("butadiene.xyz"));
+    td->click();
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_tddftWorkspace);
+    structure->click();
+    QCOMPARE(window.m_workspace->currentWidget(), window.m_moleculeWorkspace);
+    if (!capture.isEmpty()) { QTest::qWait(100); QVERIFY(window.grab().save(capture + "/linked-structure.png")); }
+    window.newDrawingDocument(Molecule{});
+    window.m_documentTabs->setCurrentIndex(0);
+    QCOMPARE(window.m_view->molecule().atoms.size(), 10);
+    QVERIFY(window.m_data.structureFilePath.endsWith("butadiene.xyz"));
 }
 
 void SmokeTest::linkedIrcAndTddftGeometrySelection() {

@@ -73,6 +73,7 @@ signals:
     void animationCopyRequested();
     void coordinateViewRequested();
     void coordinateImportRequested(const QString &xyz);
+    void structureFileRequested();
     void broadeningChanged(double value);
     void workspaceModeRequested(bool tddft);
     void tddftSpectrumChanged(const QVector<QPointF> &spectrum,
@@ -111,6 +112,8 @@ private:
     QTableWidget *m_atomTable = nullptr;
     OrbitalStudyWidget *m_orbitalStudy = nullptr;
     QLabel *m_frameInfo = nullptr;
+    QLabel *m_structureNotice = nullptr;
+    QPushButton *m_attachStructure = nullptr;
     QLabel *m_frequencyInfo = nullptr;
     QLabel *m_frequencyPageLabel = nullptr;
     QPushButton *m_nextFrequencyPage = nullptr;

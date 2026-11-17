@@ -160,6 +160,7 @@ struct ParseIndex {
 
 struct CalculationData {
     QString filePath;
+    QString structureFilePath; // Explicitly linked coordinates, separate from the result source.
     QString format;
     QString route;
     QString method;

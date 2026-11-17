@@ -10,6 +10,7 @@
 #include <QCheckBox>
 #include <QFormLayout>
 #include <QFontDatabase>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
@@ -41,6 +42,15 @@ QTableWidgetItem *item(const QString &text) { return new QTableWidgetItem(text);
 QWidget *AnalysisPanel::makeGeometryTab() {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
+    m_structureNotice = new QLabel(page);
+    m_structureNotice->setObjectName(QStringLiteral("ResultStructureNotice"));
+    m_structureNotice->setWordWrap(true);
+    layout->addWidget(m_structureNotice);
+    m_attachStructure = new QPushButton(QStringLiteral("구조 파일 연결…"), page);
+    m_attachStructure->setObjectName(QStringLiteral("AttachResultStructure"));
+    m_attachStructure->setToolTip(QStringLiteral("이 계산에 사용한 XYZ 또는 좌표가 포함된 출력 파일을 선택하세요."));
+    layout->addWidget(m_attachStructure);
+    connect(m_attachStructure, &QPushButton::clicked, this, &AnalysisPanel::structureFileRequested);
     m_openOptimizationGraph = new QPushButton(QStringLiteral("최적화 그래프..."),page);
     makeSidebarIconButton(m_openOptimizationGraph, QStyle::SP_FileDialogDetailedView);
     m_openOptimizationGraph->setObjectName("OpenOptimizationGraph");
@@ -94,6 +104,14 @@ QWidget *AnalysisPanel::makeGeometryTab() {
 }
 
 void AnalysisPanel::fillFrameList() {
+    const bool missing = m_data.molecule.isEmpty() && m_data.frames.isEmpty();
+    m_structureNotice->setText(missing
+        ? QStringLiteral("이 결과 파일에는 원자 좌표가 없습니다. 계산에 사용한 구조 파일을 연결하면 분자 구조를 볼 수 있습니다.")
+        : m_data.structureFilePath.isEmpty() ? QString()
+        : QStringLiteral("연결한 구조: %1 (결과 파일과 별도)").arg(QFileInfo(m_data.structureFilePath).fileName()));
+    m_structureNotice->setToolTip(m_data.structureFilePath);
+    m_structureNotice->setVisible((missing && hasTabData(4)) || !m_data.structureFilePath.isEmpty());
+    m_attachStructure->setVisible(missing && hasTabData(4));
     const QSignalBlocker listBlocker(m_frameList), sliderBlocker(m_frameSlider);
     m_frameList->clear();
     m_energyFrames.clear();

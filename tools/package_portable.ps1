@@ -32,7 +32,15 @@ if (-not (Test-Path -LiteralPath $windeployqt)) { throw "windeployqt가 없습�
 
 & cmake --build $BuildDir --config Release --target Youngcraft
 if ($LASTEXITCODE -ne 0) { throw "Release 빌드 실패: $LASTEXITCODE" }
-$application = if ($ApplicationPath) { [IO.Path]::GetFullPath($ApplicationPath) } else { Join-Path $ProjectRoot 'Youngcraft.exe' }
+$application = if ($ApplicationPath) {
+    [IO.Path]::GetFullPath($ApplicationPath)
+} else {
+    $outputLine = Get-Content -LiteralPath $cache -Encoding UTF8 |
+        Where-Object { $_ -match '^YOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY:[^=]+=' } | Select-Object -First 1
+    $outputDirectory = if ($outputLine) { ($outputLine -split '=', 2)[1] } else { $ProjectRoot }
+    if (-not [IO.Path]::IsPathRooted($outputDirectory)) { $outputDirectory = Join-Path $ProjectRoot $outputDirectory }
+    Join-Path $outputDirectory 'Youngcraft.exe'
+}
 if (-not (Test-Path -LiteralPath $application)) { throw "실행 파일이 없습니다: $application" }
 
 if (-not $ReuseMmRuntime) {
