@@ -6,9 +6,16 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'resources/**'
+      - 'xtb_runtime/**'
       - 'CMakeLists.txt'
       - 'tools/package_portable.ps1'
       - 'tools/build_mm_runtime.ps1'
+      - 'tools/mm_optimize.py'
+      - 'tools/requirements-mm.txt'
+      - 'tools/YoungcraftStandalone.cs'
+      - 'tools/create_standalone.ps1'
+      - 'tools/build_xtb_runtime.sh'
+      - 'tools/verify_portable_xtb.ps1'
       - 'tools/build_editor_release.ps1'
       - '.github/workflows/portable-release.yml'
   workflow_dispatch:
@@ -38,17 +45,28 @@ jobs:
       - name: Install MM dependencies
         shell: pwsh
         run: python -m pip install -r tools/requirements-mm.txt
-      - name: Download verified Windows xTB runtime
+      - name: Install xTB build toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            curl unzip
+            mingw-w64-ucrt-x86_64-gcc-fortran
+            mingw-w64-ucrt-x86_64-openblas
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - name: Build explicit-topology Windows xTB runtime
+        shell: msys2 {0}
+        run: bash tools/build_xtb_runtime.sh
+      - name: Download verified legacy Windows xTB runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $zip = Join-Path $env:RUNNER_TEMP 'xtb-win.zip'
           $extract = Join-Path $env:RUNNER_TEMP 'xtb-win'
           Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/grimme-lab/xtb/releases/download/v6.7.1/xtb-6.7.1pre-windows-x86_64.zip' -OutFile $zip
-          $sha = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($sha -ne '043e578da4a7e114a4d584972959a875e3ffb9f2767a86723b95aa6719d28d9c') {
-            throw "xTB release checksum mismatch: $sha"
-          }
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '043e578da4a7e114a4d584972959a875e3ffb9f2767a86723b95aa6719d28d9c') { throw 'xTB release checksum mismatch' }
           Expand-Archive -LiteralPath $zip -DestinationPath $extract
           foreach ($name in @('xtb.exe', 'libiomp5md.dll')) {
             $binary = Get-ChildItem -LiteralPath $extract -Recurse -File -Filter $name | Select-Object -First 1
@@ -63,7 +81,7 @@ jobs:
       - name: Compile and run CTest
         shell: pwsh
         run: |
-          cmake --build build-current --config Release --parallel 4 --target Youngcraft test_parser test_model test_editor
+          cmake --build build-current --config Release --parallel 4 --target Youngcraft test_parser test_model test_editor test_xtb
           if ($LASTEXITCODE -ne 0) { throw 'C++ application compilation failed' }
           ctest --test-dir build-current -C Release --output-on-failure -R parser_gaussian
           if ($LASTEXITCODE -ne 0) { throw 'Parser regression tests failed' }
@@ -80,11 +98,25 @@ jobs:
         run: |
           & powershell -NoProfile -ExecutionPolicy Bypass -File tools/package_portable.ps1 -Python python
           if ($LASTEXITCODE -ne 0) { throw 'Portable packaging failed' }
-      - name: Upload ZIP artifact
+      - name: Verify offline portable calculations
+        shell: powershell
+        run: |
+          & ./tools/verify_portable_xtb.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Offline portable verification failed' }
+      - name: Verify standalone launcher and frozen MM
+        shell: pwsh
+        run: |
+          python tests/packaging/test_standalone.py
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone launcher verification failed' }
+          python tests/mm/test_constraints.py build-mm-runtime/YoungcraftMM/YoungcraftMM.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Frozen MM constraints failed' }
+      - name: Upload application artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Youngcraft-portable
-          path: Youngcraft-portable.zip
+          path: |
+            Youngcraft-portable.zip
+            Youngcraft-Standalone.exe
           retention-days: 30
       - name: Publish downloadable update for one-click patcher
         if: github.ref == 'refs/heads/main'
@@ -93,5 +125,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "v0.1.0-pathway-$env:GITHUB_RUN_NUMBER"
-          gh release create $tag 'Youngcraft-portable.zip#YoungCraft portable for Windows x64' --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'YoungCraft Project Library' --notes 'Adds the Project Library and Reaction Pathway editor, opened from the top toolbar. Optimized portable package for the standalone patcher.' --latest
+          gh release create $tag 'Youngcraft-portable.zip#YoungCraft portable for Windows x64' 'Youngcraft-Standalone.exe#YoungCraft complete offline single EXE' --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'YoungCraft for Windows' --notes 'Complete offline single-EXE application and portable ZIP. Reduced MM dependencies; existing GFN1/GFN2 and GFN-FF engines retained to preserve calculation behavior.' --latest
           if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

@@ -24,6 +24,28 @@ $stage = $Destination + '.staging-' + [Guid]::NewGuid().ToString('N')
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $stage -Recurse -Force
 if (-not (Test-Path -LiteralPath (Join-Path $stage 'Youngcraft.exe'))) { throw 'Package has no Youngcraft.exe.' }
+# Carry forward user data without replacing unchanged bundled fragments with
+# their older versions. Keep the entire previous installation as a backup too.
+if (Test-Path -LiteralPath $Destination) {
+    $previousHashes = @{}
+    $previousManifest = Join-Path $Destination 'package-manifest.json'
+    if (Test-Path -LiteralPath $previousManifest) {
+        $previous = Get-Content -LiteralPath $previousManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($entry in $previous.files) { $previousHashes[[string]$entry.path] = [string]$entry.sha256 }
+    }
+    $server = Join-Path $Destination 'youngcraft-server.json'
+    if (Test-Path -LiteralPath $server) { Copy-Item -LiteralPath $server -Destination (Join-Path $stage 'youngcraft-server.json') -Force }
+    $fragments = Join-Path $Destination 'lab_fragments'
+    if (Test-Path -LiteralPath $fragments) {
+        foreach ($file in Get-ChildItem -LiteralPath $fragments -Recurse -File) {
+            $relative = $file.FullName.Substring($Destination.Length + 1).Replace('\', '/')
+            if ($previousHashes.ContainsKey($relative) -and (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash -eq $previousHashes[$relative]) { continue }
+            $targetFile = Join-Path $stage $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $targetFile) -Force | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $targetFile -Force
+        }
+    }
+}
 $backup = $Destination + '.backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
 if (Test-Path -LiteralPath $Destination) { Move-Item -LiteralPath $Destination -Destination $backup }
 try { Move-Item -LiteralPath $stage -Destination $Destination }

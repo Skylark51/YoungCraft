@@ -53,7 +53,9 @@ class GfnffFallback(Exception):
 def main():
     try:
         from rdkit import Chem
-        from rdkit.Chem import AllChem
+        # AllChem also imports drawing, reactions, descriptors and embedding.
+        # These are the same force-field APIs, without those unrelated modules.
+        from rdkit.Chem import rdForceFieldHelpers
 
         raw = sys.stdin.readline()
         if not raw:
@@ -117,14 +119,14 @@ def main():
         chosen = None
         for candidate in candidates:
             if candidate == "UFF":
-                if not AllChem.UFFHasAllMoleculeParams(molecule):
+                if not rdForceFieldHelpers.UFFHasAllMoleculeParams(molecule):
                     continue
-                field = AllChem.UFFGetMoleculeForceField(molecule, ignoreInterfragInteractions=False)
+                field = rdForceFieldHelpers.UFFGetMoleculeForceField(molecule, ignoreInterfragInteractions=False)
             else:
-                properties = AllChem.MMFFGetMoleculeProperties(molecule, mmffVariant=candidate)
+                properties = rdForceFieldHelpers.MMFFGetMoleculeProperties(molecule, mmffVariant=candidate)
                 if properties is None:
                     continue
-                field = AllChem.MMFFGetMoleculeForceField(
+                field = rdForceFieldHelpers.MMFFGetMoleculeForceField(
                     molecule, properties, ignoreInterfragInteractions=False)
             if field is not None:
                 chosen = candidate

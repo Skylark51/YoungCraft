@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "date": "2026-11-18",
+  "assessment": "Final decision: retain both legacy and newer xTB engines to preserve existing scientific behavior. Passing feature tests does not establish numerical parity; gradient differences and Fe100 aligned RMSD of approximately 1.03 A rule out consolidation as a behavior-preserving size reduction. Audit complete; no further audit tests required.",
+  "engines": {
+    "legacy": {
+      "version": "6.7.1pre (5071a88)"
+    },
+    "existing_newer": {
+      "commit": "68fe777a02418471b9ddfc7a9ea24b4021d7bca2",
+      "version_banner": "6.7.1 (unknown-commit)",
+      "exe_sha256": "5961b8e5fa82adb39952e58f81a124c5d7470f0742d17553453bee67628965d6"
+    },
+    "rebuilt": {
+      "exe_sha256": "abac83826ed2a97571b5972d1abdd11438e4313bcc77f102fdad28ad9c7316cc",
+      "exe_bytes": 8542754,
+      "runtime_dlls": [
+        "libgcc_s_seh-1.dll",
+        "libgfortran-5.dll",
+        "libgomp-1.dll",
+        "libopenblas.dll",
+        "libquadmath-0.dll",
+        "libwinpthread-1.dll"
+      ],
+      "compiler": "MSYS2 UCRT64 GCC/GFortran 16.2.0-3",
+      "openblas": "0.3.34-1"
+    }
+  },
+  "suite_runs": [
+    {
+      "runtime": "original dual runtime",
+      "passed": 20,
+      "failed": 0,
+      "jobs": 42,
+      "seconds": 58.1972
+    },
+    {
+      "runtime": "newer root exe + its DLLs, copied legacy share, original gfnff junction",
+      "passed": 20,
+      "failed": 0,
+      "jobs": 42,
+      "seconds": 67.3789
+    },
+    {
+      "runtime": "newer root exe + its DLLs, no legacy share, original gfnff junction",
+      "passed": 20,
+      "failed": 0,
+      "jobs": 42,
+      "seconds": 73.3771
+    }
+  ],
+  "coverage": {
+    "alpb_solvents_both_gfn_methods": [
+      "water",
+      "acetonitrile",
+      "benzene",
+      "toluene",
+      "thf",
+      "ch2cl2",
+      "chcl3",
+      "dmf",
+      "dmso",
+      "methanol"
+    ],
+    "features": [
+      "neutral/charged/open-shell SP+gradient; all 20 method/solvent combinations",
+      "optimization, live frames, final import, cancellation, expected nonconvergence",
+      "fixed Cartesian atoms, distance/angle/dihedral constraints, Fe bond retention",
+      "edited GFN-FF topology/coligands; invalid input and missing runtime"
+    ],
+    "rebuilt_direct_replays_passed": 39,
+    "rebuilt_direct_replays_failed": 0,
+    "expected_nonconverged_replays": 3,
+    "rebuilt_max_fixed_atom_displacement_A": 0,
+    "additional_optimization_levels": "6/6 passed: GFN1 and GFN2 with loose, normal, tight",
+    "portable_dependency_check": "Rebuilt direct runs used Windows-only PATH; no MSYS2/Conda runtime paths.",
+    "additional_GFN1_charged_and_open_shell": "2/2 newer direct cases passed, compared against legacy; energy differences <= 1e-12 Eh."
+  },
+  "numerical_caveats": {
+    "single_point_energies": "Water, charged/open-shell and all bundled-solvent test energies agree to printed precision. Larger direct GFN2 SP differences: dodecane 3.10e-11 Eh, Fe100 4.33e-9 Eh.",
+    "gradient_example": {
+      "system": "neutral water, GFN2 SP",
+      "legacy_norm_Eh_bohr": 0.177341487822,
+      "newer_norm_Eh_bohr": 0.166436546041,
+      "component": "first H, y",
+      "finite_difference_step_A": 0.0001,
+      "finite_difference_Eh_bohr": -0.004258413371915865,
+      "legacy_analytic_Eh_bohr": 0.015673809824759,
+      "newer_analytic_Eh_bohr": -0.0042584128912077,
+      "interpretation": "The newer gradient agrees with this finite-difference check; legacy does not."
+    },
+    "water_optimization": "Newer energy +1.62871e-7 Eh; maximum coordinate change 0.000493 A.",
+    "Fe100_optimization": {
+      "legacy_steps": 269,
+      "newer_builtin_steps": 364,
+      "energy_delta_Eh": -0.0023368267559931155,
+      "aligned_rmsd_A": 1.0349166113723802,
+      "interpretation": "Both pass bond-retention tests; materially different conformations. Rebuilt newer result also differs by 3.24e-5 Eh from existing newer result."
+    },
+    "goldens": "Retain existing engine routing and scientific goldens. The rejected consolidation would require review of gradient, optimizer iteration, conformation and derived gap goldens; feature/tolerance tests alone do not establish legacy numerical equality."
+  },
+  "performance": {
+    "suite_note": "Single runs: not a speed guarantee; changed Fe iteration counts dominate.",
+    "direct_SP_protocol": "GFN2 SP+gradient; 2 threads, Windows-only PATH; 1 warmup then 3 measured runs per engine, alternating engine order.",
+    "direct_SP_median_seconds": {
+      "water": {
+        "legacy": 0.028090700001484947,
+        "newer": 0.024674200001754798
+      },
+      "dodecane": {
+        "legacy": 0.14374020000104792,
+        "newer": 0.04083900000114227
+      },
+      "Fe100": {
+        "legacy": 0.3949973000017053,
+        "newer": 0.35927690000244183
+      }
+    }
+  },
+  "packaging_recommendation": {
+    "decision": "RETAIN_BOTH_ENGINES",
+    "reason": "Meaningful Cartesian gradient differences and a different Fe100 optimized conformation (aligned RMSD 1.0349 A) outweigh the proposed binary size savings when preserving scientific behavior is required.",
+    "layout": "Retain xtb_runtime/xtb.exe, libiomp5md.dll, legacy share/ parameters and notices, together with xtb_runtime/gfnff/xtb.exe, its required DLLs, licenses and runtime provenance.",
+    "runner": "Preserve original routing: legacy root executable for ordinary GFN1/GFN2; newer gfnff executable for GFN-FF and GFN1/GFN2 with exact Cartesian fixing. Consolidation fallback and associated tests were reverted by main.",
+    "parameters": "For newer executable set XTBPATH to its own gfnff directory, never legacy share/. Its built-in GFN-FF parameters expect 103 elements, legacy external file has 86.",
+    "unchanged_limitations": "GFN-FF solvation and spinpol/tblite are not exposed by the current application.",
+    "distribution_slimming": "Omit source archives from the distribution only; retain required binaries, parameter files and license notices. Keep source archives available in the source/build workflow.",
+    "legacy_exe_plus_Intel_bytes_retained": 61061760,
+    "release_zip": "Not inspected. No assumption that latest published ZIP contains gfnff.",
+    "validation_status": "Audit complete; no further audit tests requested. Main is rebuilding the original runner/tests. Recorded candidate suites remain experimental evidence, not approval to consolidate."
+  },
+  "ci": {
+    "script": "tools/build_xtb_runtime.sh",
+    "shell": "msys2 {0}, msystem UCRT64",
+    "packages": [
+      "mingw-w64-ucrt-x86_64-gcc-fortran",
+      "mingw-w64-ucrt-x86_64-cmake",
+      "mingw-w64-ucrt-x86_64-ninja",
+      "mingw-w64-ucrt-x86_64-openblas",
+      "curl"
+    ],
+    "command": "bash tools/build_xtb_runtime.sh",
+    "interface": {
+      "XTB_BUILD_ROOT": "ASCII source/build cache; default RUNNER_TEMP, TMPDIR or /tmp + /youngcraft-xtb-68fe777a",
+      "XTB_RUNTIME_DIR": "output; default <project>/xtb_runtime/gfnff",
+      "XTB_JOBS": "parallelism; default 4",
+      "CMAKE / NINJA": "optional executable overrides"
+    },
+    "archives": {
+      "xtb": {
+        "sha256": "ed92501f770a02bea4d00782f61d0bdcb61981353ee9093578d49a0b0a942bcd"
+      },
+      "mctc_lib": {
+        "tag": "v0.6.1",
+        "sha256": "549477402f38de3a2ffc3d16558b12e177920d7e0c3e3af5067c83cfc2968ba7"
+      }
+    },
+    "licenses": "Reviewed repository notices preserved byte-for-byte; added mctc-lib/ddCOSMO notices come from verified source archives. No MSYS2 notices replace reviewed files.",
+    "reviewed_license_hashes_preserved": true,
+    "source_policy": "Archives/build products remain in build cache, never copied into output runtime.",
+    "validation": "bash -n passed; fresh source build passed; curl downloads verified; cached rebuild and isolated output copy passed; 39 real-calculation replays passed.",
+    "reproducibility_limit": "Sources checksum pinned; rolling MSYS2 packages not bit-reproducible. BUILDINFO.txt records versions/hashes. Key CI caches by script hash and toolchain identity.",
+    "integration_decision": "Keep tools/build_xtb_runtime.sh as the CI bootstrap for the newer backend and retain the checksum-verified legacy runtime download; CI and distribution must provide both engines.",
+    "workflow_findings": "At audit inspection, november-analysis.yml already built the pinned newer backend; portable-release.yml downloaded only legacy and omitted test_xtb from release validation. Main handles workflow integration of the retained helper."
+  },
+  "evidence_directory": "C:\\Users\\UNIST\\AppData\\Local\\Temp\\Youngcraft-xtb-slim-audit-7f10bf5ed4984243bd8e7c075cc6066b",
+  "test_xtb_processes": "All audit runs completed; no further audit test_xtb.exe runs scheduled."
+}
