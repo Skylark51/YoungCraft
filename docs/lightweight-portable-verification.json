@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-18",
+  "baseline": {
+    "dist": {
+      "bytes": 268109759.0,
+      "files": 1244
+    },
+    "dist/mm_runtime": {
+      "bytes": 104970620.0,
+      "files": 1137
+    },
+    "dist/xtb_runtime": {
+      "bytes": 121932133.0,
+      "files": 52
+    },
+    "zipBytes": 104620110
+  },
+  "final": {
+    "dist": {
+      "bytes": 199177050,
+      "files": 207
+    },
+    "dist/mm_runtime": {
+      "bytes": 39010388,
+      "files": 102
+    },
+    "dist/xtb_runtime": {
+      "bytes": 119238238,
+      "files": 50
+    }
+  },
+  "zip_bytes": 73647139,
+  "standalone_bytes": 73847808,
+  "installed_reduction_percent": 25.71,
+  "zip_reduction_percent": 29.61,
+  "engine_decision": "Both original xTB engines retained byte-for-byte; native application routing unchanged. Source archives excluded from distribution.",
+  "checks": {
+    "mm_source_and_frozen_constraint_methods": 7,
+    "mm_exact_parity_requests": 67,
+    "mm_exact_parity_frames": 202,
+    "standalone_regression_methods": 11,
+    "native_ctest_suites": 5,
+    "gui_regression_methods": 10,
+    "portable_xtb_cases": 20,
+    "offline_mm_limit_iterations": 120,
+    "offline_gui_startup": true,
+    "single_exe_only_extraction_and_verification": true,
+    "server_configuration_preserved_on_install": true,
+    "desktop_shortcut_correct": true
+  },
+  "single_exe_verification": {
+    "single_exe_only": true,
+    "clean_path": true,
+    "extraction": true,
+    "reuse_verification": true,
+    "embedded_zip_sha256": "bc2a1ada6a5e651b65639a109dcf8e272ec6e5eef2f77a452e167b3d130cf68f",
+    "both_xtb_engines": true,
+    "fixture": "C:\\Users\\UNIST\\AppData\\Local\\Temp\\Youngcraft-final-single-exe-30jhsfne"
+  },
+  "engine_sha256": {
+    "xtb.exe": "90bff4e570ffa10a1558364ee393711900bff239f02d313685353e055324f4c3",
+    "gfnff/xtb.exe": "5961b8e5fa82adb39952e58f81a124c5d7470f0742d17553453bee67628965d6"
+  }
+}

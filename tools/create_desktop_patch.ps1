@@ -17,6 +17,8 @@ try {
         Copy-Item -LiteralPath $PackageZip -Destination $desktopZip -Force
     }
     Copy-Item -LiteralPath $temporaryExe -Destination (Join-Path $desktop 'Youngcraft-Patch.exe') -Force
+    & (Join-Path $PSScriptRoot 'create_standalone.ps1') -PackageZip $PackageZip `
+        -OutputPath (Join-Path $desktop 'Youngcraft-Standalone.exe')
     Write-Output "Desktop patch: $(Join-Path $desktop 'Youngcraft-Patch.exe')"
     Write-Output "Desktop package: $desktopZip"
 } finally {

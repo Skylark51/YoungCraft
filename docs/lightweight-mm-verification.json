@@ -1,0 +1,123 @@
+{
+  "scope": [
+    "tools/mm_optimize.py",
+    "tools/build_mm_runtime.ps1"
+  ],
+  "worker": "build-mm-runtime/YoungcraftMM/YoungcraftMM.exe",
+  "original_backup": "build-mm-runtime/YoungcraftMM.backup-20261118-160340-593",
+  "toolchain": {
+    "python": "3.12.10",
+    "rdkit": "2026.03.6",
+    "pyinstaller": "6.22.3"
+  },
+  "runtime": {
+    "bytes": 39010388,
+    "files": 102
+  },
+  "original_build_runtime": {
+    "bytes": 104970620,
+    "files": 1137
+  },
+  "existing_local_mm_runtime": {
+    "bytes": 129786705,
+    "files": 1220
+  },
+  "reduction_from_original_build_percent": 62.84,
+  "reduction_from_local_runtime_percent": 69.94,
+  "source_constraint_tests": {
+    "command": "python -X utf8 tests/mm/test_constraints.py",
+    "test_methods": 7,
+    "passed": true
+  },
+  "frozen_constraint_tests": {
+    "command": "python -X utf8 tests/mm/test_constraints.py build-mm-runtime/YoungcraftMM/YoungcraftMM.exe",
+    "test_methods": 7,
+    "passed": true
+  },
+  "clean_environment": {
+    "cwd": "build-mm-runtime/mm-slim-isolation",
+    "path": "%WINDIR%/System32",
+    "removed_env": [
+      "PYTHON*",
+      "RDBASE",
+      "RDKIT_HOME",
+      "RD_DATA_DIR"
+    ],
+    "passed": true
+  },
+  "parity": {
+    "reference": "original backed-up YoungcraftMM.exe",
+    "comparison": "exact equality of every parsed JSON frame, including positions, energy, gradients, status and fallback messages",
+    "requests": 67,
+    "frames": 202,
+    "passed": true,
+    "additional_smiles": [
+      "O",
+      "CCO",
+      "c1ccccc1",
+      "c1ccncc1",
+      "C1CCCCC1",
+      "CC(=O)NC",
+      "CS(=O)(=O)C",
+      "[SiH4]",
+      "B",
+      "[Na+].[Cl-]"
+    ]
+  },
+  "verified_behaviors": [
+    "MMFF94/MMFF94s/UFF/Auto",
+    "fixed atoms unchanged in every frame",
+    "distance/angle/dihedral targets",
+    "bond retention and explicit override",
+    "charged ammonium/methylammonium/acetate/zwitterion",
+    "invalid constraints rejected",
+    "charge mismatch/transition metal/coordination/missing hydrogens use GFN-FF",
+    "Auto selects UFF when MMFF parameters are unavailable (borane)",
+    "explicit unavailable MMFF parameters use GFN-FF",
+    "aromatic/ring/amide/sulfone/silane/disconnected ion geometries"
+  ],
+  "notes": [
+    "MM runtime remains onedir for embedding in the parent single-exe distribution.",
+    "No package or launcher changes and no git commit by MM worker."
+  ],
+  "changes": {
+    "worker_import": "Replace AllChem with rdForceFieldHelpers; all four UFF/MMFF APIs are identical exports.",
+    "hidden_imports": [
+      "rdkit.ForceField"
+    ],
+    "excluded_modules": [
+      "rdkit.Chem.AllChem",
+      "rdkit.Chem.Draw",
+      "rdkit.Dbase",
+      "rdkit.Chem.rdCoordGen",
+      "rdkit.Chem.rdMolInterchange",
+      "sqlite3",
+      "pysqlite2",
+      "pyPgSQL",
+      "IPython",
+      "matplotlib",
+      "PIL",
+      "tkinter",
+      "_tkinter",
+      "PyQt5",
+      "PyQt6",
+      "PySide2",
+      "PySide6",
+      "numpy.f2py",
+      "numpy.testing",
+      "numpy.tests",
+      "numpy.linalg",
+      "numpy.random",
+      "numpy.fft",
+      "scipy",
+      "pandas"
+    ],
+    "backup": "Move previous generated YoungcraftMM directory to YoungcraftMM.backup-yyyyMMdd-HHmmss-fff after dependency/path preflight; never delete user files."
+  },
+  "worker_sha256": "5b89d235aa82ade39930521290e8ab345f05922cb73952394ec892248822545d",
+  "powershell_syntax_check_passed": true,
+  "references": {
+    "rdkit_native_api": "https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/ForceFieldHelpers/Wrap/rdForceFields.cpp",
+    "pyinstaller_exclusions": "https://www.pyinstaller.org/en/stable/man/pyinstaller.html"
+  }
+}

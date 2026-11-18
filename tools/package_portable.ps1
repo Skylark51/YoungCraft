@@ -4,7 +4,9 @@ param(
     [string]$BuildDir = '',
     [string]$DistDir = '',
     [string]$ZipPath = '',
+    [string]$StandalonePath = '',
     [string]$Python = 'python',
+    [string]$MmRuntimeDir = '',
     [string]$ApplicationPath = '',
     [switch]$ReuseMmRuntime
 )
@@ -15,6 +17,7 @@ $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ([string]::IsNullOrWhiteSpace($BuildDir)) { $BuildDir = Join-Path $ProjectRoot 'build-current' }
 if ([string]::IsNullOrWhiteSpace($DistDir)) { $DistDir = Join-Path $ProjectRoot 'dist' }
 if ([string]::IsNullOrWhiteSpace($ZipPath)) { $ZipPath = Join-Path $ProjectRoot 'Youngcraft-portable.zip' }
+if ([string]::IsNullOrWhiteSpace($StandalonePath)) { $StandalonePath = Join-Path $ProjectRoot 'Youngcraft-Standalone.exe' }
 $expectedDist = [IO.Path]::GetFullPath((Join-Path $ProjectRoot 'dist'))
 $actualDist = [IO.Path]::GetFullPath($DistDir)
 if (-not $actualDist.Equals($expectedDist, [StringComparison]::OrdinalIgnoreCase)) {
@@ -43,12 +46,12 @@ $application = if ($ApplicationPath) {
 }
 if (-not (Test-Path -LiteralPath $application)) { throw "실행 파일이 없습니다: $application" }
 
-if (-not $ReuseMmRuntime) {
+if (-not $ReuseMmRuntime -and -not $MmRuntimeDir) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
         -ProjectRoot $ProjectRoot -Python $Python
     if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
 }
-$mmSource = Join-Path $ProjectRoot 'build-mm-runtime/YoungcraftMM'
+$mmSource = if ($MmRuntimeDir) { (Resolve-Path -LiteralPath $MmRuntimeDir).Path } else { Join-Path $ProjectRoot 'build-mm-runtime/YoungcraftMM' }
 if (-not (Test-Path -LiteralPath (Join-Path $mmSource 'YoungcraftMM.exe'))) {
     throw "MM worker가 없습니다: $mmSource"
 }
@@ -80,17 +83,21 @@ try {
     Get-ChildItem -LiteralPath $crtDirectory.FullName -Filter '*.dll' | Copy-Item -Destination $stage -Force
     Copy-Item -LiteralPath $mmSource -Destination (Join-Path $stage 'mm_runtime') -Recurse -Force
     $xtbSource = Join-Path $ProjectRoot 'xtb_runtime'
-    foreach ($required in @('xtb.exe', 'libiomp5md.dll', 'licenses/COPYING', 'licenses/COPYING.LESSER', 'licenses/Intel-Simplified-License.pdf', 'RUNTIME.txt')) {
+    # Retain both engines: their gradients and optimization results differ.
+    # Only source archives and build artifacts are unnecessary at runtime.
+    foreach ($required in @('xtb.exe', 'libiomp5md.dll', 'licenses/COPYING', 'licenses/COPYING.LESSER', 'licenses/Intel-Simplified-License.pdf', 'RUNTIME.txt', 'gfnff/xtb.exe', 'gfnff/libopenblas.dll', 'gfnff/libgcc_s_seh-1.dll', 'gfnff/libgfortran-5.dll', 'gfnff/libquadmath-0.dll', 'gfnff/libgomp-1.dll', 'gfnff/libwinpthread-1.dll', 'gfnff/licenses/COPYING', 'gfnff/licenses/COPYING.LESSER', 'gfnff/RUNTIME.md')) {
         if (-not (Test-Path -LiteralPath (Join-Path $xtbSource $required))) { throw "xTB runtime 파일 누락: $required" }
     }
     # Only runtime files are required. Source tarballs under sources/ and
     # xtb-source-*.tar.gz are retained in the source tree for license compliance.
     $xtbDest = Join-Path $stage 'xtb_runtime'
     New-Item -ItemType Directory -Path $xtbDest -Force | Out-Null
-    foreach ($item in @('xtb.exe', 'libiomp5md.dll', 'gfnff', 'share', 'licenses', 'RUNTIME.txt')) {
+    foreach ($item in @('xtb.exe', 'libiomp5md.dll', 'share', 'licenses', 'RUNTIME.txt', 'gfnff/xtb.exe', 'gfnff/libopenblas.dll', 'gfnff/libgcc_s_seh-1.dll', 'gfnff/libgfortran-5.dll', 'gfnff/libquadmath-0.dll', 'gfnff/libgomp-1.dll', 'gfnff/libwinpthread-1.dll', 'gfnff/licenses', 'gfnff/RUNTIME.md')) {
         $source = Join-Path $xtbSource $item
         if (-not (Test-Path -LiteralPath $source)) { throw "xTB runtime 구성요소 누락: $item" }
-        Copy-Item -LiteralPath $source -Destination (Join-Path $xtbDest $item) -Recurse -Force
+        $destination = Join-Path $xtbDest $item
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
     }
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'lab_fragments') -Destination (Join-Path $stage 'lab_fragments') -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'README.md') -Destination (Join-Path $stage 'README.md') -Force
@@ -142,3 +149,4 @@ Write-Host "portable 완료: $actualDist"
 Write-Host "MM worker: $worker"
 Write-Host "xTB runtime: $(Join-Path $actualDist 'xtb_runtime/xtb.exe')"
 Write-Host "ZIP: $ZipPath"
+& (Join-Path $PSScriptRoot 'create_standalone.ps1') -PackageZip $ZipPath -OutputPath $StandalonePath

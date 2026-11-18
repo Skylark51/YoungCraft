@@ -8,9 +8,12 @@ $verifyRoot = Join-Path $env:TEMP ('Youngcraft portable 한글 공백 ' + [Guid]
 Expand-Archive -LiteralPath (Join-Path $ProjectRoot 'Youngcraft-portable.zip') -DestinationPath $verifyRoot
 # The verification harness is added only to this temporary extraction, not the ZIP.
 Copy-Item -LiteralPath (Join-Path $BuildDir 'test_xtb.exe') -Destination $verifyRoot
+Copy-Item -LiteralPath (Join-Path $BuildDir 'mock_xtb.exe') -Destination $verifyRoot
 Copy-Item -LiteralPath (Join-Path $BuildDir 'Qt6Test.dll') -Destination $verifyRoot
 New-Item -ItemType Directory -Path (Join-Path $verifyRoot 'tests/xtb') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $ProjectRoot 'tests/xtb/dodecane.xyz') -Destination (Join-Path $verifyRoot 'tests/xtb')
+foreach ($fixture in @('dodecane.xyz', 'fe_oxo_approach.xyz', 'fe_oxo_approach_bonds.json')) {
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot ('tests/xtb/' + $fixture)) -Destination (Join-Path $verifyRoot 'tests/xtb')
+}
 $savedPath = $env:PATH
 $savedXtbPath = $env:XTBPATH
 $savedXtbHome = $env:XTBHOME
@@ -25,7 +28,7 @@ try {
     foreach ($dll in @('msvcp140.dll','msvcp140_1.dll','vcruntime140.dll','vcruntime140_1.dll')) {
         if (-not (Test-Path -LiteralPath (Join-Path $verifyRoot $dll))) { throw "App-local CRT missing: $dll" }
     }
-    & (Join-Path $verifyRoot 'test_xtb.exe') neutralSP chargedSP openShellSP gfn1ALPB allBundledSolvents realOptimization realLiveNonconvergence -o "$report,txt"
+    & (Join-Path $verifyRoot 'test_xtb.exe') -o "$report,txt"
     if ($LASTEXITCODE -ne 0) { throw "Portable xTB tests failed: $LASTEXITCODE" }
     $workerInfo = New-Object System.Diagnostics.ProcessStartInfo
     $workerInfo.FileName = Join-Path $verifyRoot 'mm_runtime/YoungcraftMM.exe'
