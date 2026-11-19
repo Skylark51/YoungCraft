@@ -34,6 +34,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
     QVector<Atom> lastAtoms;
     QVector<double> mullikenCharges;
     QVector<double> spinDensities;
+    QHash<qint64, int> nboChargeFrames;
     FrameMetrics currentMetrics;
     int jobIndex = 0;
     int currentStep = -1;
@@ -148,6 +149,8 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
 
         if (isJobBoundary(trimmed)) {
             ++jobIndex;
+            mullikenCharges.clear();
+            spinDensities.clear();
             currentMetrics = {};
             currentStep = -1;
             frameHasEnergy = false;
@@ -224,15 +227,17 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
             frames.last().metrics.energyHartree = energy;
         }
 
-        if (trimmed.contains(QStringLiteral("Mulliken charges:"), Qt::CaseInsensitive)) {
-            result.data.index.sectionOffsets[QStringLiteral("mulliken_charges")].push_back(offset);
-            mullikenCharges = readAtomicValues(file, false);
-            applyCharges(lastAtoms, mullikenCharges);
-        }
-        if (trimmed.contains(QStringLiteral("Mulliken atomic spin densities:"), Qt::CaseInsensitive)) {
-            result.data.index.sectionOffsets[QStringLiteral("mulliken_spin")].push_back(offset);
-            spinDensities = readAtomicValues(file, true);
-            applySpins(lastAtoms, spinDensities);
+        const bool combinedMulliken = trimmed.compare(QStringLiteral("Mulliken charges and spin densities:"), Qt::CaseInsensitive) == 0;
+        const bool mullikenCharge = combinedMulliken || trimmed.compare(QStringLiteral("Mulliken charges:"), Qt::CaseInsensitive) == 0;
+        const bool mullikenSpin = combinedMulliken ||
+            trimmed.compare(QStringLiteral("Mulliken atomic spin densities:"), Qt::CaseInsensitive) == 0;
+        if (mullikenCharge || mullikenSpin) {
+            if (mullikenCharge) result.data.index.sectionOffsets[QStringLiteral("mulliken_charges")].push_back(offset);
+            if (mullikenSpin) result.data.index.sectionOffsets[QStringLiteral("mulliken_spin")].push_back(offset);
+            readMulliken(file, lastAtoms, mullikenCharge ? &mullikenCharges : nullptr,
+                         mullikenSpin ? &spinDensities : nullptr);
+            if (mullikenSpin && !frames.isEmpty() && frames.last().jobIndex == jobIndex)
+                frames.last().mullikenSpin = spinDensities;
         }
 
         if (trimmed.contains(QStringLiteral("Forces (Hartrees/Bohr)"), Qt::CaseInsensitive)) {
@@ -322,6 +327,9 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
             result.data.hasNbo = true;
             result.data.index.sectionOffsets[QStringLiteral("nbo")].push_back(offset);
             if (result.data.nboSummary.isEmpty()) result.data.nboSummary = trimmed;
+            if (trimmed.contains(QStringLiteral("Summary of Natural Population Analysis"), Qt::CaseInsensitive) &&
+                !frames.isEmpty() && frames.last().jobIndex == jobIndex)
+                nboChargeFrames.insert(offset, frames.size() - 1);
         }
         if (trimmed.contains(QStringLiteral("CPCM"), Qt::CaseInsensitive) ||
             trimmed.contains(QStringLiteral("Polarizable Continuum"), Qt::CaseInsensitive) ||
@@ -405,6 +413,7 @@ ParseResult GaussianParser::parse(const QString &filePath, const ParseOptions &o
         result.error = QStringLiteral("Gaussian 구조 또는 계산 결과를 찾지 못했습니다.");
     }
     result.data.nbo = NboParser::parse(filePath);
+    NboParser::assignFrameCharges(result.data, nboChargeFrames);
     result.data.hasNbo = result.data.hasNbo || !result.data.nbo.charges.isEmpty() || !result.data.nbo.wiberg.isEmpty();
     return result;
 }

@@ -130,7 +130,8 @@ void MainWindow::bindDocument(const std::shared_ptr<DocumentSession> &document) 
     if (m_geometryAction) m_geometryAction->setChecked(m_geometryMode);
     for (QAction *action : findChildren<QAction *>()) {
         const auto &text = action->text();
-        if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
+        if (action->objectName() == QStringLiteral("DetailedAnalysisAction")) action->setChecked(m_view->detailedAnalysis());
+        else if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
         else if (text == QStringLiteral("molecule 중심으로 축 이동")) action->setChecked(m_style.centerAxes);
         else if (text == QStringLiteral("수소 표시")) action->setChecked(m_style.showHydrogen);
         else if (action == m_atomLabelsAction) action->setChecked(m_style.showLabels);
@@ -335,6 +336,10 @@ void MainWindow::openFile(const QString &path) {
         onFileLoaded(loaded);
         target->workspace->setProperty("loadFinished", true);
         target->workspace->setProperty("loadSuccess", loaded.parseResult.success);
+        if (target->openDetailedAnalysisOnLoad) {
+            target->openDetailedAnalysisOnLoad = false;
+            if (loaded.parseResult.success) showDetailedAnalysis();
+        }
         saveDocumentState();
         bindDocument(previous);
         activateDocument(m_documentTabs->currentIndex());

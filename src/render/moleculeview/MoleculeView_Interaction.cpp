@@ -24,7 +24,7 @@ int MoleculeView::pickAtom(const QPoint &point) const {
     float bestDistance = 26.0f;
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const Atom &atom = m_molecule.atoms[i];
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atomShown(i)) continue;
         const QVector3D projected = project(atom.position, vp);
         const float distance = QLineF(point, QPointF(projected.x(), projected.y())).length();
         if (distance < bestDistance) { bestDistance = distance; picked = i; }
@@ -115,8 +115,7 @@ void MoleculeView::panBy(const QPoint &delta) {
 
 int MoleculeView::pickBond(const QPoint &point) const {
     auto vp=viewProjection();int picked=-1;double best=9;
-    for(int i=0;i<m_molecule.bonds.size();++i){auto b=m_molecule.bonds[i];if(!m_molecule.atoms[b.first].visible||!m_molecule.atoms[b.second].visible)continue;
-        if(!m_style.showHydrogen&&(m_molecule.atoms[b.first].atomicNumber==1||m_molecule.atoms[b.second].atomicNumber==1))continue;
+    for(int i=0;i<m_molecule.bonds.size();++i){auto b=m_molecule.bonds[i];if(!atomShown(b.first)||!atomShown(b.second))continue;
         auto a=project(m_molecule.atoms[b.first].position,vp),c=project(m_molecule.atoms[b.second].position,vp);QPointF u(a.x(),a.y()),v(c.x()-a.x(),c.y()-a.y()),p(point);double den=v.x()*v.x()+v.y()*v.y();if(den<1)continue;double t=((p-u).x()*v.x()+(p-u).y()*v.y())/den;if(t<0.1||t>0.9)continue;double d=QLineF(p,u+v*t).length();if(d<best){best=d;picked=i;}}
     return picked;
 }
@@ -225,7 +224,7 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
         if(m_drawingMode)setDrawingArmed(false);
     }
     else if(m_centricDrag&&m_dragging){auto b=m_molecule.bonds[m_activeBond];emit bondManipulated(b.first,b.second,m_centricKind,m_centricValue,event->modifiers()&Qt::AltModifier);}
-    else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){auto a=m_molecule.atoms[i];if(!a.visible||(!m_style.showHydrogen&&a.atomicNumber==1))continue;auto p=project(a.position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}emit atomSelectionChanged();}
+    else if(m_rectangle){if(!add&&!toggle)m_selection.clear();QRect rect=QRect(m_pressMouse,event->pos()).normalized();auto vp=viewProjection();for(int i=0;i<m_molecule.atoms.size();++i){if(!atomShown(i))continue;auto p=project(m_molecule.atoms[i].position,vp);if(rect.contains(QPoint(qRound(p.x()),qRound(p.y()))))m_selection.click(i,true,toggle);}emit atomSelectionChanged();}
     else if(m_groupDrag&&m_dragging){if(m_transformMode==1||m_transformMode==2||m_transformMode==4)emit groupRotated(m_groupRotation,m_groupCenter);else emit groupMoved(m_groupTranslation);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::RightButton&&!m_dragging){if(m_chainDrawing&&m_chainAtom>=0)endDrawingChain();else emit deleteRequested(atom,bond);}
     else if(m_drawingMode&&m_drawingArmed&&event->button()==Qt::LeftButton&&!add&&!toggle){
@@ -247,8 +246,14 @@ void MoleculeView::mouseReleaseEvent(QMouseEvent *event) {
     if(event->button()==Qt::RightButton||event->button()==Qt::MiddleButton)emit interactionFinished();
 }
 void MoleculeView::mouseDoubleClickEvent(QMouseEvent *event) {
-    if(event->button()!=Qt::LeftButton)return;int atom=pickAtom(event->pos());
-    if(atom>=0){m_selection.connected(m_molecule,atom);m_selectedAtom=atom;update();if(m_previewOverlay)m_previewOverlay->update();emit atomSelectionChanged();}
+    if (event->button() != Qt::LeftButton) return;
+    const int atom = pickAtom(event->pos());
+    if (atom < 0) return;
+    m_selection.connected(m_molecule, atom);
+    // The trailing release must leave the connected selection intact.
+    m_dragging = true;
+    setSelectedAtom(atom);
+    emit atomSelectionChanged();
 }
 
 void MoleculeView::wheelEvent(QWheelEvent *event) {

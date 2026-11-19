@@ -751,6 +751,7 @@ void MainWindow::connectDocumentUi() {
                 m_currentFrame = frame;
                 m_view->setFrequencyMode(nullptr);
                 m_view->setCoordinates(m_data.frames[frame].coordinates);
+                m_view->setAnalysisFrame(&m_data.frames[frame]);
                 m_analysis->setCurrentFrame(frame);
                 updateGeometryReadout();
             }
@@ -801,6 +802,7 @@ void MainWindow::connectDocumentUi() {
     m_documentConnections.push_back(connect(m_animation, &AnimationController::frameChanged, this, [this](int index) {
         if (m_animation->kind() == AnimationController::Kind::Frames) {
             m_currentFrame = index;
+            m_view->setAnalysisFrame(index >= 0 && index < m_data.frames.size() ? &m_data.frames[index] : nullptr);
             m_analysis->setCurrentFrame(index);
         }
     }));

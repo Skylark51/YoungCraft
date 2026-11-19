@@ -63,13 +63,15 @@ int MoleculeView::sphereMeshLevel(const QVector3D &position, float radius) const
     return projectedRadius < 18.0f ? 0 : projectedRadius < 70.0f ? 1 : 2;
 }
 
-void MoleculeView::drawAtomSphere(const Atom &atom) {
+void MoleculeView::drawAtomSphere(int index) {
+    const auto &atom = m_molecule.atoms[index];
+    const float opacity = atomOpacity(index);
     const float radius = atomVisualRadius(atom);
     QMatrix4x4 model; model.translate(atom.position); model.scale(radius);
     const int level = sphereMeshLevel(atom.position, radius);
-    if (level == 0) drawMesh(m_sphereLowVao, m_sphereLowVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
-    else if (level == 1) drawMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
-    else drawMesh(m_sphereVao, m_sphereVertexCount, model, atomRenderColor(atom), true, atom.displayOpacity);
+    if (level == 0) drawMesh(m_sphereLowVao, m_sphereLowVertexCount, model, atomRenderColor(atom), true, opacity);
+    else if (level == 1) drawMesh(m_sphereMediumVao, m_sphereMediumVertexCount, model, atomRenderColor(atom), true, opacity);
+    else drawMesh(m_sphereVao, m_sphereVertexCount, model, atomRenderColor(atom), true, opacity);
 }
 
 void MoleculeView::drawBondCap(const QVector3D &center, const QVector3D &axis, float radius, float axialRadius,
@@ -161,9 +163,9 @@ void MoleculeView::drawColoredBond(const Bond &bond) {
     if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) return;
     const Atom &first = m_molecule.atoms[bond.first];
     const Atom &second = m_molecule.atoms[bond.second];
-    m_bondDisplayOpacity = qMin(first.displayOpacity, second.displayOpacity) * bond.displayOpacity;
+    m_bondDisplayOpacity = bondOpacity(bond);
     if (m_depthPass && m_bondDisplayOpacity < 1.0f) return;
-    if (!first.visible || !second.visible || (!m_style.showHydrogen && (first.atomicNumber == 1 || second.atomicNumber == 1))) return;
+    if (!atomShown(bond.first) || !atomShown(bond.second)) return;
     const QVector3D vector = second.position - first.position;
     const float length = vector.length();
     if (length < 0.001f) return;

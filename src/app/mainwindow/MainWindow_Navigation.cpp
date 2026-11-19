@@ -89,6 +89,7 @@ void MainWindow::showFrame(int index) {
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     m_currentFrame = index;
     m_view->setCoordinates(m_data.frames[index].coordinates);
+    m_view->setAnalysisFrame(&m_data.frames[index]);
     updateGeometryReadout();
     m_view->setFrequencyMode(nullptr);
     updateAtomVisibility();
@@ -102,6 +103,7 @@ void MainWindow::showFrequency(int index) {
     m_animation->stop();
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     m_currentFrequency = index;
+    m_view->setAnalysisFrame(m_data.frames.isEmpty() ? nullptr : &m_data.frames.last());
     updateAtomVisibility();
     if(m_outputDock->isVisible())updateOutputSource("frequency_modes",index);
     const FrequencyMode &mode = m_data.frequencies[index];
@@ -195,6 +197,53 @@ void MainWindow::setCarbonHydrogensVisible(bool visible) {
 
 void MainWindow::updateAtomVisibility() {
     m_view->setAtomDisplay(m_data.molecule);
+}
+
+void MainWindow::setDetailedAnalysisEnabled(bool enabled) {
+    auto *action = findChild<QAction *>(QStringLiteral("DetailedAnalysisAction"));
+    if (!enabled) {
+        m_view->setDetailedAnalysis(false);
+        return;
+    }
+    const QFileInfo source(m_currentFile);
+    const QString suffix = QStringLiteral("-freq.out");
+    QString missingCompanion;
+    if (source.fileName().endsWith(suffix, Qt::CaseInsensitive)) {
+        const QString name = source.fileName().chopped(suffix.size()) + QStringLiteral("-freq-bb.out");
+        const QFileInfo companion(source.dir(), name);
+        if (companion.isFile()) {
+            action->setChecked(false);
+            openFile(companion.absoluteFilePath());
+            if (!m_workspace->property("loadFinished").toBool()) {
+                m_activeDocument->openDetailedAnalysisOnLoad = true;
+            } else if (m_workspace->property("loadSuccess").toBool()) {
+                showDetailedAnalysis();
+            } else {
+                setStatus(QStringLiteral("상세 분석: %1 파일을 열 수 없습니다.").arg(name), 0);
+            }
+            return;
+        }
+        missingCompanion = name;
+    }
+    showDetailedAnalysis(missingCompanion);
+}
+
+void MainWindow::showDetailedAnalysis(const QString &missingCompanion) {
+    auto *action = findChild<QAction *>(QStringLiteral("DetailedAnalysisAction"));
+    if (m_view->molecule().isEmpty()) {
+        action->setChecked(false);
+        setStatus(missingCompanion.isEmpty()
+            ? QStringLiteral("계산 결과 또는 구조 파일을 먼저 열어 주세요.")
+            : QStringLiteral("상세 분석: 같은 폴더에 %1 파일이 없습니다.").arg(missingCompanion), 0);
+        return;
+    }
+    action->setChecked(true);
+    m_view->setDetailedAnalysis(true);
+    m_workspace->setCurrentWidget(m_moleculeWorkspace);
+    if (m_view->drawingArmed()) m_view->setDrawingArmed(false);
+    setStatus(missingCompanion.isEmpty()
+        ? QStringLiteral("상세 분석: 원자나 결합을 클릭하세요. 원자 두 개를 선택하면 거리를 표시합니다.")
+        : QStringLiteral("같은 폴더에 %1 파일이 없습니다. 현재 구조에서 상세 분석을 표시합니다.").arg(missingCompanion), 0);
 }
 
 void MainWindow::emphasizeSelectedAtoms(int mode) {

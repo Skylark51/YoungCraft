@@ -13,6 +13,7 @@ class GaussianParserTest final : public QObject {
 private slots:
     void savedNtoWithoutTdTransitions();
     void extractsGeometryEnergyFrequencyAndProperties();
+    void associatesPopulationsWithTheirFrames();
     void parsesScanAndIrcFixture();
     void toleratesIncompleteOutput();
     void relaxedScan_data();
@@ -93,6 +94,66 @@ void GaussianParserTest::extractsGeometryEnergyFrequencyAndProperties() {
     QVERIFY(result.data.hasNbo == false);
     QCOMPARE(result.data.status, CalculationStatus::NormalTermination);
     QCOMPARE(result.data.molecule.atoms.first().charge, -0.8);
+    QCOMPARE(result.data.frames.first().mullikenSpin.first(), 0.1);
+    QVERIFY(result.data.frames.first().nboCharges.isEmpty());
+}
+
+void GaussianParserTest::associatesPopulationsWithTheirFrames() {
+    QTemporaryFile file;
+    QVERIFY(file.open());
+    const QByteArray orientation =
+        " Standard orientation:\n ----\n Center Atomic Atomic Coordinates\n"
+        " Number Number Type X Y Z\n ----\n 1 26 0 0 0 0\n 2 8 0 0 0 1.8\n ----\n";
+    const QByteArray fixture = orientation + R"OUT( SCF Done: E(UB3LYP) = -100.00 A.U.
+ Mulliken charges and spin densities:
+              1          2
+     2  O    -0.35      0.42
+     1  Fe    0.35      0.31
+ Sum of Mulliken charges = 0.00000   0.73000
+ Summary of Natural Population Analysis:
+ Atom No Charge Core Valence Rydberg Total
+ Fe 1 1.42 18.0 6.5 0.08 24.58
+ O 2 -0.41 2.0 6.4 0.01 8.41
+ * Total *
+ *******         Alpha spin orbitals         *******
+ Summary of Natural Population Analysis:
+ Fe 1 -0.48 9.0 3.0 0.0 12.0
+ O 2 0.24 1.0 3.0 0.0 4.0
+ * Total *
+ *******         Beta  spin orbitals         *******
+ Summary of Natural Population Analysis:
+ Fe 1 0.61 9.0 3.0 0.0 12.0
+ O 2 0.19 1.0 3.0 0.0 4.0
+ * Total *
+ --Link1--
+)OUT" + orientation + R"OUT( SCF Done: E(UB3LYP) = -101.00 A.U.
+ Mulliken charges and spin densities:
+              1          2
+     1  Fe    0.30      0.55
+     2  O    -0.30      0.62
+ Sum of Mulliken charges = 0.00000   1.17000
+ Normal termination of Gaussian 16
+)OUT";
+    QCOMPARE(file.write(fixture), fixture.size());
+    file.flush();
+    const auto result = GaussianParser::parse(file.fileName());
+    QVERIFY2(result.success, qPrintable(result.error));
+    QCOMPARE(result.data.frames.size(), 2);
+    QCOMPARE(result.data.frames[0].mullikenSpin, QVector<double>({0.31, 0.42}));
+    QCOMPARE(result.data.frames[0].nboCharges, QVector<double>({1.42, -0.41}));
+    QCOMPARE(result.data.frames[1].mullikenSpin, QVector<double>({0.55, 0.62}));
+    QVERIFY(result.data.frames[1].nboCharges.isEmpty());
+    QCOMPARE(result.data.molecule.atoms[0].charge, 0.30);
+
+    const QDir corpus(qEnvironmentVariable("YOUNGCRAFT_NOVEMBER_CORPUS"));
+    const QString realOutput = corpus.filePath("Gaussian/Gaussian16/water_cation_nbo_opt.out");
+    if (QFileInfo::exists(realOutput)) {
+        const auto real = GaussianParser::parse(realOutput);
+        QVERIFY2(real.success, qPrintable(real.error));
+        const auto &frame = real.data.frames.last();
+        QCOMPARE(frame.mullikenSpin, QVector<double>({1.136594, -0.068297, -0.068297}));
+        QCOMPARE(frame.nboCharges, QVector<double>({0.12011, 0.43995, 0.43995}));
+    }
 }
 
 void GaussianParserTest::toleratesIncompleteOutput() {

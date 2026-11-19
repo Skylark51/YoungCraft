@@ -14,6 +14,7 @@
 #include <QThread>
 #include <QWheelEvent>
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
@@ -56,7 +57,9 @@ bool MoleculeView::eventFilter(QObject *watched, QEvent *event) {
         drawEditorPreview();
         // Keep measurements visible when Qt recomposites the OpenGL child widget.
         QPainter painter(m_previewOverlay);
-        drawGeometryMeasurements(viewProjection(), &painter);
+        const auto vp = viewProjection();
+        drawGeometryMeasurements(vp, &painter);
+        drawDetailedAnalysis(vp, &painter);
         return true;
     }
     return QOpenGLWidget::eventFilter(watched, event);
@@ -68,7 +71,7 @@ void MoleculeView::drawEditorPreview() {
     painter.setBrush(Qt::NoBrush);
     const QColor neon=selectionNeon(m_style.background);
     const QColor halo=m_style.background.lightnessF()>=0.55?QColor(0,24,82,140):QColor(0,0,0,190);
-    const auto shown = [this](int i) { return i>=0 && i<m_molecule.atoms.size() && m_molecule.atoms[i].visible && (m_style.showHydrogen || m_molecule.atoms[i].atomicNumber!=1); };
+    const auto shown = [this](int i) { return atomShown(i); };
     painter.save();
     const auto opacity=m_previewOverlay->property("selectionOpacity");
     painter.setOpacity(opacity.isValid()?opacity.toDouble():1.0);
@@ -90,10 +93,10 @@ void MoleculeView::drawEditorPreview() {
         for(int i:m_selection.atoms)painter.drawEllipse(ghost(i),8,8);
     }
     painter.setPen(QPen(QColor(80,130,210),2));
-    for(const auto &a:m_molecule.atoms)if(a.optimizationFixed&&a.visible&&(m_style.showHydrogen||a.atomicNumber!=1)){auto p=point(a.position)+QPointF(10,-10);painter.drawRect(QRectF(p,QSizeF(6,6)));}
+    for(int i=0;i<m_molecule.atoms.size();++i)if(atomShown(i)&&m_molecule.atoms[i].optimizationFixed){auto p=point(m_molecule.atoms[i].position)+QPointF(10,-10);painter.drawRect(QRectF(p,QSizeF(6,6)));}
     painter.setPen(QPen(QColor(120,180,230,180),1,Qt::DashLine));
-    for(const auto &site:m_molecule.coordinationSites)if(!site.occupied&&site.center>=0&&site.center<m_molecule.atoms.size()){auto origin=m_molecule.atoms[site.center].position;auto end=point(origin+site.direction*2);painter.drawLine(point(origin),end);painter.drawEllipse(end,6,6);}
-    for(const auto &h:m_molecule.hapticContacts){if(h.metal<0||h.metal>=m_molecule.atoms.size())continue;QVector3D c;for(int i:h.atoms)c+=m_molecule.atoms[i].position;if(!h.atoms.isEmpty()){c/=h.atoms.size();painter.drawLine(point(m_molecule.atoms[h.metal].position),point(c));painter.drawText(point(c)+QPointF(8,0),h.name);}}
+    for(const auto &site:m_molecule.coordinationSites)if(!site.occupied&&atomShown(site.center)){auto origin=m_molecule.atoms[site.center].position;auto end=point(origin+site.direction*2);painter.drawLine(point(origin),end);painter.drawEllipse(end,6,6);}
+    for(const auto &h:m_molecule.hapticContacts){if(!atomShown(h.metal))continue;QVector3D c;int count=0;for(int i:h.atoms)if(atomShown(i)){c+=m_molecule.atoms[i].position;++count;}if(count>0){c/=count;painter.drawLine(point(m_molecule.atoms[h.metal].position),point(c));painter.drawText(point(c)+QPointF(8,0),h.name);}}
     if(m_bondCentric&&m_activeBond>=0&&m_activeBond<m_molecule.bonds.size()){auto b=m_molecule.bonds[m_activeBond];auto a=point(m_molecule.atoms[b.first].position),c=point(m_molecule.atoms[b.second].position);painter.setPen(QPen(neon,3));painter.drawLine(a,c);painter.setPen(QPen(neon,1,Qt::DashLine));painter.drawEllipse((a+c)/2,32,18);painter.drawText((a+c)/2+QPointF(12,-25),m_centricText);}
     if(m_centricDrag&&m_dragging){painter.setPen(QPen(neon,2,Qt::DashLine));
         auto ghost=[&](int i){auto p=m_molecule.atoms[i].position;if(m_centricAtoms.contains(i))p=m_centricOrigin+m_centricRotation.rotatedVector(p-m_centricOrigin)+m_centricTranslation;return point(p);};
@@ -122,10 +125,10 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
     painter.setFont(font);
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const Atom &atom = m_molecule.atoms[i];
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atomShown(i)) continue;
         const QVector3D screen = project(atom.position, vp);
         if (screen.z() < -1.0f || screen.z() > 1.0f) continue;
-        painter.setOpacity(atom.displayOpacity);
+        painter.setOpacity(atomOpacity(i));
         if (m_style.showLabels || i == selectedAtom || m_geometrySelection.contains(i)) {
             QFont numberFont = font;
             numberFont.setBold(true);
@@ -170,6 +173,117 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
     }
 }
 
+void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayPainter) {
+    if (!m_detailedAnalysis) return;
+    const auto selected = analysisSelection();
+    if (selected.isEmpty()) return;
+
+    // Store each distance once under its first atom.
+    QMap<int, QSet<int>> distances;
+    for (int i = 0; i < m_molecule.bonds.size(); ++i) {
+        const auto &bond = m_molecule.bonds[i];
+        if (selected.contains(bond.first) && selected.contains(bond.second) &&
+            (m_selection.bonds.contains(i) ||
+             (m_selection.atoms.contains(bond.first) && m_selection.atoms.contains(bond.second))))
+            distances[qMin(bond.first, bond.second)].insert(qMax(bond.first, bond.second));
+    }
+    auto sites = selected.values();
+    std::sort(sites.begin(), sites.end());
+    if (sites.size() == 2) distances[sites[0]].insert(sites[1]);
+
+    QPainter capturePainter;
+    if (!overlayPainter) beginOverlayPainter(capturePainter);
+    QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
+    painter.save();
+    painter.setOpacity(1.0);
+    painter.setPen(Qt::NoPen);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    auto font = painter.font();
+    font.setPointSizeF(qMax(8.0, double(m_style.labelSize)));
+    painter.setFont(font);
+    const QFontMetricsF metrics(font);
+    const QColor paper = m_transparentCapture ? QColor(Qt::white) : m_style.background;
+    const bool light = vectorLuminance(paper) > 0.18;
+    const QColor ink = light ? QColor("#253044") : QColor("#f1f3f7");
+    const QColor spinColor = light ? QColor("#164fa6") : QColor("#8fbeff");
+    const QColor nboColor = light ? QColor("#964300") : QColor("#ffbd73");
+    const QColor border = light ? QColor("#65748c") : QColor("#9da8bb");
+    const auto atomName = [this](int i) {
+        const auto &atom = m_molecule.atoms[i];
+        return atom.element + QString::number(atom.index > 0 ? atom.index : i + 1);
+    };
+    const auto size = renderLogicalSize();
+    const QVector3D screenRight = m_rotation.conjugated().rotatedVector(QVector3D(1, 0, 0));
+    QVector<QRectF> atomBounds(m_molecule.atoms.size());
+    for (int i = 0; i < m_molecule.atoms.size(); ++i) {
+        if (!atomShown(i)) continue;
+        const auto &atom = m_molecule.atoms[i];
+        const auto center = project(atom.position, vp);
+        if (qAbs(center.z()) > 1.0f) continue;
+        const auto edge = project(atom.position + screenRight * atomVisualRadius(atom), vp);
+        const qreal radius = qAbs(double(edge.x()) - center.x()) + 4.0;
+        atomBounds[i] = QRectF(center.x() - radius, center.y() - radius, radius * 2, radius * 2);
+    }
+    QVector<QRectF> occupied;
+    for (int i : sites) {
+        const auto &atom = m_molecule.atoms[i];
+        const auto screen = project(atom.position, vp);
+        const QPointF anchor(screen.x(), screen.y());
+        if (qAbs(screen.z()) > 1.0f || !QRectF(QPointF(), size).contains(anchor)) continue;
+
+        const double spin = m_analysisSpin.value(i, kNaN);
+        const double nbo = m_analysisNbo.value(i, kNaN);
+        QVector<QPair<QString, QColor>> rows;
+        rows.push_back({QStringLiteral("%1  ·  Mulliken spin  %2").arg(atomName(i),
+            std::isfinite(spin) ? QString::number(spin, 'f', 3) : QStringLiteral("—")), spinColor});
+        if (std::isfinite(nbo))
+            rows.push_back({QStringLiteral("NBO charge  %1").arg(nbo, 0, 'f', 3), nboColor});
+        auto partners = distances.value(i).values();
+        std::sort(partners.begin(), partners.end());
+        for (int j : partners)
+            rows.push_back({QStringLiteral("%1–%2  %3 Å").arg(atomName(i), atomName(j))
+                .arg(atom.position.distanceToPoint(m_molecule.atoms[j].position), 0, 'f', 3), ink});
+
+        qreal width = 0;
+        for (const auto &row : rows) width = qMax(width, metrics.horizontalAdvance(row.first));
+        const qreal height = metrics.height() * rows.size() + 10;
+        width += 14;
+        const qreal gap = qMax(16.0, atomBounds[i].width() / 2 + 4.0);
+        QRectF box;
+        qreal bestScore = std::numeric_limits<qreal>::infinity();
+        for (const auto &offset : {QPointF(gap, -height - 8), QPointF(gap, 8),
+                                   QPointF(-gap - width, -height - 8), QPointF(-gap - width, 8),
+                                   QPointF(-width / 2, -height - gap), QPointF(-width / 2, gap)}) {
+            QRectF candidate(anchor + offset, QSizeF(width, height));
+            candidate.moveLeft(qBound(2.0, candidate.left(), qMax(2.0, size.width() - width - 2.0)));
+            candidate.moveTop(qBound(2.0, candidate.top(), qMax(2.0, size.height() - height - 2.0)));
+            const auto overlap = [&candidate](const QRectF &other) {
+                const auto intersection = candidate.intersected(other);
+                return intersection.width() * intersection.height();
+            };
+            qreal score = 0;
+            for (const auto &other : occupied) score += 4 * overlap(other);
+            for (const auto &bounds : atomBounds) score += overlap(bounds);
+            if (score < bestScore) { bestScore = score; box = candidate; }
+            if (score == 0) break;
+        }
+        occupied.push_back(box.adjusted(-3, -3, 3, 3));
+        painter.setOpacity(atomOpacity(i));
+        painter.setPen(QPen(border, 1.0));
+        painter.drawLine(anchor, QPointF(qBound(box.left(), anchor.x(), box.right()),
+                                         qBound(box.top(), anchor.y(), box.bottom())));
+        painter.setBrush(paper);
+        painter.drawRoundedRect(box, 4, 4);
+        qreal baseline = box.top() + 5 + metrics.ascent();
+        for (const auto &row : rows) {
+            painter.setPen(row.second);
+            painter.drawText(QPointF(box.left() + 7, baseline), row.first);
+            baseline += metrics.height();
+        }
+    }
+    painter.restore();
+}
+
 void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
     if (m_frequencyDisplacements.isEmpty()) return;
     QPainter painter; beginOverlayPainter(painter);
@@ -181,9 +295,8 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
     const QPen halo(outline,m_style.vectorWidth+2.5,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin);
     const int count = qMin(m_molecule.atoms.size(), m_frequencyDisplacements.size());
     for (int i = 0; i < count; ++i) {
-        const auto &atom = m_molecule.atoms[i];
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
-        painter.setOpacity(atom.displayOpacity);
+        if (!atomShown(i)) continue;
+        painter.setOpacity(atomOpacity(i));
         const QVector3D displacement = m_frequencyDisplacements[i];
         if (displacement.length() < m_style.vectorThreshold) continue;
         const QVector3D start3 = i < m_frequencyBase.size() ? m_frequencyBase[i] : m_molecule.atoms[i].position;
@@ -209,8 +322,7 @@ void MoleculeView::drawVibrationVectors(const QMatrix4x4 &vp) {
 void MoleculeView::drawGeometryMeasurements(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     if (m_geometrySelection.isEmpty()) return;
     for (int i : m_geometrySelection.mid(0,4))
-        if (i < 0 || i >= m_molecule.atoms.size() || !m_molecule.atoms[i].visible ||
-            (!m_style.showHydrogen && m_molecule.atoms[i].atomicNumber == 1)) return;
+        if (!atomShown(i)) return;
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
     QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
@@ -224,7 +336,7 @@ void MoleculeView::drawGeometryMeasurements(const QMatrix4x4 &vp, QPainter *over
     QVector<bool> visible(m_molecule.atoms.size(), false);
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const Atom &atom = m_molecule.atoms[i];
-        if (!atom.visible || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atomShown(i)) continue;
         const auto screen = project(atom.position, vp);
         if (screen.z() < -1.0f || screen.z() > 1.0f) continue;
         const QPointF center(screen.x(), screen.y());

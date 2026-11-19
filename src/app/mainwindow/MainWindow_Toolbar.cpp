@@ -67,6 +67,14 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
     p.setPen(QPen(ink,2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
     p.setBrush(Qt::NoBrush);
     switch(id) {
+    case 35:
+        p.drawLine(8, 9, 14, 17);
+        p.drawEllipse(QPointF(6, 6), 3, 3);
+        p.drawEllipse(QPointF(16, 20), 3, 3);
+        p.drawLine(19, 7, 29, 7);
+        p.drawLine(21, 13, 29, 13);
+        p.drawLine(22, 19, 29, 19);
+        break;
     case 34: {p.drawEllipse(QPointF(16,16),13,13);QFont f=p.font();f.setPixelSize(22);f.setBold(true);p.setFont(f);p.drawText(QRectF(2,2,28,28),Qt::AlignCenter,QStringLiteral("?"));break;}
     case 33: p.drawRoundedRect(QRectF(3,4,26,24),2,2);p.drawLine(3,10,29,10);p.drawLine(3,23,29,23);
         p.drawPolyline(QPolygonF{{13,13},{21,17},{13,21},{13,13}});break;
@@ -233,6 +241,37 @@ void MainWindow::createToolBar() {
     addDockToggle(m_explorerDock, QStringLiteral("ToggleResultsSidebar"), QStringLiteral("결과 패널"), 11);
     addDockToggle(m_structureDock, QStringLiteral("ToggleStructureSidebar"), QStringLiteral("구조 패널"), 25);
 
+    auto *detail = addPopup(QStringLiteral("상세 분석"), QStringLiteral("DetailedAnalysisAction"), 35);
+    detail->setToolTip(QStringLiteral("상세 분석 · 선택 원자와 결합에 스핀, NBO 전하, 길이 표시"));
+    detail->setCheckable(true);
+    qobject_cast<QToolButton *>(toolbar->widgetForAction(detail))->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *detailMenu = detail->menu();
+    auto *labelsAction = detailMenu->addAction(QStringLiteral("상세 분석 주석 표시"), detail, &QAction::trigger);
+    labelsAction->setCheckable(true);
+    detailMenu->addSeparator();
+    const auto addFragmentOption = [this, detailMenu](const char *name, const QString &label, MoleculeView::FragmentDisplay display) {
+        auto *option = detailMenu->addAction(label, this, [this, display] {
+            if (display == MoleculeView::FragmentDisplay::All) {
+                m_view->setAnalysisFragment(display);
+                return;
+            }
+            const auto selected = m_view->analysisSelection();
+            if (selected.isEmpty()) {
+                setStatus(QStringLiteral("유지할 fragment의 원자를 선택하세요. 연결된 fragment는 원자를 더블클릭하면 선택됩니다."));
+                return;
+            }
+            m_workspace->setCurrentWidget(m_moleculeWorkspace);
+            m_view->setAnalysisFragment(display, selected);
+        });
+        option->setObjectName(QString::fromLatin1(name));
+    };
+    addFragmentOption("AnalysisHideOtherFragments", QStringLiteral("선택한 fragment 외 숨기기"), MoleculeView::FragmentDisplay::HideOthers);
+    addFragmentOption("AnalysisFadeOtherFragments", QStringLiteral("선택한 fragment 외 반투명"), MoleculeView::FragmentDisplay::FadeOthers);
+    addFragmentOption("AnalysisRestoreFragments", QStringLiteral("fragment 강조 해제"), MoleculeView::FragmentDisplay::All);
+    connect(detailMenu, &QMenu::aboutToShow, labelsAction, [this, labelsAction] {
+        labelsAction->setChecked(m_view->detailedAnalysis());
+    });
+    connect(detail, &QAction::triggered, this, &MainWindow::setDetailedAnalysisEnabled);
 
     const auto addButton = [](QAction *action, QWidget *parent) {
         auto *button = new QToolButton(parent);
