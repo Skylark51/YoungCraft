@@ -98,7 +98,7 @@ Windows portable 배포물은 Release 빌드 후 아래 스크립트로 만듭�
 powershell -ExecutionPolicy Bypass -File tools/package_portable.ps1
 ```
 
-완성물은 `dist`의 portable 폴더, 루트의 `Youngcraft-portable.zip`, 그리고 모든 실행 파일을 내장한 `Youngcraft-Standalone.exe`입니다. `tools/create_desktop_patch.ps1`은 바탕화면의 단일 실행 파일 `YoungCraft.exe`와 업데이트용 `Youngcraft-Patch.exe`, `Youngcraft-portable.zip`을 같은 이름으로 갱신합니다. ZIP 배포본을 쓰려면 전체를 풀고 그 폴더의 `Youngcraft.exe`를 실행합니다.
+빌드 결과는 작업 폴더의 `dist`, `Youngcraft-portable.zip`, `Youngcraft-Standalone.exe`에 생성됩니다. `tools/create_desktop_patch.ps1`을 실행하면 빌드 결과를 담은 단일 실행 파일 `YoungCraft.exe` 하나가 바탕화면에 갱신됩니다.
 
 MM worker는 RDKit의 force-field 모듈을 직접 사용하고, 계산과 무관한 이미지·GUI·노트북·수치 분석 모듈은 패키징에서 제외합니다. MMFF94, MMFF94s, UFF, 자동 선택과 GFN-FF 전환, 기존 constraint와 최적화 기능은 유지합니다.
 
