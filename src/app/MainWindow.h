@@ -184,6 +184,7 @@ private:
     QSet<int> selectedStructureAtoms() const;
     void setDetailedAnalysisEnabled(bool enabled);
     void showDetailedAnalysis(const QString &missingCompanion = {});
+    void updateDetailedAnalysisControls();
     void applyAtomSelection(const QSet<int> &ids);
     void copyStructureFragment();
     void pasteStructureFragment();
@@ -269,6 +270,8 @@ private:
     QDockWidget *m_analysisDock = nullptr;
     QDockWidget *m_explorerDock = nullptr;
     QDockWidget *m_structureDock = nullptr;
+    QWidget *m_analysisLabelControls = nullptr;
+    QVector<QPushButton *> m_analysisLabelButtons;
     QStackedWidget *m_workspace = nullptr;
     QWidget *m_moleculeWorkspace = nullptr;
     GeometryMeasureBar *m_geometryBar = nullptr;

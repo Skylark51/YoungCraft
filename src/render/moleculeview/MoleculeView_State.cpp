@@ -77,6 +77,11 @@ void MoleculeView::setDetailedAnalysis(bool enabled) {
     if (m_previewOverlay) m_previewOverlay->update();
 }
 
+void MoleculeView::setAnalysisLabelVisible(AnalysisLabel label, bool visible) {
+    m_analysisLabels[int(label)] = visible;
+    if (m_detailedAnalysis && m_previewOverlay) m_previewOverlay->update();
+}
+
 void MoleculeView::setAnalysisFrame(const Frame *frame) {
     const bool matches = frame && frame->coordinates.size() == m_molecule.atoms.size();
     m_analysisSpin = matches ? frame->mullikenSpin : QVector<double>{};

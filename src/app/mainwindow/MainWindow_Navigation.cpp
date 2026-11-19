@@ -203,6 +203,7 @@ void MainWindow::setDetailedAnalysisEnabled(bool enabled) {
     auto *action = findChild<QAction *>(QStringLiteral("DetailedAnalysisAction"));
     if (!enabled) {
         m_view->setDetailedAnalysis(false);
+        updateDetailedAnalysisControls();
         return;
     }
     const QFileInfo source(m_currentFile);
@@ -237,13 +238,23 @@ void MainWindow::showDetailedAnalysis(const QString &missingCompanion) {
             : QStringLiteral("상세 분석: 같은 폴더에 %1 파일이 없습니다.").arg(missingCompanion), 0);
         return;
     }
-    action->setChecked(true);
     m_view->setDetailedAnalysis(true);
+    updateDetailedAnalysisControls();
+    m_structureDock->show();
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     if (m_view->drawingArmed()) m_view->setDrawingArmed(false);
     setStatus(missingCompanion.isEmpty()
         ? QStringLiteral("상세 분석: 원자 값과 결합 길이를 표시합니다. 결합이 없는 원자 두 개를 선택해 거리를 잴 수 있습니다.")
         : QStringLiteral("같은 폴더에 %1 파일이 없습니다. 현재 구조에서 상세 분석을 표시합니다.").arg(missingCompanion), 0);
+}
+
+void MainWindow::updateDetailedAnalysisControls() {
+    const bool enabled = m_view->detailedAnalysis();
+    if (auto *action = findChild<QAction *>(QStringLiteral("DetailedAnalysisAction")))
+        action->setChecked(enabled);
+    m_analysisLabelControls->setVisible(enabled);
+    for (int i = 0; i < m_analysisLabelButtons.size(); ++i)
+        m_analysisLabelButtons[i]->setChecked(m_view->analysisLabelVisible(MoleculeView::AnalysisLabel(i)));
 }
 
 void MainWindow::emphasizeSelectedAtoms(int mode) {

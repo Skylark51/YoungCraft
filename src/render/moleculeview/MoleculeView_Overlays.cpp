@@ -175,6 +175,10 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
 
 void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     if (!m_detailedAnalysis) return;
+    const bool showSpin = analysisLabelVisible(AnalysisLabel::MullikenSpin);
+    const bool showNbo = analysisLabelVisible(AnalysisLabel::NboCharge);
+    const bool showLength = analysisLabelVisible(AnalysisLabel::BondLength);
+    if (!showSpin && !showNbo && !showLength) return;
 
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
@@ -266,20 +270,25 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
         }
         labels.push_back(std::move(label));
     };
-    for (const auto &bond : m_molecule.bonds) addDistance(bond.first, bond.second, true);
-    const auto selected = analysisSelection().values();
-    if (selected.size() == 2 && m_molecule.bondIndex(selected[0], selected[1]) < 0)
-        addDistance(selected[0], selected[1], false);
+    if (showLength) {
+        for (const auto &bond : m_molecule.bonds) addDistance(bond.first, bond.second, true);
+        const auto selected = analysisSelection().values();
+        if (selected.size() == 2 && m_molecule.bondIndex(selected[0], selected[1]) < 0)
+            addDistance(selected[0], selected[1], false);
+    }
 
-    for (int i = 0; i < atomBounds.size(); ++i) {
+    for (int i = 0; (showSpin || showNbo) && i < atomBounds.size(); ++i) {
         const auto &box = atomBounds[i];
         if (!inAnalysis[i] || !viewport.intersects(box)) continue;
         const double spin = m_analysisSpin.value(i, kNaN);
         const double nbo = m_analysisNbo.value(i, kNaN);
-        QVector<QPair<QString, QColor>> rows{
-            {QStringLiteral("Mulliken %1").arg(std::isfinite(spin) ? QString::number(spin, 'f', 3)
-                                                               : QStringLiteral("—")), spinColor}};
-        if (std::isfinite(nbo)) rows.push_back({QStringLiteral("NBO %1").arg(nbo, 0, 'f', 3), nboColor});
+        QVector<QPair<QString, QColor>> rows;
+        if (showSpin)
+            rows.push_back({QStringLiteral("Mulliken %1").arg(std::isfinite(spin) ? QString::number(spin, 'f', 3)
+                                                                             : QStringLiteral("—")), spinColor});
+        if (showNbo && std::isfinite(nbo))
+            rows.push_back({QStringLiteral("NBO %1").arg(nbo, 0, 'f', 3), nboColor});
+        if (rows.isEmpty()) continue;
         auto label = makeLabel(QPointF(box.center().x(), box.top()), std::move(rows), atomOpacity(i));
         const qreal left = clampLeft(label.anchor.x() - label.size.width() / 2, label.size.width());
         label.preferred = QPointF(left, label.anchor.y() - 5 - label.size.height());

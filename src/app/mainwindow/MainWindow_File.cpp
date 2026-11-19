@@ -128,10 +128,10 @@ void MainWindow::bindDocument(const std::shared_ptr<DocumentSession> &document) 
     m_view->setAtomDragMode(m_dragAtoms);
     m_firstBondAtom = d.firstBondAtom;
     if (m_geometryAction) m_geometryAction->setChecked(m_geometryMode);
+    updateDetailedAnalysisControls();
     for (QAction *action : findChildren<QAction *>()) {
         const auto &text = action->text();
-        if (action->objectName() == QStringLiteral("DetailedAnalysisAction")) action->setChecked(m_view->detailedAnalysis());
-        else if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
+        if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
         else if (text == QStringLiteral("molecule 중심으로 축 이동")) action->setChecked(m_style.centerAxes);
         else if (text == QStringLiteral("수소 표시")) action->setChecked(m_style.showHydrogen);
         else if (action == m_atomLabelsAction) action->setChecked(m_style.showLabels);
