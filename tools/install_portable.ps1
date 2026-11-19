@@ -55,9 +55,9 @@ catch {
 }
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shell = New-Object -ComObject WScript.Shell
-$shortcuts = @(Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' | Where-Object { $_.BaseName -match '^Youngcraft($|\s|-)' })
-if ($shortcuts.Count -eq 0) { $shortcutPaths = @(Join-Path $desktop 'Youngcraft.lnk') }
-else { $shortcutPaths = @($shortcuts.FullName) }
+$shortcutPaths = @(Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' |
+    Where-Object { $_.BaseName -match '^Youngcraft(\s|-)' } |
+    Select-Object -ExpandProperty FullName)
 foreach ($path in $shortcutPaths) {
     $shortcut = $shell.CreateShortcut($path)
     $shortcut.TargetPath = $executable
@@ -73,4 +73,4 @@ if (Test-Path -LiteralPath $openWithCommand) {
     Set-Item -LiteralPath $openWithCommand -Value ('"' + $executable + '" "%1"')
 }
 Write-Output "Installed: $executable"
-Write-Output "Desktop shortcuts: $($shortcutPaths -join ', ')"
+if ($shortcutPaths.Count) { Write-Output "Desktop shortcuts: $($shortcutPaths -join ', ')" }

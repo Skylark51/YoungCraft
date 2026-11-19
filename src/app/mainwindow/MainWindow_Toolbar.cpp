@@ -242,7 +242,7 @@ void MainWindow::createToolBar() {
     addDockToggle(m_structureDock, QStringLiteral("ToggleStructureSidebar"), QStringLiteral("구조 패널"), 25);
 
     auto *detail = addPopup(QStringLiteral("상세 분석"), QStringLiteral("DetailedAnalysisAction"), 35);
-    detail->setToolTip(QStringLiteral("상세 분석 · 선택 원자와 결합에 스핀, NBO 전하, 길이 표시"));
+    detail->setToolTip(QStringLiteral("상세 분석 · 구조 위에 스핀, NBO 전하, 결합 길이 표시"));
     detail->setCheckable(true);
     qobject_cast<QToolButton *>(toolbar->widgetForAction(detail))->setPopupMode(QToolButton::MenuButtonPopup);
     auto *detailMenu = detail->menu();

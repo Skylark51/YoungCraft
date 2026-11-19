@@ -242,7 +242,7 @@ void MainWindow::showDetailedAnalysis(const QString &missingCompanion) {
     m_workspace->setCurrentWidget(m_moleculeWorkspace);
     if (m_view->drawingArmed()) m_view->setDrawingArmed(false);
     setStatus(missingCompanion.isEmpty()
-        ? QStringLiteral("상세 분석: 원자나 결합을 클릭하세요. 원자 두 개를 선택하면 거리를 표시합니다.")
+        ? QStringLiteral("상세 분석: 원자 값과 결합 길이를 표시합니다. 결합이 없는 원자 두 개를 선택해 거리를 잴 수 있습니다.")
         : QStringLiteral("같은 폴더에 %1 파일이 없습니다. 현재 구조에서 상세 분석을 표시합니다.").arg(missingCompanion), 0);
 }
 

@@ -11,9 +11,18 @@ if ([string]::IsNullOrWhiteSpace($PackageZip)) { $PackageZip = Join-Path (Split-
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'Youngcraft-Standalone.exe' }
 $PackageZip = (Resolve-Path -LiteralPath $PackageZip).Path
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
-# Never replace the native executable, including when a caller supplies a path.
+# The desktop is the only place where the standalone uses the native filename.
 if ([IO.Path]::GetFileName($OutputPath).Equals('Youngcraft.exe', [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'Standalone output must not be named Youngcraft.exe. Use Youngcraft-Standalone.exe.'
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    if (-not $desktop -or -not $OutputPath.Equals((Join-Path $desktop 'YoungCraft.exe'), [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Use Youngcraft-Standalone.exe outside the Windows Desktop to protect the native executable.'
+    }
+    if (Test-Path -LiteralPath $OutputPath -PathType Leaf) {
+        $existing = Get-Item -LiteralPath $OutputPath -Force
+        if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Invalid Desktop launcher: $OutputPath" }
+        $assembly = try { [Reflection.AssemblyName]::GetAssemblyName($OutputPath).Name } catch [BadImageFormatException] { $null }
+        if ($assembly -ne 'Youngcraft-Standalone') { throw "The existing Desktop executable is not the Youngcraft single-file launcher: $OutputPath" }
+    }
 }
 if ([IO.Path]::GetExtension($OutputPath) -ine '.exe') { throw 'OutputPath must have an .exe extension.' }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'

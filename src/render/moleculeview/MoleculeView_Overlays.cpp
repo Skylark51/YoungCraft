@@ -10,11 +10,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPointer>
+#include <QRegion>
 #include <QSurfaceFormat>
 #include <QThread>
 #include <QWheelEvent>
 
-#include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
@@ -175,24 +175,6 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
 
 void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     if (!m_detailedAnalysis) return;
-    const auto selected = analysisSelection();
-    if (selected.isEmpty()) return;
-
-    QMap<QPair<int, int>, bool> distances;
-    for (int i = 0; i < m_molecule.bonds.size(); ++i) {
-        const auto &bond = m_molecule.bonds[i];
-        if (selected.contains(bond.first) && selected.contains(bond.second) &&
-            (m_selection.bonds.contains(i) ||
-             (m_selection.atoms.contains(bond.first) && m_selection.atoms.contains(bond.second))))
-            distances.insert({qMin(bond.first, bond.second), qMax(bond.first, bond.second)}, true);
-    }
-    auto sites = selected.values();
-    std::sort(sites.begin(), sites.end());
-    if (sites.size() == 2) {
-        const QPair<int, int> pair(sites[0], sites[1]);
-        if (!distances.contains(pair))
-            distances.insert(pair, m_molecule.bondIndex(pair.first, pair.second) >= 0);
-    }
 
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
@@ -210,9 +192,13 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
     const QColor nboColor = light ? QColor("#964300") : QColor("#ffbd73");
     const QColor border = light ? QColor("#65748c") : QColor("#9da8bb");
     const auto size = renderLogicalSize();
-    const QRectF viewport(QPointF(2, 2), size - QSizeF(4, 4));
+    const qreal bannerHeight = metrics.height() + 8;
+    const QRectF viewport(QPointF(2, 2), size - QSizeF(4, 4 + bannerHeight));
+    if (viewport.isEmpty()) { painter.restore(); return; }
     const QVector3D screenRight = m_rotation.conjugated().rotatedVector(QVector3D(1, 0, 0));
     QVector<QRectF> atomBounds(m_molecule.atoms.size());
+    QVector<bool> inAnalysis(m_molecule.atoms.size(), false);
+    QRegion blocked;
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         if (!atomShown(i)) continue;
         const auto &atom = m_molecule.atoms[i];
@@ -221,46 +207,56 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
         const auto edge = project(atom.position + screenRight * atomVisualRadius(atom), vp);
         const qreal radius = qMax(3.0, qAbs(double(edge.x()) - center.x()));
         atomBounds[i] = QRectF(center.x() - radius, center.y() - radius, radius * 2, radius * 2);
+        const auto visiblePart = viewport.intersected(atomBounds[i]);
+        if (!visiblePart.isEmpty()) blocked += visiblePart.toAlignedRect();
+        inAnalysis[i] = m_fragmentDisplay == FragmentDisplay::All || m_analysisFragment.contains(i);
     }
-    QVector<QRectF> occupied;
-    const auto overlapScore = [&occupied, &atomBounds](const QRectF &box) {
-        const auto area = [&box](const QRectF &other) {
-            const auto intersection = box.intersected(other);
-            return intersection.width() * intersection.height();
-        };
-        qreal score = 0;
-        for (const auto &other : occupied) score += 4 * area(other);
-        for (const auto &bounds : atomBounds) score += area(bounds);
-        return score;
-    };
-    const auto drawBox = [&](const QRectF &box) {
-        painter.setPen(QPen(border, 0.75));
-        painter.setBrush(paper);
-        painter.drawRoundedRect(box, 3, 3);
-        occupied.push_back(box.adjusted(-2, -2, 2, 2));
-    };
 
-    for (auto it = distances.cbegin(); it != distances.cend(); ++it) {
-        const auto [first, second] = it.key();
-        if (atomBounds[first].isEmpty() || atomBounds[second].isEmpty()) continue;
+    struct Label {
+        QPointF anchor;
+        QPointF preferred;
+        QSizeF size;
+        QVector<QPair<QString, QColor>> rows;
+        QRectF box;
+        qreal opacity = 1;
+        bool leader = false;
+    };
+    QVector<Label> labels;
+    const auto makeLabel = [&metrics](QPointF anchor, QVector<QPair<QString, QColor>> rows, qreal opacity) {
+        qreal width = 0;
+        for (const auto &row : rows) width = qMax(width, metrics.horizontalAdvance(row.first));
+        Label label;
+        label.anchor = anchor;
+        label.size = QSizeF(width + 10, metrics.height() * rows.size() + 6);
+        label.rows = std::move(rows);
+        label.opacity = opacity;
+        return label;
+    };
+    const auto clampLeft = [&viewport](qreal left, qreal width) {
+        return qBound(viewport.left(), left, qMax(viewport.left(), viewport.right() - width));
+    };
+    const auto place = [&blocked, &viewport](Label &label, QPointF topLeft, bool leader) {
+        const QRectF box(topLeft, label.size);
+        const QRect padding = box.adjusted(-2, -2, 2, 2).toAlignedRect();
+        if (!viewport.contains(box) || blocked.intersects(padding)) return false;
+        blocked += padding;
+        label.box = box;
+        label.leader = leader;
+        return true;
+    };
+    const auto addDistance = [&](int first, int second, bool bonded) {
+        if (!inAnalysis.value(first) || !inAnalysis.value(second)) return;
         const QLineF line(atomBounds[first].center(), atomBounds[second].center());
+        if (!viewport.contains(line.center())) return;
         const double distance = m_molecule.atoms[first].position.distanceToPoint(m_molecule.atoms[second].position);
         const auto text = QStringLiteral("%1 Å").arg(distance, 0, 'f', 3);
-        const QSizeF labelSize(metrics.horizontalAdvance(text) + 10, metrics.height() + 4);
-        QRectF box;
-        qreal bestScore = std::numeric_limits<qreal>::infinity();
-        // Move along the bond only when the midpoint is crowded.
-        for (qreal fraction : {0.5, 0.4, 0.6, 0.3, 0.7}) {
-            QRectF candidate(QPointF(), labelSize);
-            candidate.moveCenter(line.pointAt(fraction));
-            if (!viewport.contains(candidate)) continue;
-            const qreal score = overlapScore(candidate);
-            if (score < bestScore) { bestScore = score; box = candidate; }
-            if (score == 0) break;
-        }
-        if (box.isEmpty()) continue;
-        painter.setOpacity(qMin(atomOpacity(first), atomOpacity(second)));
-        if (!it.value()) {
+        auto label = makeLabel(line.center(), {{text, ink}}, qMin(atomOpacity(first), atomOpacity(second)));
+        const QPointF halfSize(label.size.width() / 2, label.size.height() / 2);
+        label.preferred = label.anchor - halfSize;
+        for (qreal fraction : {0.5, 0.4, 0.6, 0.3, 0.7})
+            if (place(label, line.pointAt(fraction) - halfSize, false)) break;
+        if (!bonded) {
+            painter.setOpacity(label.opacity);
             painter.setPen(QPen(border, 1.0, Qt::DashLine));
             const auto direction = line.length() > 0 ? (line.p2() - line.p1()) / line.length() : QPointF();
             const qreal firstRadius = atomBounds[first].width() / 2;
@@ -268,51 +264,98 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
             if (line.length() > firstRadius + secondRadius)
                 painter.drawLine(line.p1() + direction * firstRadius, line.p2() - direction * secondRadius);
         }
-        drawBox(box);
-        painter.setPen(ink);
-        painter.drawText(box, Qt::AlignCenter, text);
-    }
+        labels.push_back(std::move(label));
+    };
+    for (const auto &bond : m_molecule.bonds) addDistance(bond.first, bond.second, true);
+    const auto selected = analysisSelection().values();
+    if (selected.size() == 2 && m_molecule.bondIndex(selected[0], selected[1]) < 0)
+        addDistance(selected[0], selected[1], false);
 
-    for (int i : sites) {
-        const auto &atomBox = atomBounds[i];
-        if (atomBox.isEmpty() || !viewport.intersects(atomBox)) continue;
-
+    for (int i = 0; i < atomBounds.size(); ++i) {
+        const auto &box = atomBounds[i];
+        if (!inAnalysis[i] || !viewport.intersects(box)) continue;
         const double spin = m_analysisSpin.value(i, kNaN);
         const double nbo = m_analysisNbo.value(i, kNaN);
-        QVector<QPair<QString, QColor>> rows;
-        rows.push_back({QStringLiteral("Mulliken %1").arg(
-            std::isfinite(spin) ? QString::number(spin, 'f', 3) : QStringLiteral("—")), spinColor});
-        if (std::isfinite(nbo))
-            rows.push_back({QStringLiteral("NBO %1").arg(nbo, 0, 'f', 3), nboColor});
+        QVector<QPair<QString, QColor>> rows{
+            {QStringLiteral("Mulliken %1").arg(std::isfinite(spin) ? QString::number(spin, 'f', 3)
+                                                               : QStringLiteral("—")), spinColor}};
+        if (std::isfinite(nbo)) rows.push_back({QStringLiteral("NBO %1").arg(nbo, 0, 'f', 3), nboColor});
+        auto label = makeLabel(QPointF(box.center().x(), box.top()), std::move(rows), atomOpacity(i));
+        const qreal left = clampLeft(label.anchor.x() - label.size.width() / 2, label.size.width());
+        label.preferred = QPointF(left, label.anchor.y() - 5 - label.size.height());
+        for (int tier = 0; tier < 3; ++tier)
+            if (place(label, label.preferred - QPointF(0, tier * (label.size.height() + 4)), tier > 0)) break;
+        labels.push_back(std::move(label));
+    }
 
-        qreal width = 0;
-        for (const auto &row : rows) width = qMax(width, metrics.horizontalAdvance(row.first));
-        const qreal height = metrics.height() * rows.size() + 6;
-        width += 10;
-        const QPointF anchor(atomBox.center().x(), atomBox.top());
-        const qreal left = qBound(viewport.left(), anchor.x() - width / 2,
-                                  qMax(viewport.left(), viewport.right() - width));
-        QRectF box;
-        qreal bestScore = std::numeric_limits<qreal>::infinity();
-        for (int tier = 0; tier < 5; ++tier) {
-            const qreal top = qMax(viewport.top(), anchor.y() - 5 - height - tier * (height + 3));
-            const QRectF candidate(left, top, width, height);
-            const qreal score = overlapScore(candidate);
-            if (score < bestScore) { bestScore = score; box = candidate; }
-            if (score == 0 || top == viewport.top()) break;
+    // Attach crowded labels to the nearest open grid position. Reserve their
+    // rectangles before painting so arrows can run beneath other labels.
+    int overflow = 0;
+    QSet<QPair<qreal, qreal>> exhaustedSizes;
+    for (auto &label : labels) {
+        if (!label.box.isEmpty()) continue;
+        const QPair<qreal, qreal> footprint(label.size.width(), label.size.height());
+        if (exhaustedSizes.contains(footprint)) { ++overflow; continue; }
+        QPointF nearest;
+        qreal best = std::numeric_limits<qreal>::infinity();
+        constexpr qreal step = 10;
+        for (qreal y = viewport.top(); y + label.size.height() <= viewport.bottom(); y += step) {
+            const qreal dy = y - label.preferred.y();
+            if (dy * dy >= best) continue;
+            for (qreal x = viewport.left(); x + label.size.width() <= viewport.right(); x += step) {
+                const qreal dx = x - label.preferred.x();
+                const qreal score = dx * dx + dy * dy;
+                if (score >= best) continue;
+                const QRectF candidate(QPointF(x, y), label.size);
+                if (!blocked.intersects(candidate.adjusted(-2, -2, 2, 2).toAlignedRect())) {
+                    best = score;
+                    nearest = QPointF(x, y);
+                }
+            }
         }
-        painter.setOpacity(atomOpacity(i));
-        if (anchor.y() - box.bottom() > 8) {
-            painter.setPen(QPen(border, 0.75));
-            painter.drawLine(anchor, QPointF(qBound(box.left(), anchor.x(), box.right()), box.bottom()));
+        if (!std::isfinite(best) || !place(label, nearest, true)) {
+            exhaustedSizes.insert(footprint);
+            ++overflow;
         }
-        drawBox(box);
-        QRectF rowBox(left, box.top() + 3, width, metrics.height());
-        for (const auto &row : rows) {
+    }
+
+    for (const auto &label : labels) {
+        if (!label.leader) continue;
+        const auto &box = label.box;
+        const QPointF tail(qBound(box.left(), label.anchor.x(), box.right()),
+                           qBound(box.top(), label.anchor.y(), box.bottom()));
+        const QLineF leader(tail, label.anchor);
+        if (leader.length() < 4) continue;
+        painter.setOpacity(label.opacity);
+        painter.setPen(QPen(border, 0.9));
+        painter.setBrush(border);
+        painter.drawLine(leader);
+        const QPointF direction = (leader.p2() - leader.p1()) / leader.length();
+        const QPointF side(-direction.y(), direction.x());
+        const QPointF base = label.anchor - direction * 5;
+        painter.drawPolygon(QPolygonF{label.anchor, base + side * 2.5, base - side * 2.5});
+    }
+    for (const auto &label : labels) {
+        if (label.box.isEmpty()) continue;
+        painter.setOpacity(label.opacity);
+        painter.setPen(QPen(border, 0.75));
+        painter.setBrush(paper);
+        painter.drawRoundedRect(label.box, 3, 3);
+        QRectF rowBox(label.box.left(), label.box.top() + 3, label.box.width(), metrics.height());
+        for (const auto &row : label.rows) {
             painter.setPen(row.second);
             painter.drawText(rowBox, Qt::AlignCenter, row.first);
             rowBox.translate(0, metrics.height());
         }
+    }
+    if (overflow > 0) {
+        painter.setOpacity(1);
+        const auto message = QStringLiteral("주석 %1개 더 보기 · 확대하거나 fragment를 분리하세요").arg(overflow);
+        const QRectF banner(viewport.left(), viewport.bottom(),
+                            qMin(viewport.width(), metrics.horizontalAdvance(message) + 12), bannerHeight);
+        painter.fillRect(banner, paper);
+        painter.setPen(ink);
+        painter.drawText(banner, Qt::AlignCenter, message);
     }
     painter.restore();
 }

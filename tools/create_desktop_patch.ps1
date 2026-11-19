@@ -17,26 +17,25 @@ try {
         Copy-Item -LiteralPath $PackageZip -Destination $desktopZip -Force
     }
     Copy-Item -LiteralPath $temporaryExe -Destination (Join-Path $desktop 'Youngcraft-Patch.exe') -Force
-    $desktopStandalone = Join-Path $desktop 'Youngcraft-Standalone.exe'
-    & (Join-Path $PSScriptRoot 'create_standalone.ps1') -PackageZip $PackageZip -OutputPath $desktopStandalone
+    $desktopLauncher = Join-Path $desktop 'YoungCraft.exe'
+    & (Join-Path $PSScriptRoot 'create_standalone.ps1') -PackageZip $PackageZip -OutputPath $desktopLauncher
 
-    # Refresh existing copies of the single-file launcher published as Youngcraft.exe.
-    $desktopAlias = Join-Path $desktop 'Youngcraft.exe'
-    if (Test-Path -LiteralPath $desktopAlias -PathType Leaf) {
-        $aliasFile = Get-Item -LiteralPath $desktopAlias -Force
-        if (-not ($aliasFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            $aliasAssembly = try { [Reflection.AssemblyName]::GetAssemblyName($desktopAlias).Name }
+    $legacyStandalone = Join-Path $desktop 'Youngcraft-Standalone.exe'
+    if (Test-Path -LiteralPath $legacyStandalone -PathType Leaf) {
+        $legacyFile = Get-Item -LiteralPath $legacyStandalone -Force
+        if (-not ($legacyFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            $legacyAssembly = try { [Reflection.AssemblyName]::GetAssemblyName($legacyStandalone).Name }
                 catch [BadImageFormatException] { $null }
-            if ($aliasAssembly -eq 'Youngcraft-Standalone') {
-                $stagedAlias = Join-Path $desktop ('.Youngcraft-' + [Guid]::NewGuid().ToString('N') + '.tmp')
-                try {
-                    [IO.File]::Copy($desktopStandalone, $stagedAlias)
-                    [IO.File]::Replace($stagedAlias, $desktopAlias, [NullString]::Value)
-                    Write-Output "Desktop single-file launcher: $desktopAlias"
-                } finally {
-                    if (Test-Path -LiteralPath $stagedAlias) { Remove-Item -LiteralPath $stagedAlias -Force }
-                }
-            }
+            if ($legacyAssembly -eq 'Youngcraft-Standalone') { Remove-Item -LiteralPath $legacyStandalone -Force }
+        }
+    }
+    $oldShortcut = Join-Path $desktop 'Youngcraft.lnk'
+    if (Test-Path -LiteralPath $oldShortcut -PathType Leaf) {
+        $shell = New-Object -ComObject WScript.Shell
+        $target = $shell.CreateShortcut($oldShortcut).TargetPath
+        $installed = Join-Path $env:LOCALAPPDATA 'Programs/Youngcraft Portable/Youngcraft.exe'
+        if ($target -in @($installed, $legacyStandalone, $desktopLauncher)) {
+            Remove-Item -LiteralPath $oldShortcut -Force
         }
     }
     Write-Output "Desktop patch: $(Join-Path $desktop 'Youngcraft-Patch.exe')"
