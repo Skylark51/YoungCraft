@@ -103,6 +103,8 @@ private slots:
     void saveLigandTemplate();
 
 private:
+    bool isRetainedClosedWindow() const;
+    void reopenClosedWindow();
     QVector<QImage> renderFrequencyAnimation(int frequency, const QSize &size, int frameCount, bool recount, QString *error);
     void synchronizeViews(MoleculeView *source);
     void applySynchronizedView(MoleculeView *view);

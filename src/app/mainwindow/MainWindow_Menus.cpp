@@ -72,11 +72,17 @@ void MainWindow::createMenus() {
         const QStringList paths = QFileDialog::getOpenFileNames(this, QStringLiteral("여러 파일 열기"), {}, FileDispatcher::openFilter());
         for (const auto &path : paths) openFile(path);
     });
-    add(file, QStringLiteral("새 창"), QKeySequence(QStringLiteral("Ctrl+Shift+N")), [] {
+    auto *newWindow = add(file, QStringLiteral("새 창"), {}, [] {
         auto *window = new MainWindow;
         window->setAttribute(Qt::WA_DeleteOnClose);
         window->show();
+        window->raise();
+        window->activateWindow();
     });
+    newWindow->setShortcuts({QKeySequence(QStringLiteral("Ctrl+T")), QKeySequence(QStringLiteral("Ctrl+Shift+N"))});
+    newWindow->setAutoRepeat(false);
+    add(file, QStringLiteral("마지막으로 닫은 창 다시 열기"), QKeySequence(QStringLiteral("Ctrl+Shift+T")),
+        [this] { reopenClosedWindow(); })->setAutoRepeat(false);
     add(file, QStringLiteral("현재 탭을 새 창으로 분리"), {}, [this] { detachDocument(m_documentTabs->currentIndex()); });
     add(file, QStringLiteral("현재 탭 닫기"), QKeySequence(QStringLiteral("Ctrl+W")), [this] { closeDocument(m_documentTabs->currentIndex()); });
     add(file, QStringLiteral("다음 문서 탭"), QKeySequence(QStringLiteral("Ctrl+Tab")), [this] {

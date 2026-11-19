@@ -184,6 +184,7 @@ private slots:
     void copiesTsAnimation_data();
     void copiesTsAnimation();
     void movesDocumentsBetweenWindows();
+    void windowShortcutsRestoreWorkspace();
     void nativeTabDragBetweenWindows_data();
     void nativeTabDragBetweenWindows();
     void selectedBondShortcutAndColigandDialog();
@@ -1534,6 +1535,66 @@ void SmokeTest::nativeTabDragBetweenWindows() {
 #else
     QSKIP("Requires Windows");
 #endif
+}
+
+void SmokeTest::windowShortcutsRestoreWorkspace() {
+    QPointer<MainWindow> owner = new MainWindow;
+    owner->setAttribute(Qt::WA_DeleteOnClose);
+    owner->show();
+    QPointer<MainWindow> first;
+    QPointer<MainWindow> second;
+    const auto cleanup = qScopeGuard([&] {
+        delete second.data();
+        delete first.data();
+        delete owner.data();
+    });
+    const auto openWindowWithShortcut = [&]() -> MainWindow * {
+        QApplication::setActiveWindow(owner);
+        QTest::keyClick(owner.data(), Qt::Key_T, Qt::ControlModifier);
+        for (auto *widget : QApplication::topLevelWidgets()) {
+            auto *window = qobject_cast<MainWindow *>(widget);
+            if (window && window->isVisible() && window != owner && window != first) return window;
+        }
+        return nullptr;
+    };
+    const auto reopen = [&] {
+        QApplication::setActiveWindow(owner);
+        QTest::keyClick(owner.data(), Qt::Key_T, Qt::ControlModifier | Qt::ShiftModifier);
+    };
+
+    reopen();
+    QCOMPARE(QApplication::activeWindow(), owner.data());
+    auto *opened = openWindowWithShortcut();
+    QVERIFY(opened && opened != owner);
+    first = opened;
+    QCOMPARE(first->m_documentTabs->count(), 0);
+    first->newDrawingDocument();
+    Molecule molecule;
+    molecule.atoms = {{1, 8, "O", {}}};
+    first->newDrawingDocument(molecule);
+    const int activeTab = first->m_documentTabs->currentIndex();
+    QCOMPARE(first->m_documentTabs->count(), 2);
+
+    QVERIFY(first->close());
+    QVERIFY(first && !first->isVisible());
+    reopen();
+    QVERIFY(first->isVisible());
+    QCOMPARE(first->m_documentTabs->count(), 2);
+    QCOMPARE(first->m_documentTabs->currentIndex(), activeTab);
+    QCOMPARE(first->m_view->molecule().atoms.size(), 1);
+    QCOMPARE(first->m_view->molecule().atoms.front().atomicNumber, 8);
+
+    opened = openWindowWithShortcut();
+    QVERIFY(opened && opened != owner && opened != first);
+    second = opened;
+    QVERIFY(first->close());
+    QVERIFY(second->close());
+    QTRY_VERIFY(first.isNull());
+    reopen();
+    QVERIFY(second->isVisible());
+    QVERIFY(second->close());
+    QVERIFY(owner->close());
+    QTRY_VERIFY(owner.isNull() && second.isNull());
 }
 
 void SmokeTest::movesDocumentsBetweenWindows() {
