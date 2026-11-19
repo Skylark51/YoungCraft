@@ -78,7 +78,7 @@ Windows에서 `tools/package_portable.ps1`을 실행하면 xTB의 실행 데이�
 
 `release/Youngcraft-Patch.exe`를 실행하면 기존 Youngcraft 설치 폴더를 자동으로 검색합니다. 패처 옆에 `Youngcraft-portable.zip`이 있으면 그 파일을 사용하고, 없으면 GitHub 최신 릴리스에서 다운로드합니다. Youngcraft를 종료한 상태에서 실행해야 하며, ZIP 해시 검증 후 적용하고 이전 배포의 중복 xTB 소스 아카이브와 기본 fragment 복사본, 구버전 실행 파일 백업을 정리합니다. 사용자 `lab_fragments`와 `youngcraft-server.json`은 보존합니다. 실패 시 이전 파일을 복구합니다.
 
-다른 PC에 프로그램 전체를 전달할 때는 `Youngcraft-Standalone.exe` 하나만 복사하면 됩니다. Qt, MM, xTB와 fragment가 모두 내부에 들어 있어 별도의 ZIP, Python 설치나 다운로드 없이 실행됩니다. 첫 실행 때 `%LOCALAPPDATA%\Youngcraft\Standalone` 아래에 실행 파일들을 풀고 이후 실행에는 캐시를 재사용합니다. 따라서 단일 EXE의 크기와 압축을 푼 뒤 사용하는 디스크 용량은 다릅니다. 상세 내용은 [배포 및 검증](docs/PORTABLE_PATCHING.md)을 참고하세요.
+다른 PC에 프로그램 전체를 전달할 때는 바탕화면의 `YoungCraft.exe` 하나만 복사하면 됩니다. Qt, MM, xTB와 fragment가 모두 내부에 들어 있어 별도의 ZIP, Python 설치나 다운로드 없이 실행됩니다. 첫 실행 때 `%LOCALAPPDATA%\Youngcraft\Standalone` 아래에 실행 파일들을 풀고 이후 실행에는 캐시를 재사용합니다. 따라서 단일 EXE의 크기와 압축을 푼 뒤 사용하는 디스크 용량은 다릅니다. 상세 내용은 [배포 및 검증](docs/PORTABLE_PATCHING.md)을 참고하세요.
 
 ## 빌드
 
@@ -98,7 +98,7 @@ Windows portable 배포물은 Release 빌드 후 아래 스크립트로 만듭�
 powershell -ExecutionPolicy Bypass -File tools/package_portable.ps1
 ```
 
-완성물은 `dist`의 portable 폴더, 루트의 `Youngcraft-portable.zip`, 그리고 모든 실행 파일을 내장한 `Youngcraft-Standalone.exe`입니다. `Youngcraft-Standalone.exe`를 직접 실행하거나 ZIP을 원하는 폴더에 풀어 `Youngcraft.exe`를 실행합니다. `dist\Youngcraft.exe`만 따로 복사하면 실행되지 않습니다. `tools/create_desktop_patch.ps1`은 바탕화면의 `Youngcraft-Standalone.exe`, `Youngcraft-Patch.exe`, `Youngcraft-portable.zip`을 같은 이름으로 갱신합니다.
+완성물은 `dist`의 portable 폴더, 루트의 `Youngcraft-portable.zip`, 그리고 모든 실행 파일을 내장한 `Youngcraft-Standalone.exe`입니다. `tools/create_desktop_patch.ps1`은 바탕화면의 단일 실행 파일 `YoungCraft.exe`와 업데이트용 `Youngcraft-Patch.exe`, `Youngcraft-portable.zip`을 같은 이름으로 갱신합니다. ZIP 배포본을 쓰려면 전체를 풀고 그 폴더의 `Youngcraft.exe`를 실행합니다.
 
 MM worker는 RDKit의 force-field 모듈을 직접 사용하고, 계산과 무관한 이미지·GUI·노트북·수치 분석 모듈은 패키징에서 제외합니다. MMFF94, MMFF94s, UFF, 자동 선택과 GFN-FF 전환, 기존 constraint와 최적화 기능은 유지합니다.
 

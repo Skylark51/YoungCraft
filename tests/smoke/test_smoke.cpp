@@ -4827,8 +4827,7 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
     QCOMPARE(view->molecule().atoms[1].position.x(), 1.95f);
     QCOMPARE(view->m_analysisSpin[0], 0.31);
     QCOMPARE(view->m_analysisNbo[0], 1.42);
-    window.applyAtomSelection({0, 1});
-    QCOMPARE(view->analysisSelection(), QSet<int>({0, 1}));
+    QVERIFY(view->analysisSelection().isEmpty());
     if (view->isValid()) {
         const auto checkAnchors = [&] {
             const auto withLabels = view->m_previewOverlay->grab().toImage();
@@ -4858,6 +4857,8 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
         checkAnchors();
         view->setCameraState(originalCamera);
     }
+    window.applyAtomSelection({0, 1});
+    QCOMPARE(view->analysisSelection(), QSet<int>({0, 1}));
     auto *hide = window.findChild<QAction *>("AnalysisHideOtherFragments");
     auto *fade = window.findChild<QAction *>("AnalysisFadeOtherFragments");
     auto *restore = window.findChild<QAction *>("AnalysisRestoreFragments");
@@ -4875,6 +4876,14 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
         QTest::qWait(80);
         QVERIFY(window.grab().save(preview + "-window.png"));
         QVERIFY(view->imageAtSize({1000, 650}, false, true).save(preview + "-nbo.png"));
+        const auto originalCamera = view->cameraState();
+        auto crowded = originalCamera;
+        crowded.rotation = QQuaternion::fromAxisAndAngle(0, 1, 0, 72) * crowded.rotation;
+        crowded.orthoScale *= 1.8f;
+        crowded.distance *= 1.8f;
+        view->setCameraState(crowded);
+        QVERIFY(view->imageAtSize({750, 480}, false, true).save(preview + "-crowded.png"));
+        view->setCameraState(originalCamera);
     }
     window.openFile(dir.filePath("missing-freq.out"));
     QTRY_COMPARE(loaded.size(), 3);
