@@ -4830,13 +4830,33 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
     window.applyAtomSelection({0, 1});
     QCOMPARE(view->analysisSelection(), QSet<int>({0, 1}));
     if (view->isValid()) {
-        const auto withLabels = view->m_previewOverlay->grab().toImage();
-        detail->trigger();
-        QVERIFY(!view->detailedAnalysis());
-        const auto withoutLabels = view->m_previewOverlay->grab().toImage();
-        QVERIFY(withLabels != withoutLabels);
-        detail->trigger();
-        QVERIFY(view->detailedAnalysis());
+        const auto checkAnchors = [&] {
+            const auto withLabels = view->m_previewOverlay->grab().toImage();
+            detail->trigger();
+            QVERIFY(!view->detailedAnalysis());
+            const auto withoutLabels = view->m_previewOverlay->grab().toImage();
+            detail->trigger();
+            QVERIFY(view->detailedAnalysis());
+            const auto projection = view->viewProjection();
+            const auto &atoms = view->molecule().atoms;
+            const auto first = view->project(atoms[0].position, projection);
+            const auto second = view->project(atoms[1].position, projection);
+            const auto screenRight = view->m_rotation.conjugated().rotatedVector(QVector3D(1, 0, 0));
+            const auto edge = view->project(atoms[0].position + screenRight * view->atomVisualRadius(atoms[0]), projection);
+            const auto differsAt = [&](const QPointF &logical) {
+                const QPoint pixel = (logical * withLabels.devicePixelRatio()).toPoint();
+                return withLabels.valid(pixel) && withLabels.pixel(pixel) != withoutLabels.pixel(pixel);
+            };
+            QVERIFY(differsAt(QPointF(first.x(), first.y() - qAbs(edge.x() - first.x()) - 10)));
+            QVERIFY(differsAt(QPointF((first.x() + second.x()) / 2, (first.y() + second.y()) / 2)));
+        };
+        checkAnchors();
+        const auto originalCamera = view->cameraState();
+        auto rotated = originalCamera;
+        rotated.rotation = QQuaternion::fromAxisAndAngle(0, 0, 1, 30) * rotated.rotation;
+        view->setCameraState(rotated);
+        checkAnchors();
+        view->setCameraState(originalCamera);
     }
     auto *hide = window.findChild<QAction *>("AnalysisHideOtherFragments");
     auto *fade = window.findChild<QAction *>("AnalysisFadeOtherFragments");

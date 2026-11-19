@@ -178,25 +178,26 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
     const auto selected = analysisSelection();
     if (selected.isEmpty()) return;
 
-    // Store each distance once under its first atom.
-    QMap<int, QSet<int>> distances;
+    QMap<QPair<int, int>, bool> distances;
     for (int i = 0; i < m_molecule.bonds.size(); ++i) {
         const auto &bond = m_molecule.bonds[i];
         if (selected.contains(bond.first) && selected.contains(bond.second) &&
             (m_selection.bonds.contains(i) ||
              (m_selection.atoms.contains(bond.first) && m_selection.atoms.contains(bond.second))))
-            distances[qMin(bond.first, bond.second)].insert(qMax(bond.first, bond.second));
+            distances.insert({qMin(bond.first, bond.second), qMax(bond.first, bond.second)}, true);
     }
     auto sites = selected.values();
     std::sort(sites.begin(), sites.end());
-    if (sites.size() == 2) distances[sites[0]].insert(sites[1]);
+    if (sites.size() == 2) {
+        const QPair<int, int> pair(sites[0], sites[1]);
+        if (!distances.contains(pair))
+            distances.insert(pair, m_molecule.bondIndex(pair.first, pair.second) >= 0);
+    }
 
     QPainter capturePainter;
     if (!overlayPainter) beginOverlayPainter(capturePainter);
     QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
     painter.save();
-    painter.setOpacity(1.0);
-    painter.setPen(Qt::NoPen);
     painter.setRenderHint(QPainter::Antialiasing, true);
     auto font = painter.font();
     font.setPointSizeF(qMax(8.0, double(m_style.labelSize)));
@@ -208,11 +209,8 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
     const QColor spinColor = light ? QColor("#164fa6") : QColor("#8fbeff");
     const QColor nboColor = light ? QColor("#964300") : QColor("#ffbd73");
     const QColor border = light ? QColor("#65748c") : QColor("#9da8bb");
-    const auto atomName = [this](int i) {
-        const auto &atom = m_molecule.atoms[i];
-        return atom.element + QString::number(atom.index > 0 ? atom.index : i + 1);
-    };
     const auto size = renderLogicalSize();
+    const QRectF viewport(QPointF(2, 2), size - QSizeF(4, 4));
     const QVector3D screenRight = m_rotation.conjugated().rotatedVector(QVector3D(1, 0, 0));
     QVector<QRectF> atomBounds(m_molecule.atoms.size());
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
@@ -221,64 +219,99 @@ void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayP
         const auto center = project(atom.position, vp);
         if (qAbs(center.z()) > 1.0f) continue;
         const auto edge = project(atom.position + screenRight * atomVisualRadius(atom), vp);
-        const qreal radius = qAbs(double(edge.x()) - center.x()) + 4.0;
+        const qreal radius = qMax(3.0, qAbs(double(edge.x()) - center.x()));
         atomBounds[i] = QRectF(center.x() - radius, center.y() - radius, radius * 2, radius * 2);
     }
     QVector<QRectF> occupied;
+    const auto overlapScore = [&occupied, &atomBounds](const QRectF &box) {
+        const auto area = [&box](const QRectF &other) {
+            const auto intersection = box.intersected(other);
+            return intersection.width() * intersection.height();
+        };
+        qreal score = 0;
+        for (const auto &other : occupied) score += 4 * area(other);
+        for (const auto &bounds : atomBounds) score += area(bounds);
+        return score;
+    };
+    const auto drawBox = [&](const QRectF &box) {
+        painter.setPen(QPen(border, 0.75));
+        painter.setBrush(paper);
+        painter.drawRoundedRect(box, 3, 3);
+        occupied.push_back(box.adjusted(-2, -2, 2, 2));
+    };
+
+    for (auto it = distances.cbegin(); it != distances.cend(); ++it) {
+        const auto [first, second] = it.key();
+        if (atomBounds[first].isEmpty() || atomBounds[second].isEmpty()) continue;
+        const QLineF line(atomBounds[first].center(), atomBounds[second].center());
+        const double distance = m_molecule.atoms[first].position.distanceToPoint(m_molecule.atoms[second].position);
+        const auto text = QStringLiteral("%1 Å").arg(distance, 0, 'f', 3);
+        const QSizeF labelSize(metrics.horizontalAdvance(text) + 10, metrics.height() + 4);
+        QRectF box;
+        qreal bestScore = std::numeric_limits<qreal>::infinity();
+        // Move along the bond only when the midpoint is crowded.
+        for (qreal fraction : {0.5, 0.4, 0.6, 0.3, 0.7}) {
+            QRectF candidate(QPointF(), labelSize);
+            candidate.moveCenter(line.pointAt(fraction));
+            if (!viewport.contains(candidate)) continue;
+            const qreal score = overlapScore(candidate);
+            if (score < bestScore) { bestScore = score; box = candidate; }
+            if (score == 0) break;
+        }
+        if (box.isEmpty()) continue;
+        painter.setOpacity(qMin(atomOpacity(first), atomOpacity(second)));
+        if (!it.value()) {
+            painter.setPen(QPen(border, 1.0, Qt::DashLine));
+            const auto direction = line.length() > 0 ? (line.p2() - line.p1()) / line.length() : QPointF();
+            const qreal firstRadius = atomBounds[first].width() / 2;
+            const qreal secondRadius = atomBounds[second].width() / 2;
+            if (line.length() > firstRadius + secondRadius)
+                painter.drawLine(line.p1() + direction * firstRadius, line.p2() - direction * secondRadius);
+        }
+        drawBox(box);
+        painter.setPen(ink);
+        painter.drawText(box, Qt::AlignCenter, text);
+    }
+
     for (int i : sites) {
-        const auto &atom = m_molecule.atoms[i];
-        const auto screen = project(atom.position, vp);
-        const QPointF anchor(screen.x(), screen.y());
-        if (qAbs(screen.z()) > 1.0f || !QRectF(QPointF(), size).contains(anchor)) continue;
+        const auto &atomBox = atomBounds[i];
+        if (atomBox.isEmpty() || !viewport.intersects(atomBox)) continue;
 
         const double spin = m_analysisSpin.value(i, kNaN);
         const double nbo = m_analysisNbo.value(i, kNaN);
         QVector<QPair<QString, QColor>> rows;
-        rows.push_back({QStringLiteral("%1  ·  Mulliken spin  %2").arg(atomName(i),
+        rows.push_back({QStringLiteral("Mulliken %1").arg(
             std::isfinite(spin) ? QString::number(spin, 'f', 3) : QStringLiteral("—")), spinColor});
         if (std::isfinite(nbo))
-            rows.push_back({QStringLiteral("NBO charge  %1").arg(nbo, 0, 'f', 3), nboColor});
-        auto partners = distances.value(i).values();
-        std::sort(partners.begin(), partners.end());
-        for (int j : partners)
-            rows.push_back({QStringLiteral("%1–%2  %3 Å").arg(atomName(i), atomName(j))
-                .arg(atom.position.distanceToPoint(m_molecule.atoms[j].position), 0, 'f', 3), ink});
+            rows.push_back({QStringLiteral("NBO %1").arg(nbo, 0, 'f', 3), nboColor});
 
         qreal width = 0;
         for (const auto &row : rows) width = qMax(width, metrics.horizontalAdvance(row.first));
-        const qreal height = metrics.height() * rows.size() + 10;
-        width += 14;
-        const qreal gap = qMax(16.0, atomBounds[i].width() / 2 + 4.0);
+        const qreal height = metrics.height() * rows.size() + 6;
+        width += 10;
+        const QPointF anchor(atomBox.center().x(), atomBox.top());
+        const qreal left = qBound(viewport.left(), anchor.x() - width / 2,
+                                  qMax(viewport.left(), viewport.right() - width));
         QRectF box;
         qreal bestScore = std::numeric_limits<qreal>::infinity();
-        for (const auto &offset : {QPointF(gap, -height - 8), QPointF(gap, 8),
-                                   QPointF(-gap - width, -height - 8), QPointF(-gap - width, 8),
-                                   QPointF(-width / 2, -height - gap), QPointF(-width / 2, gap)}) {
-            QRectF candidate(anchor + offset, QSizeF(width, height));
-            candidate.moveLeft(qBound(2.0, candidate.left(), qMax(2.0, size.width() - width - 2.0)));
-            candidate.moveTop(qBound(2.0, candidate.top(), qMax(2.0, size.height() - height - 2.0)));
-            const auto overlap = [&candidate](const QRectF &other) {
-                const auto intersection = candidate.intersected(other);
-                return intersection.width() * intersection.height();
-            };
-            qreal score = 0;
-            for (const auto &other : occupied) score += 4 * overlap(other);
-            for (const auto &bounds : atomBounds) score += overlap(bounds);
+        for (int tier = 0; tier < 5; ++tier) {
+            const qreal top = qMax(viewport.top(), anchor.y() - 5 - height - tier * (height + 3));
+            const QRectF candidate(left, top, width, height);
+            const qreal score = overlapScore(candidate);
             if (score < bestScore) { bestScore = score; box = candidate; }
-            if (score == 0) break;
+            if (score == 0 || top == viewport.top()) break;
         }
-        occupied.push_back(box.adjusted(-3, -3, 3, 3));
         painter.setOpacity(atomOpacity(i));
-        painter.setPen(QPen(border, 1.0));
-        painter.drawLine(anchor, QPointF(qBound(box.left(), anchor.x(), box.right()),
-                                         qBound(box.top(), anchor.y(), box.bottom())));
-        painter.setBrush(paper);
-        painter.drawRoundedRect(box, 4, 4);
-        qreal baseline = box.top() + 5 + metrics.ascent();
+        if (anchor.y() - box.bottom() > 8) {
+            painter.setPen(QPen(border, 0.75));
+            painter.drawLine(anchor, QPointF(qBound(box.left(), anchor.x(), box.right()), box.bottom()));
+        }
+        drawBox(box);
+        QRectF rowBox(left, box.top() + 3, width, metrics.height());
         for (const auto &row : rows) {
             painter.setPen(row.second);
-            painter.drawText(QPointF(box.left() + 7, baseline), row.first);
-            baseline += metrics.height();
+            painter.drawText(rowBox, Qt::AlignCenter, row.first);
+            rowBox.translate(0, metrics.height());
         }
     }
     painter.restore();
