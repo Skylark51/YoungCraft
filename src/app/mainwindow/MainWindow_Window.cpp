@@ -29,6 +29,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QMenuBar>
+#include <QPointer>
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
@@ -40,9 +41,14 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
+#include <algorithm>
 #include <functional>
 
 namespace youngcraft {
+
+namespace {
+QPointer<MainWindow> lastClosedWindow;
+}
 
 void MainWindow::setStatus(const QString &message, int timeout) {
     m_statusLabel->setText(message);
@@ -65,7 +71,40 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
     settings.setValue(QStringLiteral("window/sidebarPanelState"), saveState());
     StyleManager::save(m_style);
+    if (isVisible() && testAttribute(Qt::WA_DeleteOnClose)) {
+        if (lastClosedWindow) lastClosedWindow->deleteLater();
+        lastClosedWindow.clear();
+        const auto windows = QApplication::topLevelWidgets();
+        const bool anotherWindowOpen = std::any_of(windows.cbegin(), windows.cend(), [this](QWidget *widget) {
+            return widget != this && widget->isVisible() && qobject_cast<MainWindow *>(widget);
+        });
+        if (anotherWindowOpen) {
+            stopMMOptimization();
+            m_animation->stop();
+            // Keep the workspace and its unsaved edits available for one reopen.
+            setAttribute(Qt::WA_DeleteOnClose, false);
+            lastClosedWindow = this;
+        }
+    }
     event->accept();
+}
+
+void MainWindow::reopenClosedWindow() {
+    MainWindow *window = lastClosedWindow;
+    if (!window) {
+        setStatus(QStringLiteral("다시 열 수 있는 닫힌 창이 없습니다."), 3000);
+        return;
+    }
+    lastClosedWindow.clear();
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    if (window->isMinimized()) window->setWindowState(window->windowState() & ~Qt::WindowMinimized);
+    window->show();
+    window->raise();
+    window->activateWindow();
+}
+
+bool MainWindow::isRetainedClosedWindow() const {
+    return lastClosedWindow == this;
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {

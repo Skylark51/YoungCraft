@@ -68,7 +68,7 @@ void MainWindow::openMechanismAnimation() {
         }
     };
     append(this);
-    for(auto *widget:QApplication::topLevelWidgets())if(auto *owner=qobject_cast<MainWindow *>(widget);owner&&owner!=this)append(owner);
+    for(auto *widget:QApplication::topLevelWidgets())if(auto *owner=qobject_cast<MainWindow *>(widget);owner&&owner!=this&&!owner->isRetainedClosedWindow())append(owner);
     (new MechanismAnimationDialog(m_view->style(),steps,this))->show();
 }
 
@@ -92,7 +92,7 @@ void MainWindow::openMultiCapture() {
     QVector<CaptureSource> sources;
     int windowNumber=0;
     for(auto *widget:QApplication::topLevelWidgets()) {
-        auto *window=qobject_cast<MainWindow *>(widget);if(!window)continue;
+        auto *window=qobject_cast<MainWindow *>(widget);if(!window||window->isRetainedClosedWindow())continue;
         ++windowNumber;
         for(int i=0;i<window->m_documentTabs->count();++i) {
             const auto document=window->m_documents.value(window->m_documentTabs->widget(i));

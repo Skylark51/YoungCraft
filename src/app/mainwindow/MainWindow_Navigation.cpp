@@ -245,7 +245,7 @@ void MainWindow::emphasizeSelectedAtoms(int mode) {
     };
     for (auto *widget : QApplication::topLevelWidgets()) {
         auto *owner = qobject_cast<MainWindow *>(widget);
-        if (!owner || (!all && owner != this)) continue;
+        if (!owner || owner->isRetainedClosedWindow() || (!all && owner != this)) continue;
         for (const auto &document : owner->m_documents) apply(owner, document);
         if (owner->m_documents.isEmpty() && owner->m_emptyDocument) apply(owner, owner->m_emptyDocument);
     }

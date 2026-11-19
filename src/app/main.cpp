@@ -73,8 +73,9 @@ int main(int argc, char *argv[]) {
         youngcraft::MainWindow *target = nullptr;
         if (!separate) {
             target = qobject_cast<youngcraft::MainWindow *>(QApplication::activeWindow());
-            if (!target) target = lastWindow;
+            if (!target && lastWindow && lastWindow->isVisible()) target = lastWindow;
             if (!target) for (auto *widget : QApplication::topLevelWidgets()) {
+                if (!widget->isVisible()) continue;
                 target = qobject_cast<youngcraft::MainWindow *>(widget);
                 if (target) break;
             }
