@@ -113,10 +113,12 @@ void MoleculeView::paintGL() {
     m_program->setUniformValue("uAmbientUp", m_style.cameraRelativeLights
         ? cameraToWorld.rotatedVector(QVector3D(0, 1, 0)) : QVector3D(0, 1, 0));
     float depthExtent = 0.5f;
-    for (const Atom &atom : m_molecule.atoms)
-        if (atom.visible && (m_style.showHydrogen || atom.atomicNumber != 1))
+    for (int i = 0; i < m_molecule.atoms.size(); ++i) {
+        const auto &atom = m_molecule.atoms[i];
+        if (atomShown(i))
             depthExtent = qMax(depthExtent, qAbs(QVector3D::dotProduct(atom.position - m_center, viewDirection))
                                           + atomVisualRadius(atom));
+    }
     m_program->setUniformValue("uDepthCenter", m_center);
     m_program->setUniformValue("uDepthSpan", 2.0f * depthExtent);
     m_program->setUniformValue("uLightColor", m_style.lightColor.redF(), m_style.lightColor.greenF(), m_style.lightColor.blueF());
@@ -151,13 +153,14 @@ void MoleculeView::paintGL() {
         m_program->setUniformValue("uMaterialShininess", 0.72f);
         for (const Bond &bond : m_molecule.bonds) {
             if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
-            if (qMin(m_molecule.atoms[bond.first].displayOpacity, m_molecule.atoms[bond.second].displayOpacity) * bond.displayOpacity >= 1.0f)
+            if (bondOpacity(bond) >= 1.0f)
                 drawColoredBond(bond);
         }
     }
 
-    if ((m_style.showPositiveSurface && m_positiveSurfaceVertexCount > 0) ||
-        (m_style.showNegativeSurface && m_negativeSurfaceVertexCount > 0)) {
+    if (m_fragmentDisplay == FragmentDisplay::All &&
+        ((m_style.showPositiveSurface && m_positiveSurfaceVertexCount > 0) ||
+         (m_style.showNegativeSurface && m_negativeSurfaceVertexCount > 0))) {
         glDisable(GL_CULL_FACE);
         m_program->setUniformValue("uMaterialSpecular", 0.55f);
         m_program->setUniformValue("uMaterialShininess", 0.85f);
@@ -176,11 +179,11 @@ void MoleculeView::paintGL() {
     glDepthMask(GL_TRUE);
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const Atom &atom = m_molecule.atoms[i];
-        if (!atom.visible || atom.displayOpacity < 1.0f || (!m_style.showHydrogen && atom.atomicNumber == 1)) continue;
+        if (!atomShown(i) || atomOpacity(i) < 1.0f) continue;
         const bool metal = isMetal(atom.atomicNumber);
         m_program->setUniformValue("uMaterialSpecular", metal ? 1.12f : 1.0f);
         m_program->setUniformValue("uMaterialShininess", metal ? 1.18f : 1.0f);
-        drawAtomSphere(atom);
+        drawAtomSphere(i);
     }
     glEnable(GL_BLEND);
     // Draw faded atoms and their bonds back-to-front after opaque geometry.
@@ -189,14 +192,14 @@ void MoleculeView::paintGL() {
     QVector<FadedItem> faded;
     for (int i = 0; i < m_molecule.atoms.size(); ++i) {
         const auto &atom = m_molecule.atoms[i];
-        if (atom.visible && atom.displayOpacity < 1.0f && (m_style.showHydrogen || atom.atomicNumber != 1))
+        if (atomShown(i) && atomOpacity(i) < 1.0f)
             faded.push_back({QVector3D::dotProduct(atom.position, viewDirection), i, false});
     }
     if (!m_style.showVdwSpheres && m_style.displayMode != DisplayMode::SpaceFilling) for (int i = 0; i < m_molecule.bonds.size(); ++i) {
         const auto &bond = m_molecule.bonds[i];
         if (bond.first < 0 || bond.second < 0 || bond.first >= m_molecule.atoms.size() || bond.second >= m_molecule.atoms.size()) continue;
         const auto &a = m_molecule.atoms[bond.first]; const auto &b = m_molecule.atoms[bond.second];
-        if (a.visible && b.visible && qMin(a.displayOpacity, b.displayOpacity) * bond.displayOpacity < 1.0f)
+        if (atomShown(bond.first) && atomShown(bond.second) && bondOpacity(bond) < 1.0f)
             faded.push_back({QVector3D::dotProduct((a.position + b.position) * 0.5f, viewDirection), i, true});
     }
     std::stable_sort(faded.begin(), faded.end(), [](const FadedItem &a, const FadedItem &b) { return a.depth < b.depth; });
@@ -210,7 +213,7 @@ void MoleculeView::paintGL() {
             const auto &atom = m_molecule.atoms[item.index];
             m_program->setUniformValue("uMaterialSpecular", isMetal(atom.atomicNumber) ? 1.12f : 1.0f);
             m_program->setUniformValue("uMaterialShininess", isMetal(atom.atomicNumber) ? 1.18f : 1.0f);
-            drawAtomSphere(atom);
+            drawAtomSphere(item.index);
         }
     }
     glDepthMask(GL_TRUE);
@@ -226,7 +229,8 @@ void MoleculeView::paintGL() {
     if (m_style.showVibrationVectors) drawVibrationVectors(vp);
     drawLabels(vp);
     drawGeometryMeasurements(vp);
-    if (m_potentialGrid && m_style.showPositiveSurface) {
+    if (m_capturePaintDevice) drawDetailedAnalysis(vp);
+    if (m_fragmentDisplay == FragmentDisplay::All && m_potentialGrid && m_style.showPositiveSurface) {
         QPainter painter; beginOverlayPainter(painter);
         const double width=qMin(240.0,renderLogicalSize().width()-40.0);
         const QRectF bar((renderLogicalSize().width()-width)/2,renderLogicalSize().height()-48,width,12);

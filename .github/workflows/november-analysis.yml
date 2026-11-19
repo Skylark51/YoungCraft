@@ -110,7 +110,7 @@ jobs:
           $env:QT_OPENGL = 'software'
           $env:QT_OPENGL_DLL = $softwareDll.FullName
           $env:QT_LOGGING_RULES = 'qt.qpa.gl=true'
-          $tests = @('linkedIrcAndTddftGeometrySelection', 'cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture')
+          $tests = @('linkedIrcAndTddftGeometrySelection', 'cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture', 'detailedAnalysisOpensCompanionAndFocusesFragment')
           python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 @tests
           if ($LASTEXITCODE -ne 0) { throw 'GUI regressions failed; see per-case logs and summary' }
       - name: Upload regression evidence

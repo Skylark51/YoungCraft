@@ -78,6 +78,7 @@ void MainWindow::restoreFrequencyGeometry() {
     m_animation->stop();
     m_animation->setFrequency(base, m_data.frequencies[m_currentFrequency]);
     m_view->setCoordinates(base);
+    m_view->setAnalysisFrame(m_data.frames.isEmpty() ? nullptr : &m_data.frames.last());
     m_view->setBonds(m_data.molecule.bonds);
     m_view->setFrequencyMode(nullptr);
     updateAtomVisibility();

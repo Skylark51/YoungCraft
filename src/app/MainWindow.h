@@ -118,6 +118,7 @@ private:
     bool moveDocumentTo(int index, MainWindow *target);
     void detachDocument(int index);
     struct DocumentSession {
+        bool openDetailedAnalysisOnLoad = false;
         QVector<QMetaObject::Connection> connections;
         CalculationData data;
         QString path, status;
@@ -181,6 +182,8 @@ private:
     void changeSelectionElement();
     void manipulateSelection();
     QSet<int> selectedStructureAtoms() const;
+    void setDetailedAnalysisEnabled(bool enabled);
+    void showDetailedAnalysis(const QString &missingCompanion = {});
     void applyAtomSelection(const QSet<int> &ids);
     void copyStructureFragment();
     void pasteStructureFragment();

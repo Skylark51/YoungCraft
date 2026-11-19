@@ -192,8 +192,14 @@ FINAL SINGLE POINT ENERGY      -40.123456789
           MAX step            0.0005      0.001 YES
 MULLIKEN ATOMIC CHARGES AND SPIN POPULATIONS
 --------------------------------------------
-0 C : -0.2000 0.8000
+0 C: -0.2000 0.8000
 1 H :  0.2000 0.2000
+
+Summary of Natural Population Analysis:
+ Atom No Charge Core Valence Rydberg Total
+ C 1 -0.3200 2.0 4.30 0.02 6.32
+ H 2  0.3200 0.0 0.68 0.00 0.68
+ * Total *
 
 VIBRATIONAL FREQUENCIES
 -----------------------
@@ -223,6 +229,8 @@ ORCA TERMINATED NORMALLY
     QCOMPARE(data.frames.last().metrics.maxDisplacement, 0.0005);
     QCOMPARE(data.molecule.atoms.first().charge, -0.2);
     QCOMPARE(data.molecule.atoms.first().spinDensity, 0.8);
+    QCOMPARE(data.frames.last().mullikenSpin, QVector<double>({0.8, 0.2}));
+    QCOMPARE(data.frames.last().nboCharges, QVector<double>({-0.32, 0.32}));
     QCOMPARE(data.frequencies.size(), 2);
     QCOMPARE(data.frequencies.first().wavenumber, -123.45);
     QVERIFY(data.frequencies.first().imaginary);

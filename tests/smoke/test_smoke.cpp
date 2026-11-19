@@ -138,6 +138,7 @@ private slots:
     void suppliedMechanismPreview();
     void atomFocusAcrossWindowsAndTabs();
     void atomFocusTransparentExport();
+    void detailedAnalysisOpensCompanionAndFocusesFragment();
     void projectLibraryOpensOnDemand();
     void additionalInteractionRequests();
     void toolbarCleanupAndMolecularInformation();
@@ -4784,6 +4785,88 @@ void SmokeTest::atomFocusTransparentExport() {
     molecule.atoms[0].visible=false; view.setAtomDisplay(molecule);
     const auto hidden = view.imageAtSize({400,300},true,true);
     QCOMPARE(qAlpha(hidden.pixel(center)),0);
+}
+
+void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto writeOutput = [&dir](const QString &name, const QByteArray &distance, bool nbo) {
+        QFile file(dir.filePath(name));
+        if (!file.open(QIODevice::WriteOnly)) return false;
+        QByteArray output = " Entering Gaussian System\n #p UB3LYP/def2SVP\n"
+            " Standard orientation:\n ----\n Center Atomic Atomic Coordinates\n"
+            " Number Number Type X Y Z\n ----\n"
+            " 1 26 0 0 0 0\n 2 8 0 " + distance + " 0 0\n 3 18 0 -3 0 0\n ----\n"
+            " SCF Done: E(UB3LYP) = -100.00 A.U.\n"
+            " Mulliken charges and spin densities:\n 1 2\n"
+            " 1 Fe 0.3 0.31\n 2 O -0.3 0.42\n 3 Ar 0.0 0.0\n"
+            " Sum of Mulliken charges = 0.00000   0.73000\n";
+        if (nbo) output += " Summary of Natural Population Analysis:\n"
+            " Fe 1 1.420 18.0 6.50 0.08 24.58\n O 2 -0.410 2.0 6.40 0.01 8.41\n * Total *\n";
+        output += " Normal termination of Gaussian 16\n";
+        return file.write(output) == output.size();
+    };
+    QVERIFY(writeOutput("example-freq.out", "1.8", false));
+    QVERIFY(writeOutput("example-freq-bb.out", "1.95", true));
+    QVERIFY(writeOutput("missing-freq.out", "2.1", false));
+    MainWindow window;
+    window.resize(1400, 900);
+    window.show();
+    QSignalSpy loaded(&window, &MainWindow::documentLoaded);
+    window.openFile(dir.filePath("example-freq.out"));
+    QTRY_COMPARE(loaded.size(), 1);
+    auto *detail = window.findChild<QAction *>("DetailedAnalysisAction");
+    QVERIFY(detail);
+    QVERIFY(!detail->isChecked());
+    detail->trigger();
+    QTRY_COMPARE(loaded.size(), 2);
+    QVERIFY(window.m_currentFile.endsWith("example-freq-bb.out"));
+    QVERIFY(detail->isChecked());
+    auto *view = window.m_view;
+    QVERIFY(view->detailedAnalysis());
+    QCOMPARE(view->molecule().atoms[1].position.x(), 1.95f);
+    QCOMPARE(view->m_analysisSpin[0], 0.31);
+    QCOMPARE(view->m_analysisNbo[0], 1.42);
+    window.applyAtomSelection({0, 1});
+    QCOMPARE(view->analysisSelection(), QSet<int>({0, 1}));
+    if (view->isValid()) {
+        const auto withLabels = view->m_previewOverlay->grab().toImage();
+        detail->trigger();
+        QVERIFY(!view->detailedAnalysis());
+        const auto withoutLabels = view->m_previewOverlay->grab().toImage();
+        QVERIFY(withLabels != withoutLabels);
+        detail->trigger();
+        QVERIFY(view->detailedAnalysis());
+    }
+    auto *hide = window.findChild<QAction *>("AnalysisHideOtherFragments");
+    auto *fade = window.findChild<QAction *>("AnalysisFadeOtherFragments");
+    auto *restore = window.findChild<QAction *>("AnalysisRestoreFragments");
+    QVERIFY(hide && fade && restore);
+    hide->trigger();
+    QVERIFY(view->atomShown(0));
+    QVERIFY(!view->atomShown(2));
+    QVERIFY(view->molecule().atoms[2].visible);
+    fade->trigger();
+    QVERIFY(view->atomShown(2));
+    QCOMPARE(view->atomOpacity(2), 0.22f);
+    restore->trigger();
+    QCOMPARE(view->atomOpacity(2), 1.0f);
+    if (const auto preview = qEnvironmentVariable("YOUNGCRAFT_DETAIL_PREVIEW"); !preview.isEmpty() && view->isValid()) {
+        QTest::qWait(80);
+        QVERIFY(window.grab().save(preview + "-window.png"));
+        QVERIFY(view->imageAtSize({1000, 650}, false, true).save(preview + "-nbo.png"));
+    }
+    window.openFile(dir.filePath("missing-freq.out"));
+    QTRY_COMPARE(loaded.size(), 3);
+    QVERIFY(!detail->isChecked());
+    detail->trigger();
+    QVERIFY(window.m_currentFile.endsWith("missing-freq.out"));
+    QVERIFY(window.m_statusLabel->text().contains("missing-freq-bb.out"));
+    QVERIFY(window.m_view->detailedAnalysis());
+    QVERIFY(window.m_view->m_analysisNbo.isEmpty());
+    window.applyAtomSelection({0, 1});
+    if (const auto preview = qEnvironmentVariable("YOUNGCRAFT_DETAIL_PREVIEW"); !preview.isEmpty() && window.m_view->isValid())
+        QVERIFY(window.m_view->imageAtSize({1000, 650}, false, true).save(preview + "-without-nbo.png"));
 }
 
 void SmokeTest::reactionCoordinatePresentationWorkflow() {

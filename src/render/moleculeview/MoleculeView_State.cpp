@@ -24,6 +24,8 @@ namespace youngcraft {
 
 void MoleculeView::setMolecule(const Molecule &molecule) {
     endDrawingChain();
+    setAnalysisFrame(nullptr);
+    setAnalysisFragment(FragmentDisplay::All);
     m_molecule = molecule;
     recalculateBounds();
     { const QSignalBlocker blocker(this); bestView(); }
@@ -58,6 +60,8 @@ void MoleculeView::setAtomDisplay(const Molecule &appearance) {
 
 void MoleculeView::setEditedMolecule(const Molecule &molecule) {
     endDrawingChain();
+    setAnalysisFrame(nullptr);
+    setAnalysisFragment(FragmentDisplay::All);
     const bool wasEmpty = m_molecule.atoms.isEmpty();
     m_molecule = molecule;
     recalculateBounds();
@@ -66,6 +70,54 @@ void MoleculeView::setEditedMolecule(const Molecule &molecule) {
     emit geometryChanged();
     update();
     if(m_previewOverlay)m_previewOverlay->update();
+}
+
+void MoleculeView::setDetailedAnalysis(bool enabled) {
+    m_detailedAnalysis = enabled;
+    if (m_previewOverlay) m_previewOverlay->update();
+}
+
+void MoleculeView::setAnalysisFrame(const Frame *frame) {
+    const bool matches = frame && frame->coordinates.size() == m_molecule.atoms.size();
+    m_analysisSpin = matches ? frame->mullikenSpin : QVector<double>{};
+    m_analysisNbo = matches ? frame->nboCharges : QVector<double>{};
+    if (m_detailedAnalysis && m_previewOverlay) m_previewOverlay->update();
+}
+
+QSet<int> MoleculeView::analysisSelection() const {
+    auto atoms = m_selection.atoms;
+    for (int index : m_selection.bonds) {
+        if (index < 0 || index >= m_molecule.bonds.size()) continue;
+        const auto &bond = m_molecule.bonds[index];
+        atoms.insert(bond.first);
+        atoms.insert(bond.second);
+    }
+    atoms.removeIf([this](int index) { return !atomShown(index); });
+    return atoms;
+}
+
+void MoleculeView::setAnalysisFragment(FragmentDisplay display, const QSet<int> &atoms) {
+    m_fragmentDisplay = atoms.isEmpty() ? FragmentDisplay::All : display;
+    m_analysisFragment = atoms;
+    update();
+    if (m_previewOverlay) m_previewOverlay->update();
+}
+
+bool MoleculeView::atomShown(int index) const {
+    if (index < 0 || index >= m_molecule.atoms.size()) return false;
+    const auto &atom = m_molecule.atoms[index];
+    return atom.visible && (m_style.showHydrogen || atom.atomicNumber != 1) &&
+        (m_fragmentDisplay != FragmentDisplay::HideOthers || m_analysisFragment.contains(index));
+}
+
+float MoleculeView::atomOpacity(int index) const {
+    const float base = m_molecule.atoms[index].displayOpacity;
+    return m_fragmentDisplay == FragmentDisplay::FadeOthers && !m_analysisFragment.contains(index)
+        ? qMin(base, 0.22f) : base;
+}
+
+float MoleculeView::bondOpacity(const Bond &bond) const {
+    return qMin(atomOpacity(bond.first), atomOpacity(bond.second)) * bond.displayOpacity;
 }
 
 void MoleculeView::setDrawingAnchorAt(const QVector3D &position) {
@@ -193,6 +245,7 @@ QImage MoleculeView::imageAtSize(const QSize &pixels, bool transparent, bool vie
 }
 
 QImage MoleculeView::image(bool transparent, bool viewportOnly) {
+    if (m_detailedAnalysis) return imageAtSize(renderPixelSize(), transparent, viewportOnly);
     m_transparentCapture = transparent;
     m_viewportOnlyCapture = viewportOnly;
     update();

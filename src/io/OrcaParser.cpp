@@ -1,4 +1,5 @@
 #include "io/OrcaParser.h"
+#include "io/NboParser.h"
 #include "io/XYZParser.h"
 #include <QDir>
 
@@ -58,7 +59,7 @@ QVector<Atom> readCoordinates(QFile &file) {
 }
 
 void readMulliken(QFile &file, QVector<Atom> &atoms) {
-    // ORCA: "0 C : -0.20 0.13", or charge-only "0 C : -0.20".
+    static const QRegularExpression row(QStringLiteral(R"(^\s*(\d+)\s+([A-Za-z]{1,2})\s*:\s*(\S+)(?:\s+(\S+))?\s*$)"));
     int parsed = 0;
     while (!file.atEnd()) {
         const qint64 start = file.pos();
@@ -68,28 +69,17 @@ void readMulliken(QFile &file, QVector<Atom> &atoms) {
             continue;
         }
         if (isSeparator(line)) continue;
-        const QStringList cols = parser::columns(line);
-        if (cols.size() < 4 || !cols[0].endsWith(QLatin1Char(':')) &&
-            !cols.value(2).endsWith(QLatin1Char(':'))) {
-            if (parsed > 0) file.seek(start);
+        const auto match = row.match(line);
+        if (!match.hasMatch()) {
+            file.seek(start);
             break;
         }
-        bool ok = false;
-        const int idx = cols[0].toInt(&ok);
-        if (!ok || idx < 0 || idx >= atoms.size()) {
-            if (parsed > 0) file.seek(start);
-            break;
-        }
-        const int values = cols[2] == QStringLiteral(":") ? 3 : 2;
-        double charge = 0.0;
-        if (!number(cols.value(values), charge)) {
-            // Standard table: 0 C : -0.20 [spin]
-            if (!number(cols.value(3), charge)) break;
-        }
-        atoms[idx].charge = charge;
-        double spin = 0.0;
-        if (number(cols.value(values + 1), spin)) atoms[idx].spinDensity = spin;
         ++parsed;
+        const int index = match.captured(1).toInt();
+        if (index >= atoms.size() || atomicNumberFor(match.captured(2)) != atoms[index].atomicNumber) continue;
+        double value = kNaN;
+        if (number(match.captured(3), value)) atoms[index].charge = value;
+        if (number(match.captured(4), value)) atoms[index].spinDensity = value;
     }
 }
 
@@ -214,6 +204,9 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
     data.index.fileSize = file.size();
 
     QVector<Atom> atoms;
+    QHash<qint64, int> nboChargeFrames;
+    int jobIndex = 0;
+    const QRegularExpression jobHeader(QStringLiteral(R"(^\$?\s*JOB NUMBER\s+\d+\s*$)"), QRegularExpression::CaseInsensitiveOption);
     double latestEnergy = kNaN;
     int pendingFrame = -1;
     bool hasContent = false;
@@ -372,6 +365,7 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
                     atoms = std::move(next);
                     Frame frame = frameFrom(atoms);
                     frame.metrics.step = ++step;
+                    frame.jobIndex = jobIndex;
                     data.frames.push_back(std::move(frame));
                     data.index.sectionOffsets[QStringLiteral("frame_geometry")].push_back(offset);
                     pendingFrame = data.frames.size() - 1;
@@ -420,10 +414,25 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         const auto multMatch = multRe.match(line);
         if (multMatch.hasMatch()) data.molecule.multiplicity = multMatch.captured(1).toInt();
 
-        if (trimmed.contains(QStringLiteral("MULLIKEN ATOMIC CHARGES"),
-                             Qt::CaseInsensitive) && !atoms.isEmpty()) {
+        if (jobHeader.match(trimmed).hasMatch()) {
+            ++jobIndex;
+            pendingFrame = -1;
+        }
+        if (trimmed.contains(QStringLiteral("Summary of Natural Population Analysis"), Qt::CaseInsensitive) &&
+            pendingFrame >= 0) {
+            nboChargeFrames.insert(offset, pendingFrame);
+            data.index.sectionOffsets[QStringLiteral("nbo")].push_back(offset);
+        }
+        if (trimmed.startsWith(QStringLiteral("MULLIKEN ATOMIC CHARGES"), Qt::CaseInsensitive) &&
+            pendingFrame >= 0) {
             data.index.sectionOffsets[QStringLiteral("mulliken_charges")].push_back(offset);
             readMulliken(file, atoms);
+            if (trimmed.contains(QStringLiteral("SPIN POPULATIONS"), Qt::CaseInsensitive)) {
+                data.index.sectionOffsets[QStringLiteral("mulliken_spin")].push_back(offset);
+                auto &spin = data.frames[pendingFrame].mullikenSpin;
+                spin.clear();
+                for (const auto &atom : atoms) spin.push_back(atom.spinDensity);
+            }
             continue;
         }
 
@@ -510,6 +519,21 @@ ParseResult OrcaParser::parse(const QString &filePath, const ParseOptions &optio
         data.molecule.rebuildBonds();
         // Reflect the last atomic properties in the final visible frame's model.
         if (data.frames.isEmpty()) data.frames.push_back(frameFrom(atoms));
+    }
+    if (!nboChargeFrames.isEmpty()) {
+        data.nbo = NboParser::parse(filePath);
+        data.hasNbo = !data.nbo.charges.isEmpty();
+        NboParser::assignFrameCharges(data, nboChargeFrames);
+    }
+    // ORCA can print the converged Cartesian table again after population analysis.
+    for (int i = 1; i < data.frames.size(); ++i) {
+        auto &frame = data.frames[i];
+        const auto &previous = data.frames[i - 1];
+        if (frame.jobIndex == previous.jobIndex && frame.coordinates == previous.coordinates &&
+            !std::isfinite(frame.metrics.energyHartree)) {
+            if (frame.mullikenSpin.isEmpty()) frame.mullikenSpin = previous.mullikenSpin;
+            if (frame.nboCharges.isEmpty()) frame.nboCharges = previous.nboCharges;
+        }
     }
     if (data.status == CalculationStatus::Unknown && hasContent) {
         data.status = CalculationStatus::Incomplete;

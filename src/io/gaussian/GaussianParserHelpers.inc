@@ -94,33 +94,36 @@ void applySpins(QVector<Atom> &atoms, const QVector<double> &values) {
     }
 }
 
-QVector<double> readAtomicValues(QFile &file, bool spin) {
-    QVector<double> values;
+void readMulliken(QFile &file, const QVector<Atom> &atoms,
+                  QVector<double> *charges, QVector<double> *spins) {
+    if (charges) charges->fill(kNaN, atoms.size());
+    if (spins) spins->fill(kNaN, atoms.size());
+    const int expectedColumns = charges && spins ? 4 : 3;
+    bool sawRow = false;
     while (!file.atEnd()) {
+        const qint64 offset = file.pos();
         const QString line = QString::fromUtf8(file.readLine());
-        if ((spin && line.contains(QStringLiteral("Sum of Mulliken"), Qt::CaseInsensitive)) ||
-            (!spin && line.contains(QStringLiteral("Sum of Mulliken"), Qt::CaseInsensitive))) {
+        if (line.contains(QStringLiteral("Sum of Mulliken"), Qt::CaseInsensitive)) break;
+        const QStringList fields = parser::columns(line);
+        bool okIndex = false;
+        const int index = fields.value(0).toInt(&okIndex) - 1;
+        if (fields.size() < expectedColumns || !okIndex) {
+            if (!sawRow && (fields.isEmpty() || (fields.size() < expectedColumns && okIndex))) continue;
+            file.seek(offset);
             break;
         }
-        const QStringList fields = parser::columns(line);
-        if (fields.size() < 3) {
-            if (!values.isEmpty() && line.trimmed().isEmpty()) {
-                break;
-            }
-            continue;
-        }
-        bool okIndex = false;
-        fields[0].toInt(&okIndex);
-        if (!okIndex) {
-            continue;
-        }
+        sawRow = true;
+        if (index < 0 || index >= atoms.size() || atomicNumberFor(fields[1]) != atoms[index].atomicNumber) continue;
         bool ok = false;
-        const double value = parser::toDouble(fields.last(), &ok);
-        if (ok) {
-            values.push_back(value);
+        if (charges) {
+            const double value = parser::toDouble(fields[2], &ok);
+            if (ok) (*charges)[index] = value;
+        }
+        if (spins) {
+            const double value = parser::toDouble(fields[expectedColumns - 1], &ok);
+            if (ok) (*spins)[index] = value;
         }
     }
-    return values;
 }
 
 void readForceBlock(QFile &file, QVector<Atom> &atoms) {

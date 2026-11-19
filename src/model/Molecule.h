@@ -66,6 +66,8 @@ struct Frame {
     QVector<QVector3D> coordinates;
     FrameMetrics metrics;
     int jobIndex = 0;
+    QVector<double> mullikenSpin;
+    QVector<double> nboCharges;
 };
 
 struct FrequencyMode {

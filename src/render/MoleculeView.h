@@ -39,6 +39,12 @@ public:
     void setAnimationMolecule(const Molecule &molecule);
     void setAtomVisibility(const QVector<bool> &visibility);
     void setAtomDisplay(const Molecule &appearance);
+    enum class FragmentDisplay { All, HideOthers, FadeOthers };
+    bool detailedAnalysis() const { return m_detailedAnalysis; }
+    void setDetailedAnalysis(bool enabled);
+    void setAnalysisFrame(const Frame *frame);
+    QSet<int> analysisSelection() const;
+    void setAnalysisFragment(FragmentDisplay display, const QSet<int> &atoms = {});
     void setEditedMolecule(const Molecule &molecule);
     void setCoordinates(const QVector<QVector3D> &coordinates);
     void setFrequencyMode(const FrequencyMode *mode);
@@ -172,13 +178,17 @@ private:
                   const QColor &color, bool lighting = true, float opacity = -1.0f,
                   const QColor &secondColor = QColor(), float colorStart = 0.0f, float colorEnd = 1.0f);
     int sphereMeshLevel(const QVector3D &position, float radius) const;
-    void drawAtomSphere(const Atom &atom);
+    void drawAtomSphere(int index);
+    bool atomShown(int index) const;
+    float atomOpacity(int index) const;
+    float bondOpacity(const Bond &bond) const;
     void drawBondCap(const QVector3D &center, const QVector3D &axis, float radius, float axialRadius,
                      const QColor &firstColor, const QColor &secondColor, float colorPosition);
     void drawSurface(QOpenGLVertexArrayObject &vao, int vertexCount, const QColor &color);
     void drawAxes(const QMatrix4x4 &viewProjection);
     void drawCrystalCell(const QMatrix4x4 &viewProjection);
     void drawLabels(const QMatrix4x4 &viewProjection);
+    void drawDetailedAnalysis(const QMatrix4x4 &viewProjection, QPainter *overlayPainter = nullptr);
     void drawVibrationVectors(const QMatrix4x4 &viewProjection);
     void drawGeometryMeasurements(const QMatrix4x4 &viewProjection, QPainter *overlayPainter = nullptr);
     void drawEditorPreview();
@@ -208,6 +218,10 @@ private:
 
     Molecule m_molecule;
     SelectionModel m_selection;
+    bool m_detailedAnalysis = false;
+    FragmentDisplay m_fragmentDisplay = FragmentDisplay::All;
+    QSet<int> m_analysisFragment;
+    QVector<double> m_analysisSpin, m_analysisNbo;
     int m_hoverAtom=-1, m_hoverBond=-1;
     double m_drawOrder=0, m_previewOrder=1;
     bool m_rectangle=false, m_groupDrag=false;
