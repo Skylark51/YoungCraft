@@ -40,8 +40,11 @@ public:
     void setAtomVisibility(const QVector<bool> &visibility);
     void setAtomDisplay(const Molecule &appearance);
     enum class FragmentDisplay { All, HideOthers, FadeOthers };
+    enum class AnalysisLabel { MullikenSpin, NboCharge, BondLength };
     bool detailedAnalysis() const { return m_detailedAnalysis; }
     void setDetailedAnalysis(bool enabled);
+    bool analysisLabelVisible(AnalysisLabel label) const { return m_analysisLabels[int(label)]; }
+    void setAnalysisLabelVisible(AnalysisLabel label, bool visible);
     void setAnalysisFrame(const Frame *frame);
     QSet<int> analysisSelection() const;
     void setAnalysisFragment(FragmentDisplay display, const QSet<int> &atoms = {});
@@ -219,6 +222,7 @@ private:
     Molecule m_molecule;
     SelectionModel m_selection;
     bool m_detailedAnalysis = false;
+    bool m_analysisLabels[3] = {true, true, true};
     FragmentDisplay m_fragmentDisplay = FragmentDisplay::All;
     QSet<int> m_analysisFragment;
     QVector<double> m_analysisSpin, m_analysisNbo;

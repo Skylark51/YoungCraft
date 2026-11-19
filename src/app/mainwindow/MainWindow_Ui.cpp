@@ -191,7 +191,28 @@ void MainWindow::createUi() {
     structureContainer->setObjectName("StructureToolsContainer");
     auto *structureLayout = new QVBoxLayout(structureContainer);
     structureLayout->setContentsMargins(8, 4, 8, 8);
-    structureLayout->addWidget(m_structureTabs);
+    m_analysisLabelControls = new QWidget(structureContainer);
+    m_analysisLabelControls->setObjectName(QStringLiteral("DetailedAnalysisControls"));
+    auto *labelLayout = new QVBoxLayout(m_analysisLabelControls);
+    labelLayout->setContentsMargins(0, 4, 0, 4);
+    labelLayout->setSpacing(4);
+    labelLayout->addWidget(new QLabel(QStringLiteral("상세 분석 표시"), m_analysisLabelControls));
+    const QStringList labels{QStringLiteral("Mulliken 스핀"), QStringLiteral("NBO 전하"), QStringLiteral("결합 길이")};
+    const char *labelActions[]{"DetailedAnalysisMullikenSpin", "DetailedAnalysisNboCharge", "DetailedAnalysisBondLength"};
+    for (int i = 0; i < labels.size(); ++i) {
+        auto *button = new QPushButton(labels[i], m_analysisLabelControls);
+        button->setObjectName(QString::fromLatin1(labelActions[i]));
+        button->setCheckable(true);
+        button->setChecked(true);
+        m_analysisLabelButtons.push_back(button);
+        labelLayout->addWidget(button);
+        connect(button, &QPushButton::clicked, this, [this, i](bool visible) {
+            m_view->setAnalysisLabelVisible(MoleculeView::AnalysisLabel(i), visible);
+        });
+    }
+    m_analysisLabelControls->hide();
+    structureLayout->addWidget(m_analysisLabelControls);
+    structureLayout->addWidget(m_structureTabs, 1);
     m_structureDock->setWidget(structureContainer);
     addDockWidget(Qt::RightDockWidgetArea, m_structureDock);
     resizeDocks({m_explorerDock, m_structureDock}, {280, 208}, Qt::Horizontal);

@@ -4817,11 +4817,20 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
     QTRY_COMPARE(loaded.size(), 1);
     auto *detail = window.findChild<QAction *>("DetailedAnalysisAction");
     QVERIFY(detail);
+    auto *controls = window.findChild<QWidget *>("DetailedAnalysisControls");
+    QVERIFY(controls);
+    QVERIFY(controls->isHidden());
+    auto *spinButton = controls->findChild<QPushButton *>("DetailedAnalysisMullikenSpin");
+    auto *nboButton = controls->findChild<QPushButton *>("DetailedAnalysisNboCharge");
+    auto *lengthButton = controls->findChild<QPushButton *>("DetailedAnalysisBondLength");
+    QVERIFY(spinButton && nboButton && lengthButton);
     QVERIFY(!detail->isChecked());
     detail->trigger();
     QTRY_COMPARE(loaded.size(), 2);
     QVERIFY(window.m_currentFile.endsWith("example-freq-bb.out"));
     QVERIFY(detail->isChecked());
+    QVERIFY(controls->isVisible());
+    QVERIFY(spinButton->isChecked() && nboButton->isChecked() && lengthButton->isChecked());
     auto *view = window.m_view;
     QVERIFY(view->detailedAnalysis());
     QCOMPARE(view->molecule().atoms[1].position.x(), 1.95f);
@@ -4833,6 +4842,7 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
             const auto withLabels = view->m_previewOverlay->grab().toImage();
             detail->trigger();
             QVERIFY(!view->detailedAnalysis());
+            QVERIFY(controls->isHidden());
             const auto withoutLabels = view->m_previewOverlay->grab().toImage();
             detail->trigger();
             QVERIFY(view->detailedAnalysis());
@@ -4857,6 +4867,32 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
         checkAnchors();
         view->setCameraState(originalCamera);
     }
+    const auto overlay = [&] {
+        return view->isValid() ? view->m_previewOverlay->grab().toImage() : QImage{};
+    };
+    const auto allLabels = overlay();
+    nboButton->click();
+    QVERIFY(!view->analysisLabelVisible(MoleculeView::AnalysisLabel::NboCharge));
+    QVERIFY(view->analysisLabelVisible(MoleculeView::AnalysisLabel::MullikenSpin));
+    QVERIFY(view->analysisLabelVisible(MoleculeView::AnalysisLabel::BondLength));
+    const auto withoutNbo = overlay();
+    spinButton->click();
+    QVERIFY(!view->analysisLabelVisible(MoleculeView::AnalysisLabel::MullikenSpin));
+    const auto onlyLength = overlay();
+    lengthButton->click();
+    QVERIFY(!view->analysisLabelVisible(MoleculeView::AnalysisLabel::BondLength));
+    const auto noLabels = overlay();
+    if (view->isValid()) {
+        QVERIFY(allLabels != withoutNbo);
+        QVERIFY(withoutNbo != onlyLength);
+        QVERIFY(onlyLength != noLabels);
+        detail->trigger();
+        QCOMPARE(overlay(), noLabels);
+        detail->trigger();
+        QVERIFY(!spinButton->isChecked() && !nboButton->isChecked() && !lengthButton->isChecked());
+    }
+    for (auto *button : {spinButton, nboButton, lengthButton}) button->click();
+    if (view->isValid()) QCOMPARE(overlay(), allLabels);
     window.applyAtomSelection({0, 1});
     QCOMPARE(view->analysisSelection(), QSet<int>({0, 1}));
     auto *hide = window.findChild<QAction *>("AnalysisHideOtherFragments");
@@ -4885,17 +4921,23 @@ void SmokeTest::detailedAnalysisOpensCompanionAndFocusesFragment() {
         QVERIFY(view->imageAtSize({750, 480}, false, true).save(preview + "-crowded.png"));
         view->setCameraState(originalCamera);
     }
+    nboButton->click();
     window.openFile(dir.filePath("missing-freq.out"));
     QTRY_COMPARE(loaded.size(), 3);
     QVERIFY(!detail->isChecked());
+    QVERIFY(controls->isHidden());
     detail->trigger();
     QVERIFY(window.m_currentFile.endsWith("missing-freq.out"));
     QVERIFY(window.m_statusLabel->text().contains("missing-freq-bb.out"));
     QVERIFY(window.m_view->detailedAnalysis());
     QVERIFY(window.m_view->m_analysisNbo.isEmpty());
+    QVERIFY(nboButton->isChecked());
     window.applyAtomSelection({0, 1});
     if (const auto preview = qEnvironmentVariable("YOUNGCRAFT_DETAIL_PREVIEW"); !preview.isEmpty() && window.m_view->isValid())
         QVERIFY(window.m_view->imageAtSize({1000, 650}, false, true).save(preview + "-without-nbo.png"));
+    window.openFile(dir.filePath("example-freq-bb.out"));
+    QVERIFY(controls->isVisible());
+    QVERIFY(spinButton->isChecked() && !nboButton->isChecked() && lengthButton->isChecked());
 }
 
 void SmokeTest::reactionCoordinatePresentationWorkflow() {
