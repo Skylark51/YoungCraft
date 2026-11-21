@@ -59,6 +59,7 @@
 #include <QDoubleSpinBox>
 #include <QSettings>
 #include <QComboBox>
+#include <QActionGroup>
 #include <QMenuBar>
 #include <QMenu>
 #include <QPlainTextEdit>
@@ -231,6 +232,8 @@ private slots:
     void scanWithoutGeometryIsSelectable();
     void realScanGuiInputs();
     void drawingModeCreatesAtomsAndBonds();
+    void firstDrawingAtomKeepsCanvasScale_data();
+    void firstDrawingAtomKeepsCanvasScale();
     void toolbarDrawKeepsWindowOpen();
     void autoHydrogenFollowsDrawingEditsAndUndo();
     void mmStopTerminatesWorker();
@@ -245,7 +248,7 @@ private slots:
     void editorPreservesCalculationFrames();
     void editorFragmentUndoAndKeyboard();
     void editorVisualPreview();
-    void atomNumbersToolbarLabelsEveryAtom();
+    void atomLabelMenuUpdatesRenderingAndTabs();
     void atomClicksMeasureDistanceAngleAndDihedral();
 };
 
@@ -2058,59 +2061,112 @@ void SmokeTest::chemcraftGeneratedDialogsAndExtraction() {
     w.extractStructureFragments();QVERIFY(checked);QCOMPARE(w.m_documentTabs->count(),tabs+1);QCOMPARE(w.m_data.molecule.atoms.size(),3);w.m_documentTabs->setCurrentIndex(source);QCOMPARE(w.m_data.molecule.atoms.size(),3);
 }
 
-void SmokeTest::atomNumbersToolbarLabelsEveryAtom() {
+void SmokeTest::atomLabelMenuUpdatesRenderingAndTabs() {
+    const auto oldOrg = QCoreApplication::organizationName();
+    const auto oldApp = QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName("YoungcraftTest");
+    QCoreApplication::setApplicationName("AtomLabelMenu");
+    QSettings().clear();
+    auto cleanup = qScopeGuard([&] {
+        QSettings().clear();
+        QCoreApplication::setOrganizationName(oldOrg);
+        QCoreApplication::setApplicationName(oldApp);
+    });
+
     MainWindow window;
     window.resize(1200, 850);
     window.show();
-    const RenderStyle originalStyle = window.m_style;
     Molecule molecule;
     molecule.atoms = {{1, 8, "O", {-2, 0, 0}}, {2, 6, "C", {0, 0, 0}}, {3, 1, "H", {2, 0, 0}}};
     molecule.atoms[1].label = QStringLiteral("CA");
     window.newDrawingDocument(molecule);
     window.setDrawingMode(false);
     RenderStyle style = StyleManager::preset(QStringLiteral("Youngcraft Studio"));
-    style.showLabels = false;
     style.showHydrogen = true;
     window.applyStyle(style);
-    auto *action = window.findChild<QAction *>(QStringLiteral("ShowAtomNumbers"));
     window.m_structureTabs->setCurrentIndex(0);
-    auto *display = toolButtonForAction(window.m_structureDock, action);
-    QVERIFY(action && display && display->isVisible());
-    QVERIFY(!action->isChecked());
+
+    auto *menu = window.findChild<QMenu *>("AtomLabelsMenu");
+    QVERIFY(menu);
+    auto *button = toolButtonForAction(window.m_structureDock, menu->menuAction());
+    QVERIFY(button && button->isVisible());
+    QVERIFY(!button->icon().isNull());
+    QCOMPARE(button->popupMode(), QToolButton::InstantPopup);
+    QCOMPARE(menu->actions().size(), 4);
+    auto *hide = menu->findChild<QAction *>("HideAtomLabels");
+    auto *numbers = menu->findChild<QAction *>("ShowAtomNumbers");
+    auto *symbols = menu->findChild<QAction *>("ShowElementSymbols");
+    auto *both = menu->findChild<QAction *>("ShowAtomSymbolsAndNumbers");
+    QVERIFY(hide && numbers && symbols && both);
+    QVERIFY(hide->isChecked());
+
     auto *view = window.m_view;
     view->bestView();
     QTest::qWait(150);
     const bool visual = QGuiApplication::platformName() != "offscreen";
-    QImage before;
-    if (visual) { QVERIFY(view->isValid()); before = view->image(); }
-    QTest::mouseClick(display, Qt::LeftButton);
-    QVERIFY(action->isChecked());
-    QVERIFY(view->style().showLabels);
+    QImage hidden;
+    QImage hiddenOverlay;
     if (visual) {
-        QTest::qWait(100);
-        const QImage after = view->image();
+        QVERIFY(view->isValid());
+        hidden = view->image(false, true);
+        hiddenOverlay = view->m_previewOverlay->grab().toImage();
+    }
+    bool popupVisible = false;
+    QTimer::singleShot(0, menu, [&] {
+        popupVisible = menu->isVisible();
+        menu->hide();
+    });
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_VERIFY(popupVisible);
+
+    QImage previous = hidden;
+    QImage previousOverlay = hiddenOverlay;
+    const auto capture = qEnvironmentVariable("YOUNGCRAFT_ATOM_LABELS_CAPTURE");
+    for (auto *mode : {numbers, symbols, both}) {
+        mode->trigger();
+        QCOMPARE(mode->actionGroup()->checkedAction(), mode);
+        QCOMPARE(view->style().showLabels, mode != symbols);
+        QCOMPARE(view->style().showElementSymbols, mode != numbers);
+        QVERIFY(button->toolTip().contains(mode->text()));
+        if (!visual) continue;
+        const QImage current = view->image(false, true);
+        const QImage overlay = view->m_previewOverlay->grab().toImage();
         for (const Atom &atom : view->molecule().atoms) {
             const auto screen = view->project(atom.position, view->viewProjection());
-            const qreal scale = after.devicePixelRatio();
-            const QRect region(qRound((screen.x() - 16) * scale), qRound((screen.y() - 16) * scale),
-                               qRound(32 * scale), qRound(32 * scale));
-            QVERIFY2(before.copy(region) != after.copy(region), "Each atom, including named atoms and H, must render a label");
+            const auto labelRegion = [screen](qreal scale) {
+                return QRect(qRound((screen.x() - 16) * scale), qRound((screen.y() - 16) * scale),
+                             qRound(32 * scale), qRound(32 * scale));
+            };
+            const auto exported = labelRegion(current.devicePixelRatio());
+            QVERIFY2(hidden.copy(exported) != current.copy(exported), "Exports must label each visible atom");
+            QVERIFY(previous.copy(exported) != current.copy(exported));
+            const auto interactive = labelRegion(overlay.devicePixelRatio());
+            QVERIFY2(hiddenOverlay.copy(interactive) != overlay.copy(interactive), "The live view must label each visible atom");
+            QVERIFY(previousOverlay.copy(interactive) != overlay.copy(interactive));
         }
-        const QString capture = qEnvironmentVariable("YOUNGCRAFT_ATOM_NUMBERS_CAPTURE");
-        if (!capture.isEmpty()) { QVERIFY(window.grab().save(capture)); QVERIFY(after.save(capture + ".scene.png")); }
+        if (!capture.isEmpty() && mode == both) QVERIFY(current.save(capture + "-scene.png"));
+        previous = current;
+        previousOverlay = overlay;
     }
-    const int numberedTab = window.m_documentTabs->currentIndex();
+    if (visual && !capture.isEmpty()) {
+        QTimer::singleShot(100, menu, [&] {
+            window.grab().save(capture + "-window.png");
+            menu->grab().save(capture + "-menu.png");
+            menu->hide();
+        });
+        button->showMenu();
+    }
+    QVERIFY(StyleManager::load().showLabels);
+    QVERIFY(StyleManager::load().showElementSymbols);
+
+    const int labeledTab = window.m_documentTabs->currentIndex();
     window.newDrawingDocument(molecule);
-    style.showLabels = false;
-    window.applyStyle(style);
-    QVERIFY(!action->isChecked());
-    window.m_documentTabs->setCurrentIndex(numberedTab);
-    QVERIFY(action->isChecked());
-    QVERIFY(window.m_view->style().showLabels);
-    action->trigger();
-    QVERIFY(!action->isChecked());
-    QVERIFY(!window.m_view->style().showLabels);
-    window.applyStyle(originalStyle);
+    hide->trigger();
+    QVERIFY(hide->isChecked());
+    QVERIFY(!window.m_view->style().showLabels && !window.m_view->style().showElementSymbols);
+    window.m_documentTabs->setCurrentIndex(labeledTab);
+    QVERIFY(both->isChecked());
+    QVERIFY(window.m_view->style().showLabels && window.m_view->style().showElementSymbols);
 }
 
 void SmokeTest::atomClicksMeasureDistanceAngleAndDihedral() {
@@ -2537,6 +2593,49 @@ void SmokeTest::toolbarDrawKeepsWindowOpen() {
     QVERIFY(finish);
     finish->click();
     QVERIFY(!window.m_drawingMode && !window.m_drawBar->isVisible());
+}
+
+void SmokeTest::firstDrawingAtomKeepsCanvasScale_data() {
+    QTest::addColumn<bool>("perspective");
+    QTest::newRow("orthographic") << false;
+    QTest::newRow("perspective") << true;
+}
+
+void SmokeTest::firstDrawingAtomKeepsCanvasScale() {
+    QFETCH(bool, perspective);
+    MainWindow window;
+    window.resize(1280, 850);
+    window.show();
+    auto style = StyleManager::preset(QStringLiteral("Youngcraft Studio"));
+    style.perspective = perspective;
+    window.m_view->setStyle(style);
+    window.newDrawingDocument();
+    auto *view = window.m_view;
+    auto *carbon = window.m_drawBar->findChild<QPushButton *>("QuickElement_C");
+    QVERIFY(carbon);
+    carbon->click();
+    QCoreApplication::processEvents();
+
+    const QPoint first = view->rect().center() + QPoint(-65, 45);
+    const auto initialCamera = view->cameraState();
+    QTest::mouseClick(view, Qt::LeftButton, Qt::NoModifier, first);
+    QVERIFY(!view->molecule().atoms.isEmpty());
+    const Atom &atom = view->molecule().atoms.first();
+    QCOMPARE(atom.atomicNumber, 6);
+    QCOMPARE(view->cameraState().orthoScale, initialCamera.orthoScale);
+    QCOMPARE(view->cameraState().distance, initialCamera.distance);
+
+    const auto projection = view->viewProjection();
+    const auto center = view->project(atom.position, projection);
+    const auto edge = view->project(atom.position + QVector3D(view->atomVisualRadius(atom), 0, 0), projection);
+    QVERIFY((QPointF(center.x(), center.y()) - QPointF(first)).manhattanLength() < 2.0);
+    QVERIFY2(2 * qAbs(edge.x() - center.x()) < 0.12 * view->height(),
+             "A single carbon should leave room to draw a structure without zooming out");
+    const auto capture = qEnvironmentVariable("YOUNGCRAFT_FIRST_DRAW_CAPTURE");
+    if (!capture.isEmpty() && !perspective && view->isValid()) {
+        QTest::qWait(80);
+        QVERIFY(window.grab().save(capture));
+    }
 }
 
 void SmokeTest::drawingModeCreatesAtomsAndBonds() {

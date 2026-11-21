@@ -72,6 +72,7 @@ struct RenderStyle {
     bool showHydrogen = true;
     bool showBondOrders = true;
     bool showLabels = false;
+    bool showElementSymbols = false;
     bool showProperties = false;
     bool showAxes = false;
     bool centerAxes = true;

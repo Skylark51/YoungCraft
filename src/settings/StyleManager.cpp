@@ -216,6 +216,7 @@ void StyleManager::save(const RenderStyle &style) {
     settings.setValue(QStringLiteral("showHydrogen"), style.showHydrogen);
     settings.setValue(QStringLiteral("showBondOrders"), style.showBondOrders);
     settings.setValue(QStringLiteral("showLabels"), style.showLabels);
+    settings.setValue(QStringLiteral("showElementSymbols"), style.showElementSymbols);
     settings.setValue(QStringLiteral("showProperties"), style.showProperties);
     settings.setValue(QStringLiteral("showAxes"), style.showAxes);
     settings.setValue(QStringLiteral("perspective"), style.perspective);
@@ -311,6 +312,7 @@ RenderStyle StyleManager::load() {
     style.showBondOrders = settings.value(QStringLiteral("showBondOrders"),
         hasSavedStyle ? true : style.showBondOrders).toBool();
     style.showLabels = settings.value(QStringLiteral("showLabels"), style.showLabels).toBool();
+    style.showElementSymbols = settings.value(QStringLiteral("showElementSymbols"), style.showElementSymbols).toBool();
     style.showProperties = settings.value(QStringLiteral("showProperties"), style.showProperties).toBool();
     style.showAxes = settings.value(QStringLiteral("showAxes"), style.showAxes).toBool();
     style.perspective = settings.value(QStringLiteral("perspective"), style.perspective).toBool();

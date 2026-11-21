@@ -58,6 +58,7 @@ bool MoleculeView::eventFilter(QObject *watched, QEvent *event) {
         // Keep measurements visible when Qt recomposites the OpenGL child widget.
         QPainter painter(m_previewOverlay);
         const auto vp = viewProjection();
+        drawLabels(vp, &painter);
         drawGeometryMeasurements(vp, &painter);
         drawDetailedAnalysis(vp, &painter);
         return true;
@@ -115,10 +116,14 @@ void MoleculeView::drawEditorPreview() {
     painter.setPen(m_style.labelColor);painter.drawText(end+QPointF(12,-8),QString("%1 · %2 · %3 Å").arg(m_ghostSnapAtom>=0?m_molecule.atoms[m_ghostSnapAtom].element:elementSymbol(m_drawAtomicNumber)).arg(m_previewOrder).arg((m_ghostPosition-origin).length(),0,'f',2));
 }
 
-void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
+void MoleculeView::drawLabels(const QMatrix4x4 &vp, QPainter *overlayPainter) {
     const int selectedAtom = m_viewportOnlyCapture ? -1 : m_selectedAtom;
-    if (!m_style.showLabels && !m_style.showProperties && selectedAtom < 0 && m_geometrySelection.isEmpty()) return;
-    QPainter painter; beginOverlayPainter(painter);
+    const bool showAtomLabels = m_style.showLabels || m_style.showElementSymbols;
+    if (!showAtomLabels && !m_style.showProperties && selectedAtom < 0 && m_geometrySelection.isEmpty()) return;
+    QPainter capturePainter;
+    if (!overlayPainter) beginOverlayPainter(capturePainter);
+    QPainter &painter = overlayPainter ? *overlayPainter : capturePainter;
+    painter.save();
     painter.setRenderHint(QPainter::TextAntialiasing, m_style.antiAliasing);
     QFont font = painter.font();
     font.setPointSizeF(m_style.labelSize);
@@ -129,12 +134,18 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
         const QVector3D screen = project(atom.position, vp);
         if (screen.z() < -1.0f || screen.z() > 1.0f) continue;
         painter.setOpacity(atomOpacity(i));
-        if (m_style.showLabels || i == selectedAtom || m_geometrySelection.contains(i)) {
-            QFont numberFont = font;
-            numberFont.setBold(true);
-            QPainterPath number;
-            number.addText(QPointF(), numberFont, QString::number(atom.index > 0 ? atom.index : i + 1));
-            const QRectF bounds = number.boundingRect();
+        const bool showNumber = m_style.showLabels ||
+            (!showAtomLabels && (i == selectedAtom || m_geometrySelection.contains(i)));
+        QString atomLabel;
+        if (m_style.showElementSymbols)
+            atomLabel = atom.atomicNumber > 0 ? elementSymbol(atom.atomicNumber) : atom.element;
+        if (showNumber) atomLabel += QString::number(atom.index > 0 ? atom.index : i + 1);
+        if (!atomLabel.isEmpty()) {
+            QFont labelFont = font;
+            labelFont.setBold(true);
+            QPainterPath glyphs;
+            glyphs.addText(QPointF(), labelFont, atomLabel);
+            const QRectF bounds = glyphs.boundingRect();
             const QVector3D edge = project(atom.position + m_rotation.conjugated().rotatedVector(QVector3D(atomVisualRadius(atom), 0, 0)), vp);
             const double radius = QLineF(QPointF(screen.x(), screen.y()), QPointF(edge.x(), edge.y())).length();
             const double scale = qMin(1.0, qMin(radius * 1.6 / qMax(1.0, bounds.width()), radius * 1.4 / qMax(1.0, bounds.height())));
@@ -145,9 +156,9 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
             painter.setRenderHint(QPainter::Antialiasing, true);
             painter.setPen(QPen(QColor(20, 24, 30, 220), 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             painter.setBrush(Qt::NoBrush);
-            const QPainterPath centeredNumber = transform.map(number);
-            painter.drawPath(centeredNumber);
-            painter.fillPath(centeredNumber, Qt::white);
+            const QPainterPath centeredLabel = transform.map(glyphs);
+            painter.drawPath(centeredLabel);
+            painter.fillPath(centeredLabel, Qt::white);
         }
         QString label;
         if (m_style.showProperties) {
@@ -171,6 +182,7 @@ void MoleculeView::drawLabels(const QMatrix4x4 &vp) {
         painter.setPen(m_style.labelColor);
         painter.drawText(box.adjusted(5, 3, -5, -3), Qt::AlignLeft | Qt::AlignTop, text);
     }
+    painter.restore();
 }
 
 void MoleculeView::drawDetailedAnalysis(const QMatrix4x4 &vp, QPainter *overlayPainter) {

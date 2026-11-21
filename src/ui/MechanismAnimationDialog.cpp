@@ -160,7 +160,7 @@ MechanismAnimationDialog::MechanismAnimationDialog(const RenderStyle &style,cons
     connect(m_lift,&QDoubleSpinBox::valueChanged,this,[this]{rebuild();});
     auto *right=new QWidget;auto *rightLayout=new QVBoxLayout(right);rightLayout->setContentsMargins(0,0,0,0);splitter->addWidget(right);
     m_view=new MoleculeView;m_view->setObjectName("MechanismView");m_view->setMinimumSize(400,300);
-    auto presentation=style;presentation.showPositiveSurface=false;presentation.showNegativeSurface=false;presentation.showAxes=false;presentation.showLabels=false;presentation.showProperties=false;presentation.showVibrationVectors=false;presentation.showHydrogen=true;
+    auto presentation=style;presentation.showPositiveSurface=false;presentation.showNegativeSurface=false;presentation.showAxes=false;presentation.showLabels=false;presentation.showElementSymbols=false;presentation.showProperties=false;presentation.showVibrationVectors=false;presentation.showHydrogen=true;
     m_view->setStyle(presentation);rightLayout->addWidget(m_view,1);
     auto *coordinateRow=new QHBoxLayout;rightLayout->addLayout(coordinateRow);
     m_coordinateEdit=new QPushButton(QStringLiteral("반응 좌표 · 2D / 에너지 삽입…"));m_coordinateEdit->setObjectName("ReactionCoordinateEdit");coordinateRow->addWidget(m_coordinateEdit);

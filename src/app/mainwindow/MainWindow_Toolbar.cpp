@@ -125,7 +125,17 @@ QIcon actionIcon(int id, const QColor &ink=QColor("#2874b8")) {
         p.drawEllipse(QPointF(16,16),5,5);break;
     case 32: p.drawPolyline(QPolygonF{{12,10},{5,10},{5,28},{27,28},{27,10},{20,10}});
         p.drawLine(16,20,16,3);p.drawPolyline(QPolygonF{{11,8},{16,3},{21,8}});break;
-    case 20: {p.drawEllipse(QPointF(11,16),8,8);QFont font=p.font();font.setBold(true);font.setPixelSize(15);p.setFont(font);p.drawText(QRectF(16,1,15,18),Qt::AlignCenter,QStringLiteral("#"));break;}
+    case 20: {
+        p.drawEllipse(QPointF(12, 15), 9, 9);
+        QFont font = p.font();
+        font.setBold(true);
+        font.setPixelSize(13);
+        p.setFont(font);
+        p.drawText(QRectF(3, 6, 18, 18), Qt::AlignCenter, QStringLiteral("C"));
+        p.drawText(QRectF(21, 3, 10, 17), Qt::AlignCenter, QStringLiteral("1"));
+        p.drawPolyline(QPolygonF{{21, 24}, {25, 28}, {29, 24}});
+        break;
+    }
     default: p.drawRoundedRect(QRectF(3,8,17,10),5,5);p.drawRoundedRect(QRectF(12,15,17,10),5,5);p.drawLine(12,16,20,16);break;
     }
     p.end();
@@ -366,7 +376,7 @@ void MainWindow::createToolBar() {
     addDisplayButton(findChild<QAction *>("CenterStructureView"), 8);
     addDisplayButton(findChild<QAction *>("HideCarbonHydrogens"), 6);
     addDisplayButton(findChild<QAction *>("RestoreCarbonHydrogens"), 7);
-    addDisplayButton(findChild<QAction *>("ShowAtomNumbers"), 20);
+    addDisplayButton(m_atomLabelsMenu->menuAction(), 20);
     addDisplayButton(m_atomFocusMenu->menuAction(), 17);
     addDisplayButton(m_syncViewsAction, 10);
 

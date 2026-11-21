@@ -190,7 +190,7 @@ private:
     void drawSurface(QOpenGLVertexArrayObject &vao, int vertexCount, const QColor &color);
     void drawAxes(const QMatrix4x4 &viewProjection);
     void drawCrystalCell(const QMatrix4x4 &viewProjection);
-    void drawLabels(const QMatrix4x4 &viewProjection);
+    void drawLabels(const QMatrix4x4 &viewProjection, QPainter *overlayPainter = nullptr);
     void drawDetailedAnalysis(const QMatrix4x4 &viewProjection, QPainter *overlayPainter = nullptr);
     void drawVibrationVectors(const QMatrix4x4 &viewProjection);
     void drawGeometryMeasurements(const QMatrix4x4 &viewProjection, QPainter *overlayPainter = nullptr);
@@ -326,6 +326,7 @@ private:
     QVector<QVector3D> m_frequencyBase;
     double m_vibrationVectorScaleFactor = 1.0;
     double m_vibrationVectorLengthFactor = 1.0;
+    bool m_framebufferCapture = false;
     bool m_transparentCapture = false;
     bool m_viewportOnlyCapture = false;
     GLuint m_shadowFbo = 0;

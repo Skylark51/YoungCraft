@@ -129,12 +129,12 @@ void MainWindow::bindDocument(const std::shared_ptr<DocumentSession> &document) 
     m_firstBondAtom = d.firstBondAtom;
     if (m_geometryAction) m_geometryAction->setChecked(m_geometryMode);
     updateDetailedAnalysisControls();
+    updateAtomLabelMenu();
     for (QAction *action : findChildren<QAction *>()) {
         const auto &text = action->text();
         if (text == QStringLiteral("축 표시")) action->setChecked(m_style.showAxes);
         else if (text == QStringLiteral("molecule 중심으로 축 이동")) action->setChecked(m_style.centerAxes);
         else if (text == QStringLiteral("수소 표시")) action->setChecked(m_style.showHydrogen);
-        else if (action == m_atomLabelsAction) action->setChecked(m_style.showLabels);
         else if (text == QStringLiteral("전하/스핀 밀도 표시")) action->setChecked(m_style.showProperties);
         else if (text == QStringLiteral("van der Waals 구 표시")) action->setChecked(m_style.showVdwSpheres);
         else if (text == QStringLiteral("원근 보기")) action->setChecked(m_style.perspective);
