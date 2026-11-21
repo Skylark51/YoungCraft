@@ -18,12 +18,13 @@ if (Test-Path -LiteralPath $legacyStandalone -PathType Leaf) {
         if ($legacyAssembly -eq 'Youngcraft-Standalone') { Remove-Item -LiteralPath $legacyStandalone -Force }
     }
 }
-$oldShortcut = Join-Path $desktop 'Youngcraft.lnk'
-if (Test-Path -LiteralPath $oldShortcut -PathType Leaf) {
-    $shell = New-Object -ComObject WScript.Shell
-    $target = $shell.CreateShortcut($oldShortcut).TargetPath
-    $installed = Join-Path $env:LOCALAPPDATA 'Programs/Youngcraft Portable/Youngcraft.exe'
+# Remove only recognized Youngcraft shortcuts after the single EXE is published.
+$shell = New-Object -ComObject WScript.Shell
+$installed = Join-Path $env:LOCALAPPDATA 'Programs/Youngcraft Portable/Youngcraft.exe'
+foreach ($shortcut in Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -File) {
+    if ($shortcut.BaseName -notmatch '^Youngcraft($|\s|-)') { continue }
+    $target = $shell.CreateShortcut($shortcut.FullName).TargetPath
     if ($target -in @($installed, $legacyStandalone, $desktopLauncher)) {
-        Remove-Item -LiteralPath $oldShortcut -Force
+        Remove-Item -LiteralPath $shortcut.FullName -Force
     }
 }

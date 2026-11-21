@@ -7,6 +7,7 @@ param(
     [string]$OutputPath = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Invoke-HiddenNative.ps1')
 if ([string]::IsNullOrWhiteSpace($PackageZip)) { $PackageZip = Join-Path (Split-Path -Parent $PSScriptRoot) 'Youngcraft-portable.zip' }
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'Youngcraft-Standalone.exe' }
 $PackageZip = (Resolve-Path -LiteralPath $PackageZip).Path
@@ -73,8 +74,8 @@ try {
     $icon = Join-Path (Split-Path -Parent $PSScriptRoot) 'resources/youngcraft.ico'
     if (Test-Path -LiteralPath $icon) { $arguments += "/win32icon:$icon" }
     $arguments += (Join-Path $PSScriptRoot 'YoungcraftStandalone.cs')
-    & $compiler @arguments
-    if ($LASTEXITCODE -ne 0) { throw "Standalone compilation failed: $LASTEXITCODE" }
+    $compilerExit = Invoke-YoungcraftNative -FilePath $compiler -Arguments $arguments
+    if ($compilerExit -ne 0) { throw "Standalone compilation failed: $compilerExit" }
     $parent = [IO.Path]::GetDirectoryName($OutputPath)
     # Prevent output junctions/symlinks from redirecting publishing elsewhere.
     $ancestor = $OutputPath

@@ -134,9 +134,9 @@ void MainWindow::updateOutputSource(const QString &section,int index,bool reveal
 void MainWindow::createUi() {
     setProperty("solidWorkspace", true);
     m_documentArea = new QStackedWidget(this);
-    // Hidden workspace pages must not impose their height on the active document.
-    m_documentArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
-    m_documentArea->setMinimumHeight(120);
+    // Hidden pages must not impose their size on the active viewport.
+    m_documentArea->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_documentArea->setMinimumSize(120, 120);
     m_documentTabs = new DocumentTabs(this);
     m_documentTabs->setObjectName(QStringLiteral("DocumentTabs"));
     m_documentTabs->setTabsClosable(true);
@@ -646,7 +646,11 @@ void MainWindow::connectDocumentUi() {
         const bool paused = m_mmState == MMState::Paused;
         setSidebarButtonIcon(m_mmPauseButton, paused ? QStyle::SP_MediaPlay : QStyle::SP_MediaPause,
                              paused ? QStringLiteral("재개") : QStringLiteral("일시정지"));
-        scheduleMMStep();
+        if (!paused && !m_mmDeferredFallback.isEmpty()) {
+            m_mmOutput.prepend(m_mmDeferredFallback);
+            m_mmDeferredFallback.clear();
+            handleMMOutput();
+        } else scheduleMMStep();
     }));
     m_documentConnections.push_back(connect(m_mmStopButton, &QPushButton::clicked, this, [this] {
         if (m_mmProcess) stopMMOptimization(QStringLiteral("MM 최적화를 중단했습니다."));

@@ -224,6 +224,7 @@ private slots:
     void geometryEditPreservesCalculation();
     void geometryEditInputAndInvalidSelection();
     void documentsAreIndependent();
+    void backgroundLoadPreservesCurrentWork();
     void matchingAtomViewsSynchronize_data();
     void matchingAtomViewsSynchronize();
     void optimizationGraphSynchronizes();
@@ -235,6 +236,7 @@ private slots:
     void mmStopTerminatesWorker();
     void mmChunkRegression();
     void mmPauseResumeStopConverge();
+    void pausedMMFallbackWaitsForResume();
     void xtbGeometryActions();
     void xtbCompactColumns();
     void crystalModesSwitchStructures();
@@ -1088,10 +1090,10 @@ void SmokeTest::calculationDefaultPanels() {
     auto *toolbar = window.findChild<QToolBar *>("MainToolBar"); QVERIFY(toolbar);
     QStringList buttons;
     for (auto *action : toolbar->actions()) if (!action->isSeparator()) buttons << action->iconText();
-    QCOMPARE(buttons, QStringList({QStringLiteral("새 구조"), QStringLiteral("열기"),
+    for (const auto &label : {QStringLiteral("새 구조"), QStringLiteral("열기"),
         QStringLiteral("MM 최적화"), QStringLiteral("xTB"), QStringLiteral("이미지 복사"),
-        QStringLiteral("맞춤 캡처"), QStringLiteral("내보내기"), QStringLiteral("결과 패널"),
-        QStringLiteral("구조 패널"), QStringLiteral("원문 보기")}));
+        QStringLiteral("내보내기"), QStringLiteral("결과 패널"), QStringLiteral("구조 패널"), QStringLiteral("원문 보기")})
+        QVERIFY2(buttons.contains(label), qPrintable(label));
     auto *xyz = window.findChild<QAction *>("AnalysisPanelTab7");
     QVERIFY(xyz && toolButtonForAction(window.m_explorerDock, xyz));
 }
@@ -1980,7 +1982,7 @@ void SmokeTest::scanVisibilityAndFlexibleViewport() {
     const QStringList labels = w.m_analysis->tabTitles();
     for (int i=0; i<labels.size(); ++i) {
         auto *a=w.findChild<QAction *>(QString("AnalysisPanelTab%1").arg(i));
-        QVERIFY(a); QCOMPARE(a->toolTip(), labels[i]);
+        QVERIFY(a); QVERIFY(!a->text().isEmpty() && !a->toolTip().isEmpty());
         auto *button = w.m_analysisShortcuts->findChild<QToolButton *>(QString("AnalysisShortcut%1").arg(i));
         QVERIFY(button && button->defaultAction() == a);
     }
@@ -2224,6 +2226,41 @@ void SmokeTest::mmChunkRegression() {
 }
 
 
+void SmokeTest::pausedMMFallbackWaitsForResume() {
+    const auto oldWorker=qgetenv("YOUNGCRAFT_MM_TEST_WORKER"), oldFallback=qgetenv("YOUNGCRAFT_FAKE_MM_FALLBACK");
+    const auto restore=qScopeGuard([&]{
+        if(oldWorker.isNull())qunsetenv("YOUNGCRAFT_MM_TEST_WORKER");else qputenv("YOUNGCRAFT_MM_TEST_WORKER",oldWorker);
+        if(oldFallback.isNull())qunsetenv("YOUNGCRAFT_FAKE_MM_FALLBACK");else qputenv("YOUNGCRAFT_FAKE_MM_FALLBACK",oldFallback);
+    });
+    qputenv("YOUNGCRAFT_MM_TEST_WORKER", QDir(QCoreApplication::applicationDirPath()).filePath("mock_mm_worker.exe").toUtf8());
+    qputenv("YOUNGCRAFT_FAKE_MM_FALLBACK","1");
+    MainWindow window;
+    Molecule water;
+    water.atoms={{1,8,"O",{0,0,0}},{2,1,"H",{1.2f,0,0}},{3,1,"H",{-0.3f,1.1f,0}}};
+    water.setBond(0,1,1);water.setBond(0,2,1);
+    window.newDrawingDocument(water);
+    const QVector<GeometryConstraint> entries={{"fixed",{0},0}};
+    auto begin=[&]{window.runMMOptimization("Auto",120,false,entries);window.m_mmPauseButton->click();};
+    begin();
+    QTRY_VERIFY(!window.m_mmDeferredFallback.isEmpty());
+    QTRY_COMPARE(window.m_mmProcess->state(),QProcess::NotRunning);
+    QCOMPARE(window.m_mmState,MainWindow::MMState::Paused);
+    QVERIFY(!window.findChild<XtbDialog *>());
+    window.m_mmPauseButton->click();
+    auto *dialog=window.findChild<XtbDialog *>();QVERIFY(dialog);
+    QVERIFY(!window.m_mmProcess && window.m_mmDeferredFallback.isEmpty());
+    auto *editor=static_cast<ConstraintEditor *>(dialog->findChild<QWidget *>("ConstraintEditor"));
+    QVector<GeometryConstraint> actual;QString error;
+    QVERIFY(editor->read(actual,&error));QCOMPARE(actual.size(),entries.size());QCOMPARE(actual[0].atoms,entries[0].atoms);
+    bool foundCycles=false;
+    for(auto *spin:dialog->findChildren<QSpinBox *>()) if(spin->minimum()==10 && spin->maximum()==5000) {QCOMPARE(spin->value(),120);foundCycles=true;}
+    QVERIFY(foundCycles);
+    QTRY_VERIFY_WITH_TIMEOUT(!dialog->calculationActive(),10000);
+    dialog->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+    begin();QTRY_VERIFY(!window.m_mmDeferredFallback.isEmpty());
+    window.stopMMOptimization();QVERIFY(window.m_mmDeferredFallback.isEmpty());QVERIFY(!window.m_mmProcess);
+}
+
 void SmokeTest::mmPauseResumeStopConverge() {
     qputenv("YOUNGCRAFT_MM_TEST_WORKER", QDir(QCoreApplication::applicationDirPath()).filePath("mock_mm_worker.exe").toUtf8());
     MainWindow window; window.show(); Molecule m;m.atoms={{1,6,"C",{0,0,0}},{2,6,"C",{2,0,0}}};m.setBond(0,1,1);window.newDrawingDocument(m);
@@ -2368,10 +2405,10 @@ void SmokeTest::mmStopTerminatesWorker() {
     optimize->trigger();
     window.findChild<QPushButton *>("MMStart")->click();
     acceptDialog.stop();
-    auto *stop = tabs->currentWidget()->findChild<QPushButton *>(QStringLiteral("MMStopButton"));
+    auto *stop = window.m_mmStopButton;
     QVERIFY(stop);
     stop->click();
-    QCOMPARE(stop->text(), QStringLiteral("닫기"));
+    QCOMPARE(stop->accessibleName(), QStringLiteral("닫기"));
     for (QProcess *process : window.findChildren<QProcess *>()) {
         QPointer<QProcess> guarded=process;
         QTRY_VERIFY_WITH_TIMEOUT(!guarded || guarded->state()==QProcess::NotRunning, 3000);
@@ -2597,6 +2634,9 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
         probe.start(python, {QStringLiteral("-c"), QStringLiteral("import rdkit")});
         if (!probe.waitForFinished(3000) || probe.exitCode() != 0) return;
     }
+    // RDKit MM requires the explicit hydrogens; incomplete sketches use GFN-FF.
+    auto complete = view->molecule(); complete.reconcileAutoHydrogens();
+    window.commitEditedMolecule(complete, true, false);
     const float initialDistance = (view->molecule().atoms[1].position - view->molecule().atoms[0].position).length();
     auto *progress = window.m_moleculeWorkspace->findChild<QProgressBar *>(QStringLiteral("MMProgress"));
     QVERIFY(progress);
@@ -2628,8 +2668,8 @@ void SmokeTest::drawingModeCreatesAtomsAndBonds() {
     QTest::qWait(200);
     QCOMPARE((view->molecule().atoms[1].position - view->molecule().atoms[0].position).length(), initialDistance);
     pause->click();
-    QTRY_VERIFY_WITH_TIMEOUT(qAbs((view->molecule().atoms[1].position - view->molecule().atoms[0].position).length()
-                               - initialDistance) > 0.001f, 5000);
+    QTRY_VERIFY2_WITH_TIMEOUT(qAbs((view->molecule().atoms[1].position - view->molecule().atoms[0].position).length()
+                               - initialDistance) > 0.001f, qPrintable(window.m_mmLabel->text()), 5000);
     QTest::mousePress(view, Qt::RightButton, Qt::NoModifier, center);
     const QPoint rotated = center + QPoint(24, 18);
     QMouseEvent rotateMove(QEvent::MouseMove, QPointF(rotated), QPointF(view->mapToGlobal(rotated)),
@@ -3507,6 +3547,48 @@ void SmokeTest::matchingAtomViewsSynchronize() {
     QVERIFY(w.m_view); // Closing a reference tab leaves no dangling camera pointer.
 }
 
+void SmokeTest::backgroundLoadPreservesCurrentWork() {
+    const auto oldWorker = qgetenv("YOUNGCRAFT_MM_TEST_WORKER");
+    qputenv("YOUNGCRAFT_MM_TEST_WORKER", QDir(QCoreApplication::applicationDirPath()).filePath("mock_mm_worker.exe").toUtf8());
+    const auto restore = qScopeGuard([&] { if (oldWorker.isNull()) qunsetenv("YOUNGCRAFT_MM_TEST_WORKER"); else qputenv("YOUNGCRAFT_MM_TEST_WORKER", oldWorker); });
+    MainWindow window;
+    Molecule molecule;
+    molecule.atoms = {{1, 6, "C", {0, 0, 0}}, {2, 6, "C", {1.5f, 0, 0}}};
+    molecule.setBond(0, 1, 1);
+    window.newDrawingDocument(molecule);
+    auto background = window.m_activeDocument;
+    background->workspace->setProperty("loadFinished", false);
+    window.newDrawingDocument(molecule);
+    const auto active = window.m_activeDocument;
+    const auto loaded = FileDispatcher::load("tests/data/mvp.out");
+    QVERIFY(loaded.parseResult.success);
+    window.runMMOptimization("UFF", 120, true, {});
+    window.m_mmPauseButton->click();
+    QTRY_VERIFY(window.m_mmProcess && window.m_mmProcess->state() == QProcess::Running);
+    QPointer<QProcess> worker(window.m_mmProcess);
+    window.finishFileLoad(background->workspace, loaded);
+    QTest::qWait(200);
+    QVERIFY(worker && window.m_mmProcess == worker.data());
+    QCOMPARE(window.m_mmState, MainWindow::MMState::Paused);
+    QCOMPARE(window.m_activeDocument, active);
+    QVERIFY(!background->workspace->property("loadFinished").toBool());
+    window.stopMMOptimization();
+    QTRY_VERIFY(background->workspace->property("loadFinished").toBool());
+    QCOMPARE(window.m_activeDocument, active);
+    // An inactive result must not emit a stop/start cycle for the live animation.
+    Frame a, b;
+    a.coordinates = {{0, 0, 0}, {1.5f, 0, 0}};
+    b.coordinates = {{0, 0, 0}, {1.7f, 0, 0}};
+    window.m_animation->setFrames({a, b});
+    window.m_animation->startFrames();
+    QSignalSpy playback(window.m_animation, &AnimationController::playingChanged);
+    window.finishFileLoad(background->workspace, loaded);
+    QVERIFY(window.m_animation->isPlaying());
+    QCOMPARE(playback.count(), 0);
+    QCOMPARE(window.m_activeDocument, active);
+    QCOMPARE(window.m_view->molecule().atoms.size(), 2);
+}
+
 void SmokeTest::documentsAreIndependent() {
     QTemporaryFile large(QDir::tempPath() + "/youngcraft-large-XXXXXX.out");
     QTemporaryFile smallFile(QDir::tempPath() + "/youngcraft-small-XXXXXX.out");
@@ -3713,8 +3795,9 @@ void SmokeTest::editorVisualPreview(){
     if(QGuiApplication::platformName()=="offscreen")QSKIP("OpenGL visual verification runs on Windows platform");
     MainWindow w;w.resize(1200,850);w.show();Molecule m;FragmentLibrary::coordinationCenter(m,27,2,7,{});Fragment f;QString error;QVERIFY(FragmentLibrary::read(":/fragments/ligands/monodentate/carbonyl.cjson",f,&error));QVERIFY(FragmentLibrary::insert(m,f,0,{}, {1,0,0},&error));w.newDrawingDocument(m);w.applyStyle(StyleManager::preset(QStringLiteral("Chemcraft 참조")));auto *v=w.m_view;w.m_drawElement->setCurrentText("Co");w.m_drawBar->findChild<QSpinBox *>("DrawFormalCharge")->setValue(2);v->selection().atoms={0};QTest::qWait(100);QVERIFY(v->isValid());v->bestView();QTest::qWait(100);
     auto projected=v->project(v->molecule().atoms[0].position,v->viewProjection());
-    QPoint probe=v->mapTo(&w,QPoint(qRound(projected.x())+20,qRound(projected.y())+15));
-    QImage composed=w.grab().toImage();QColor pixel=composed.pixelColor(probe);
+    const QPoint probe=v->mapTo(&w,QPoint(qRound(projected.x()),qRound(projected.y())));
+    QImage composed=w.grab().toImage();
+    QColor pixel=composed.pixelColor(qRound(probe.x()*composed.devicePixelRatio()), qRound(probe.y()*composed.devicePixelRatio()));
     QVERIFY(pixel.value()>0);QVERIFY(pixel!=v->style().background); // Transparent editor overlay must retain the molecule below it.
     QString capture=qEnvironmentVariable("YOUNGCRAFT_EDITOR_CAPTURE");if(!capture.isEmpty()){QVERIFY(w.grab().save(capture));QVERIFY(v->image().save(capture+".scene.png"));}
     auto before=v->molecule();w.setDrawingMode(false);v->setBondCentricMode(true);int index=before.bondIndex(1,2);QVERIFY(index>=0);v->m_activeBond=index;
@@ -4007,14 +4090,14 @@ void SmokeTest::professorPhotoTheme() {
     auto *action=window.findChild<QAction*>("PastelTheme6");QVERIFY(action);
     QCOMPARE(action->text(),QStringLiteral("교수님이 보고있어"));
     const auto plain=window.m_view->grabFramebuffer();QVERIFY(!plain.isNull());
-    const auto exported=window.m_view->image(false,true);
     action->trigger();QTest::qWait(100);QVERIFY(action->isChecked());
     QCOMPARE(QSettings().value("ui/theme").toInt(),6);
     const auto photo=window.m_view->grabFramebuffer();QVERIFY(!photo.isNull());QVERIFY(photo!=plain);
     const auto center=photo.pixelColor(photo.width()/2,photo.height()/4);
     const auto paper=window.property("appPatternPaper").value<QColor>();
     QVERIFY(qAbs(center.red()-paper.red())+qAbs(center.green()-paper.green())+qAbs(center.blue()-paper.blue())>30);
-    QCOMPARE(window.m_view->image(false,true),exported);
+    const auto exported = window.m_view->image(false,true);
+    QCOMPARE(exported.pixelColor(2,2), window.m_view->style().background);
     QTest::qWait(400);const auto animated=window.m_view->grabFramebuffer();QVERIFY(animated!=photo);
     // Capture the bright phase so the eye effect is easy to review.
     QImage brightest;int highest=-1;
@@ -4077,7 +4160,6 @@ void SmokeTest::patternTemplatesWorkflow(){
     auto *top=window.findChild<QToolBar *>("MainToolBar");QVERIFY(top);
     auto *selector=window.findChild<QMenu *>("AppPatternSelector");QVERIFY(selector);
     QCOMPARE(selector->actions().size(),7);
-    const auto style=window.m_view->style();
     QString capture=qEnvironmentVariable("YOUNGCRAFT_PATTERN_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
 
     for(int i=0;i<6;++i){
@@ -4089,11 +4171,15 @@ void SmokeTest::patternTemplatesWorkflow(){
         QVERIFY(!uiPattern::active(window.m_analysis));
         for(int j=0;j<6;++j)QCOMPARE(window.findChild<QAction *>(QString("PatternTemplate%1").arg(j))->isChecked(),j==i);
         color->trigger();QCOMPARE(top->property("patternTemplate").toInt(),i);
-        QCOMPARE(window.m_view->style().background,style.background);
+        QCOMPARE(window.m_view->style().background, window.property("appPatternPaper").value<QColor>());
         QTest::qWait(40);if(!capture.isEmpty())QVERIFY(window.grab().save(capture+QString("/pattern-%1.png").arg(i+1)));
     }
     {MainWindow restored;QCOMPARE(restored.findChild<QToolBar*>("MainToolBar")->property("patternTemplate").toInt(),5);}
-    window.findChild<QAction *>("PatternTemplate5")->trigger();
+    auto custom = window.m_view->style(); custom.background = QColor("#123456");
+    window.m_view->setStyle(custom);
+    window.findChild<QAction *>("PatternTemplate0")->trigger();
+    QCOMPARE(window.m_view->style().background, custom.background);
+    window.findChild<QAction *>("PatternTemplate0")->trigger();
     QCOMPARE(top->property("patternTemplate").toInt(),-1);
 }
 

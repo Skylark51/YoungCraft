@@ -80,10 +80,10 @@ std::shared_ptr<MainWindow::DocumentSession> MainWindow::captureDocument() {
     return document;
 }
 
-void MainWindow::saveDocumentState() {
+void MainWindow::saveDocumentState(bool suspendWork) {
     if (!m_activeDocument) return;
-    stopMMOptimization();
-    if(m_mmBar && m_mmBar->parentWidget()!=m_moleculeWorkspace){m_mmBar->hide();m_mmBar->setParent(m_moleculeWorkspace);}
+    if (suspendWork) stopMMOptimization();
+    if(suspendWork && m_mmBar && m_mmBar->parentWidget()!=m_moleculeWorkspace){m_mmBar->hide();m_mmBar->setParent(m_moleculeWorkspace);}
     auto &d = *m_activeDocument;
     d.data = m_data; d.frame = m_currentFrame; d.frequency = m_currentFrequency;
     m_style = m_view->style();
@@ -95,7 +95,7 @@ void MainWindow::saveDocumentState() {
     d.undoMolecules = m_undoMolecules; d.redoMolecules = m_redoMolecules;
     d.firstBondAtom = m_firstBondAtom; d.status = m_statusLabel->text();
     d.resumeAnimation = m_animation->isPlaying();
-    m_animation->stop();
+    if (suspendWork) m_animation->stop();
 }
 
 void MainWindow::bindDocument(const std::shared_ptr<DocumentSession> &document) {
@@ -327,28 +327,44 @@ void MainWindow::openFile(const QString &path) {
     connect(thread, &QThread::started, worker, &ParseWorker::run);
     const QPointer<QWidget> identity(document->workspace);
     connect(worker, &ParseWorker::finished, this, [this, identity](const LoadedFile &loaded) {
-        if (!identity || !m_documents.contains(identity.data())) return;
-        const auto target = m_documents.value(identity.data());
-        const auto previous = m_activeDocument;
-        saveDocumentState();
-        bindDocument(target);
-        target->cube = loaded.cube;
-        onFileLoaded(loaded);
-        target->workspace->setProperty("loadFinished", true);
-        target->workspace->setProperty("loadSuccess", loaded.parseResult.success);
-        if (target->openDetailedAnalysisOnLoad) {
-            target->openDetailedAnalysisOnLoad = false;
-            if (loaded.parseResult.success) showDetailedAnalysis();
-        }
-        saveDocumentState();
-        bindDocument(previous);
-        activateDocument(m_documentTabs->currentIndex());
-        emit documentLoaded(target->path, loaded.parseResult.success);
+        if (identity) finishFileLoad(identity.data(), loaded);
     }, Qt::QueuedConnection);
     connect(worker, &ParseWorker::finished, thread, &QThread::quit, Qt::DirectConnection);
     connect(worker, &ParseWorker::finished, worker, &QObject::deleteLater);
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();
+}
+
+void MainWindow::finishFileLoad(QWidget *identity, const LoadedFile &loaded) {
+    if (!identity || !m_documents.contains(identity)) return;
+    const auto target = m_documents.value(identity);
+    // A background file must never terminate the current document's MM worker.
+    // Its result can be applied once the user switches tabs or the worker finishes.
+    if (target != m_activeDocument && m_mmProcess) {
+        const QPointer<QWidget> guarded(identity);
+        QTimer::singleShot(100, this, [this, guarded, loaded] {
+            if (guarded) finishFileLoad(guarded.data(), loaded);
+        });
+        return;
+    }
+    const auto previous = m_activeDocument;
+    const bool background = previous != target;
+    saveDocumentState(false);
+    bindDocument(target);
+    target->cube = loaded.cube;
+    if (background && !loaded.parseResult.success)
+        setStatus(QStringLiteral("파일 열기 실패: %1").arg(loaded.parseResult.error), 0);
+    else onFileLoaded(loaded);
+    target->workspace->setProperty("loadFinished", true);
+    target->workspace->setProperty("loadSuccess", loaded.parseResult.success);
+    if (target->openDetailedAnalysisOnLoad) {
+        target->openDetailedAnalysisOnLoad = false;
+        if (loaded.parseResult.success) showDetailedAnalysis();
+    }
+    saveDocumentState(false);
+    bindDocument(previous);
+    activateDocument(m_documentTabs->currentIndex());
+    emit documentLoaded(target->path, loaded.parseResult.success);
 }
 
 bool MainWindow::attachResultStructure(const QString &path) {

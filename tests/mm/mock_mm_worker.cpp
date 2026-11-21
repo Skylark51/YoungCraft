@@ -7,6 +7,9 @@
 int main(int argc,char **argv) {
  QCoreApplication app(argc,argv); std::string line;std::getline(std::cin,line);
  auto input=QJsonDocument::fromJson(QByteArray::fromStdString(line)).object();
+ if(qEnvironmentVariableIntValue("YOUNGCRAFT_FAKE_MM_FALLBACK")) {
+  std::cout<<"{\"type\":\"fallback\",\"method\":\"GFN-FF\",\"message\":\"fixture fallback\"}"<<std::endl;return 0;
+ }
  int maximum=input["max_iterations"].toInt(),step=0;
  QJsonObject out{{"type","ready"},{"field","UFF"},{"iteration",0},{"energy",100.0},{"rms_gradient",1.0},{"max_gradient",2.0}};
  auto send=[&]{std::cout<<QJsonDocument(out).toJson(QJsonDocument::Compact).constData()<<std::endl;};send();

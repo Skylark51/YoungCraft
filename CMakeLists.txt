@@ -115,13 +115,15 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_RUNTIME_DLLS:${_target}> $<TARGET_FILE_DIR:${_target}>
             COMMAND_EXPAND_LISTS VERBATIM)
-        if(TARGET Qt6::QGifPlugin)
+        foreach(_image_plugin QGifPlugin QJpegPlugin QICOPlugin)
+        if(TARGET Qt6::${_image_plugin})
             add_custom_command(TARGET ${_target} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${_target}>/imageformats"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:Qt6::QGifPlugin>" "$<TARGET_FILE_DIR:${_target}>/imageformats"
+                    "$<TARGET_FILE:Qt6::${_image_plugin}>" "$<TARGET_FILE_DIR:${_target}>/imageformats"
                 VERBATIM)
         endif()
+        endforeach()
         foreach(_plugin QWindowsIntegrationPlugin QOffscreenIntegrationPlugin)
             if(TARGET Qt6::${_plugin})
                 add_custom_command(TARGET ${_target} POST_BUILD

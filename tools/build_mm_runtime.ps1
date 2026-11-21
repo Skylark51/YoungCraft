@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Invoke-HiddenNative.ps1')
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $ProjectRoot 'build-mm-runtime'
@@ -16,8 +17,8 @@ $projectPrefix = [IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\') + '\'
 if (-not $OutputDir.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "MM runtime 출력 경로는 프로젝트 내부여야 합니다: $OutputDir"
 }
-& $Python -c 'import rdkit, PyInstaller'
-if ($LASTEXITCODE -ne 0) { throw 'MM runtime 빌드에는 Python, RDKit, PyInstaller가 필요합니다.' }
+$probeExit = Invoke-YoungcraftNative -FilePath $Python -Arguments @('-c', 'import rdkit, PyInstaller')
+if ($probeExit -ne 0) { throw 'MM runtime 빌드에는 Python, RDKit, PyInstaller가 필요합니다.' }
 
 # The worker only constructs molecules and minimizes force fields. RDKit's
 # notebook detection and optional database support otherwise pull in GUI/image
@@ -48,15 +49,12 @@ if (Test-Path -LiteralPath $runtimeDir) {
 }
 # rdForceFieldHelpers imports these Python bindings from native code, so static
 # import analysis cannot discover them after removing AllChem.
-& $Python -m PyInstaller --noconfirm --clean --onedir --console `
-    --name YoungcraftMM `
-    --hidden-import rdkit.ForceField `
-    --distpath $OutputDir `
-    --workpath (Join-Path $OutputDir 'work') `
-    --specpath $OutputDir `
-    @exclusionArgs `
-    (Join-Path $ProjectRoot 'tools/mm_optimize.py')
-if ($LASTEXITCODE -ne 0) { throw "PyInstaller MM runtime 빌드 실패: $LASTEXITCODE" }
+$builderArgs = @('-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--console',
+    '--name', 'YoungcraftMM', '--hidden-import', 'rdkit.ForceField', '--distpath', $OutputDir,
+    '--workpath', (Join-Path $OutputDir 'work'), '--specpath', $OutputDir) + $exclusionArgs +
+    @((Join-Path $ProjectRoot 'tools/mm_optimize.py'))
+$builderExit = Invoke-YoungcraftNative -FilePath $Python -Arguments $builderArgs
+if ($builderExit -ne 0) { throw "PyInstaller MM runtime 빌드 실패: $builderExit" }
 $worker = Join-Path $OutputDir 'YoungcraftMM/YoungcraftMM.exe'
 if (-not (Test-Path -LiteralPath $worker)) { throw "MM worker가 없습니다: $worker" }
 Write-Output $worker
