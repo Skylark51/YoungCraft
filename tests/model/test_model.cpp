@@ -17,6 +17,8 @@
 #include <QTemporaryDir>
 #include <QtTest>
 #include <cmath>
+#include <random>
+#include <limits>
 
 using namespace youngcraft;
 
@@ -25,6 +27,8 @@ class ModelTest final : public QObject {
 private slots:
     void reactionCapturePathsAlignmentAndPanels();
     void infersBondsAndElements();
+    void spatialBondsMatchPairwiseReference();
+    void largeStructureBondSearch();
     void buildsPositiveAndNegativeIsosurfaces();
     void parsesCubeAndSharesGrid();
     void writesAnimatedGif();
@@ -138,6 +142,92 @@ void ModelTest::editsInternalCoordinates() {
     Molecule t2=chain();QVERIFY(GeometryEditor::setDihedral(t2,0,1,2,3,-110.0,GeometryMoveMode::BothSides));QVERIFY(periodic(GeometryEditor::dihedralDegrees(t2,0,1,2,3),-110.0)<1e-3);
     Molecule wrap=chain();QVERIFY(GeometryEditor::setDihedral(wrap,0,1,2,3,179.0,GeometryMoveMode::OneSide));QVERIFY(GeometryEditor::setDihedral(wrap,0,1,2,3,-179.0,GeometryMoveMode::OneSide));QVERIFY(periodic(GeometryEditor::dihedralDegrees(wrap,0,1,2,3),-179.0)<1e-3);
     Molecule ring=chain();ring.setBond(0,3,1);QVERIFY(GeometryEditor::setDistance(ring,0,1,1.3,GeometryMoveMode::BothSides,&warning));QVERIFY(!warning.isEmpty());for(const Atom&atom:ring.atoms){QVERIFY(std::isfinite(atom.position.x()));QVERIFY(std::isfinite(atom.position.y()));QVERIFY(std::isfinite(atom.position.z()));}
+}
+
+
+namespace {
+QVector<Bond> pairwiseBonds(Molecule molecule, double scale, bool hydrogen, bool metal, bool preserve) {
+        const auto previous = molecule.bonds;
+        molecule.bonds.clear();
+        for (int i = 0; i < molecule.atoms.size(); ++i) for (int j = i + 1; j < molecule.atoms.size(); ++j) {
+            const auto &a = molecule.atoms[i], &b = molecule.atoms[j];
+            if (!a.visible || !b.visible || (!hydrogen && (a.atomicNumber == 1 || b.atomicNumber == 1))) continue;
+            const bool coordination = isMetal(a.atomicNumber) || isMetal(b.atomicNumber);
+            if (coordination && !metal) continue;
+            const double distance = (a.position - b.position).length();
+            if (!(distance > 0.15 && distance <= (covalentRadius(a.atomicNumber) + covalentRadius(b.atomicNumber)) * scale)) continue;
+            Bond bond{i, j, 1, coordination, coordination ? BondStyle::Dashed : BondStyle::Solid, false};
+            if (preserve) for (const auto &old : previous)
+                if (old.manual && ((old.first == i && old.second == j) || (old.first == j && old.second == i))) { bond = old; break; }
+            molecule.bonds.push_back(bond);
+        }
+        if (preserve) for (const auto &old : previous)
+            if (old.manual && old.first >= 0 && old.second >= 0 && old.first < molecule.atoms.size() &&
+                old.second < molecule.atoms.size() && molecule.bondIndex(old.first, old.second) < 0) molecule.bonds.push_back(old);
+        return molecule.bonds;
+}
+}
+
+void ModelTest::spatialBondsMatchPairwiseReference() {
+    Molecule input;
+    std::mt19937 random(20261121);
+    std::uniform_real_distribution<float> coordinate(-18, 18);
+    const int elements[] = {1, 6, 7, 8, 26, 53, 19, 118};
+    for (int i = 0; i < 650; ++i) {
+        Atom atom{i + 1, elements[i % 8], elementSymbol(elements[i % 8]),
+                  {coordinate(random), coordinate(random), coordinate(random)}};
+        atom.visible = i % 17 != 0;
+        input.atoms.push_back(atom);
+    }
+    // Exact/barely-inside/outside cutoffs, coincident atoms, negative cell edges.
+    for (int i = 0; i < 10; ++i) {
+        input.atoms[i].atomicNumber = 6;
+        input.atoms[i].visible = true;
+        input.atoms[i].position = {float(i / 2) * 5 - 10, i % 2 ? 1.9f : 0, 0};
+    }
+    input.setBond(0, 1, 2.0);
+    input.setBond(2, 649, 3.0);
+    input.setBond(17, 18, 1.5, true, BondStyle::Dashed, true);
+    for (double scale : {0.0, -1.0, 0.001, 1.0, 1.25, 2.5,
+                         std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
+        for (bool hydrogen : {false, true}) for (bool metal : {false, true}) for (bool preserve : {false, true}) {
+            auto actual = input;
+            actual.rebuildBonds(scale, hydrogen, metal, preserve);
+            const auto expected = pairwiseBonds(input, scale, hydrogen, metal, preserve);
+            QCOMPARE(actual.bonds.size(), expected.size());
+            for (int i = 0; i < expected.size(); ++i) {
+                QCOMPARE(actual.bonds[i].first, expected[i].first);
+                QCOMPARE(actual.bonds[i].second, expected[i].second);
+                QCOMPARE(actual.bonds[i].order, expected[i].order);
+                QCOMPARE(actual.bonds[i].coordination, expected[i].coordination);
+                QCOMPARE(actual.bonds[i].style, expected[i].style);
+                QCOMPARE(actual.bonds[i].manual, expected[i].manual);
+            }
+        }
+    input.atoms.last().position.setX(std::numeric_limits<float>::infinity());
+    auto actual = input;
+    actual.rebuildBonds();
+    QCOMPARE(actual.bonds.size(), pairwiseBonds(input, 1.25, true, true, true).size());
+}
+
+void ModelTest::largeStructureBondSearch() {
+    Molecule molecule;
+    constexpr int count = 12000;
+    for (int i = 0; i < count; ++i)
+        molecule.atoms.push_back({i + 1, 6, QStringLiteral("C"), {float(i) * 1.5f, 0, 0}});
+    QElapsedTimer timer;
+    timer.start();
+    const auto reference = pairwiseBonds(molecule, 1.25, true, true, false);
+    const auto pairwiseMs = timer.elapsed();
+    timer.restart();
+    molecule.rebuildBonds(1.25, true, true, false);
+    qInfo() << "12,000-atom bond search (ms), pairwise / spatial:" << pairwiseMs << timer.elapsed();
+    QCOMPARE(molecule.bonds.size(), reference.size());
+    QCOMPARE(molecule.bonds.size(), count - 1);
+    for (int i = 0; i < count - 1; ++i) {
+        QCOMPARE(molecule.bonds[i].first, i);
+        QCOMPARE(molecule.bonds[i].second, i + 1);
+    }
 }
 
 void ModelTest::infersBondsAndElements() {

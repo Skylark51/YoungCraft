@@ -90,12 +90,15 @@ internal static class YoungcraftStandalone
             using (FileStream gate = AcquireLock(lockPath))
             {
                 CheckPath(cache);
+                bool extracted = false;
                 if (!Directory.Exists(cache))
                 {
                     if (verifyOnly) throw new IOException("The payload has not been extracted: " + cache);
                     Extract(root, cache, payloadHash, manifestBytes, records);
+                    extracted = true;
                 }
-                VerifyCache(cache, manifestHash, records, false);
+                // Extract already checks every pristine file before publishing the cache.
+                if (!extracted) VerifyCache(cache, manifestHash, records, false);
                 // Verification alone never migrates data or updates version metadata.
                 if (!verifyOnly) MigrateCustomizations(root, cache, payloadHash, manifestHash, records);
             }
@@ -134,7 +137,9 @@ internal static class YoungcraftStandalone
     }
     private static string HashStream(Stream stream)
     {
-        using (SHA256 sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+        // Use Windows CNG rather than the Framework default managed SHA256.
+        // Every byte is still checked on every launch, including warm caches.
+        using (SHA256 sha = new SHA256Cng()) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
     }
     private static string HashBytes(byte[] bytes)
     {
@@ -143,7 +148,8 @@ internal static class YoungcraftStandalone
     private static string HashFile(string path)
     {
         CheckPath(path);
-        using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read)) return HashStream(stream);
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                          128 * 1024, FileOptions.SequentialScan)) return HashStream(stream);
     }
     private static void RequireHash(string hash)
     {

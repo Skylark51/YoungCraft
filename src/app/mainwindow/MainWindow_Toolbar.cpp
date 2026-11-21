@@ -615,12 +615,14 @@ void MainWindow::createToolBar() {
     patternGroup->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
     const QStringList names={QStringLiteral("달빛 몽환"),QStringLiteral("랩 모눈"),QStringLiteral("트윌 사선"),QStringLiteral("소다 물결"),QStringLiteral("보태니컬 잎"),QStringLiteral("molecule 격자")};
     const QStringList motifDescriptions={QStringLiteral("초승달 · 별빛 · 옅은 빛무리가 떠 있는 꿈속의 하늘"),QStringLiteral("정갈한 실험실 그래프 종이"),QStringLiteral("비스듬히 짜인 가벼운 패브릭"),QStringLiteral("부드럽게 이어지는 잔물결"),QStringLiteral("식물 표본을 닮은 잎사귀"),QStringLiteral("육각 고리와 원자로 이어진 화학 문양")};
-    auto applyPattern = [toolbar, patternGroup, applyTheme](int index) {
+    auto applyPattern = [this, toolbar, patternGroup](int index) {
         index = qBound(-1, index, 5);
         for (auto *action : patternGroup->actions()) action->setChecked(action->data().toInt() == index);
         toolbar->setMotif(index);
         QSettings().setValue(QStringLiteral("ui/patternTemplate"), index);
-        applyTheme(QSettings().value(QStringLiteral("ui/theme"), 0).toInt());
+        // A motif change only affects dialog/startup paper, not molecular styles.
+        setProperty("appPattern", index);
+        uiPattern::synchronizeDialogs(this);
     };
     patternMenu->addAction(QStringLiteral("문양 없음"), this, [applyPattern] { applyPattern(-1); });
     for (int i = 0; i < names.size(); ++i) {
@@ -634,6 +636,7 @@ void MainWindow::createToolBar() {
     connect(patternGroup, &QActionGroup::triggered, this, [applyPattern](QAction *action) {
         applyPattern(action->isChecked() ? action->data().toInt() : -1);
     });
+    applyTheme(QSettings().value(QStringLiteral("ui/theme"), 0).toInt());
     applyPattern(QSettings().value(QStringLiteral("ui/patternTemplate"), -1).toInt());
     updatePanelActions();
 }

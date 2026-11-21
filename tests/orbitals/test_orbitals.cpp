@@ -32,7 +32,10 @@ static QByteArray cube(bool mo=false) {
 class OrbitalTest : public QObject {
     Q_OBJECT
 private slots:
-    void passwordHelperUsesPrivateIpc() {
+    void passwordHelperUsesPrivateIpc() { exercisePasswordHelper(false); }
+    void passwordHelperWithWindowsOpenSsh() { exercisePasswordHelper(true); }
+private:
+    void exercisePasswordHelper(bool nativeOpenSsh) {
         QLocalServer server;server.setSocketOptions(QLocalServer::UserAccessOption);
         const auto endpoint="Youngcraft-test-"+QUuid::createUuid().toString(QUuid::Id128);QVERIFY(server.listen(endpoint));
         const auto token=QUuid::createUuid().toString();
@@ -58,27 +61,38 @@ private slots:
         QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helper.readAllStandardError().isEmpty());
         QVERIFY(!received.contains("fixture-only-password"));
 #ifdef Q_OS_WIN
+        if (nativeOpenSsh) {
         // Exercise the actual Windows OpenSSH askpass launcher without using an account.
-        const auto keygen=QStandardPaths::findExecutable("ssh-keygen");QVERIFY(!keygen.isEmpty());
+        const auto keygen=QStandardPaths::findExecutable("ssh-keygen");
+        if (keygen.isEmpty()) QSKIP("Windows OpenSSH is not installed; private IPC is tested separately");
+        QProcess probe; probe.start(keygen, {"-?"}); probe.closeWriteChannel();
+        QVERIFY(probe.waitForFinished(10000));
+        if (probe.exitCode() == 255 && probe.readAllStandardOutput().isEmpty() && probe.readAllStandardError().isEmpty())
+            QSKIP("System ssh-keygen exits 255 without output even for -?; native OpenSSH integration unavailable on this PC");
         QTemporaryDir portable(QDir::tempPath()+QStringLiteral("/Youngcraft 한글 공백-XXXXXX"));QVERIFY(portable.isValid());
         QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",portable.filePath("YoungcraftSshAskpass.exe")));
-        const auto keyPath=portable.filePath("fixture-key");QProcess makeKey;
-        makeKey.start(keygen,{"-q","-t","ed25519","-N","fixture-only-password","-f",keyPath});
+        QProcess makeKey;
+        makeKey.setWorkingDirectory(portable.path());
+        makeKey.start(keygen,{"-q","-t","ed25519","-N","fixture-only-password","-f","fixture-key"});
         QVERIFY(makeKey.waitForFinished(10000));QCOMPARE(makeKey.exitCode(),0);
         auto sshEnv=env;sshEnv.insert("SSH_ASKPASS",".\\YoungcraftSshAskpass.exe");
         sshEnv.insert("SSH_ASKPASS_REQUIRE","force");sshEnv.insert("DISPLAY","Youngcraft");
         sshEnv.insert("PATH",QDir::toNativeSeparators(QCoreApplication::applicationDirPath())+';'+sshEnv.value("PATH"));
         received.clear();QProcess decrypt;decrypt.setWorkingDirectory(portable.path());decrypt.setProcessEnvironment(sshEnv);
-        decrypt.start(keygen,{"-y","-f",keyPath});decrypt.closeWriteChannel();
+        decrypt.start(keygen,{"-y","-f","fixture-key"});decrypt.closeWriteChannel();
         QTRY_VERIFY_WITH_TIMEOUT(decrypt.state()==QProcess::NotRunning,10000);
         QVERIFY2(decrypt.exitCode()==0,qPrintable(QString::fromUtf8(decrypt.readAllStandardError())));
         QVERIFY(decrypt.readAllStandardOutput().startsWith("ssh-ed25519 "));QCOMPARE(requests,2);
+        }
+#else
+        Q_UNUSED(nativeOpenSsh);
 #endif
         // Missing broker information must fail closed, with no credential output.
         env.remove("YOUNGCRAFT_SSH_TOKEN");helper.setProcessEnvironment(env);
         helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{});
         QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);QCOMPARE(helper.exitCode(),1);QVERIFY(helper.readAllStandardOutput().isEmpty());
     }
+private slots:
     void fchkOccupationsAndSpin() {
         QTemporaryDir dir;const auto path=dir.filePath("test.fchk");QVERIFY(write(path,fchk(true)));
         const auto r=FchkParser::parse(path);QVERIFY(r.success);QCOMPARE(r.data.orbitals.size(),6);

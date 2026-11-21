@@ -6,6 +6,8 @@
 #include <QtMath>
 
 #include <iterator>
+#include <algorithm>
+#include <limits>
 #include <cmath>
 
 namespace youngcraft {
@@ -159,48 +161,108 @@ bool isMetal(int atomicNumber) {
            (atomicNumber >= 57 && atomicNumber <= 80);
 }
 
+namespace {
+struct BondCell {
+    qint64 x, y, z;
+    bool operator==(const BondCell &) const = default;
+};
+size_t qHash(const BondCell &cell, size_t seed = 0) {
+    return qHashMulti(seed, cell.x, cell.y, cell.z);
+}
+quint64 bondKey(int a, int b) {
+    return (quint64(quint32(qMin(a, b))) << 32) | quint32(qMax(a, b));
+}
+}
+
 void inferBonds(Molecule &molecule, double cutoffScale, bool includeHydrogen,
                 bool includeMetalCoordination, bool preserveManual) {
     const QVector<Bond> previous = molecule.bonds;
     molecule.bonds.clear();
     const auto &atoms = molecule.atoms;
+    QVector<int> eligible;
+    QVector<double> radii(atoms.size());
+    QVector<bool> metals(atoms.size());
+    double largestRadius = 0;
     for (int i = 0; i < atoms.size(); ++i) {
-        if (!atoms[i].visible) {
-            continue;
+        radii[i] = covalentRadius(atoms[i].atomicNumber);
+        metals[i] = isMetal(atoms[i].atomicNumber);
+        if (atoms[i].visible && (includeHydrogen || atoms[i].atomicNumber != 1) &&
+            (includeMetalCoordination || !metals[i])) {
+            eligible.push_back(i);
+            largestRadius = qMax(largestRadius, radii[i]);
         }
-        for (int j = i + 1; j < atoms.size(); ++j) {
-            if (!atoms[j].visible || (!includeHydrogen &&
-                                      (atoms[i].atomicNumber == 1 || atoms[j].atomicNumber == 1))) {
-                continue;
-            }
-            const bool metalPair = isMetal(atoms[i].atomicNumber) || isMetal(atoms[j].atomicNumber);
-            if (metalPair && !includeMetalCoordination) {
-                continue;
-            }
-            const double cutoff = (covalentRadius(atoms[i].atomicNumber) +
-                                   covalentRadius(atoms[j].atomicNumber)) *
-                                  cutoffScale;
-            const double distance = (atoms[i].position - atoms[j].position).length();
-            if (distance > 0.15 && distance <= cutoff) {
-                Bond inferred{i, j, 1.0, metalPair, metalPair ? BondStyle::Dashed : BondStyle::Solid, false};
-                if (preserveManual) {
-                    for (const Bond &old : previous) {
-                        if (old.manual && ((old.first == i && old.second == j) ||
-                                           (old.first == j && old.second == i))) {
-                            inferred = old;
-                            break;
-                        }
-                    }
-                }
-                molecule.bonds.push_back(inferred);
-            }
+    }
+    QHash<quint64, Bond> manual;
+    if (preserveManual) for (const Bond &old : previous) {
+        const auto key = bondKey(old.first, old.second);
+        if (old.manual && !manual.contains(key)) manual.insert(key, old);
+    }
+    QSet<quint64> added;
+    auto appendPair = [&](int i, int j) {
+        const double cutoff = (radii[i] + radii[j]) * cutoffScale;
+        // Keep the original float-distance comparison, including cutoff boundaries.
+        const double distance = (atoms[i].position - atoms[j].position).length();
+        if (!(distance > 0.15 && distance <= cutoff)) return;
+        const bool metalPair = metals[i] || metals[j];
+        Bond inferred{i, j, 1.0, metalPair, metalPair ? BondStyle::Dashed : BondStyle::Solid, false};
+        if (preserveManual) {
+            const auto key = bondKey(i, j);
+            const auto old = manual.constFind(key);
+            if (old != manual.cend()) inferred = old.value();
+            added.insert(key);
         }
+        molecule.bonds.push_back(inferred);
+    };
+    // A cell spans the largest possible bond, so only its 26 neighbors can
+    // contain a partner. Padding covers rounding in QVector3D's float distance.
+    const double cellSize = 2 * largestRadius * cutoffScale *
+        (1 + 8 * std::numeric_limits<float>::epsilon());
+    bool useCells = eligible.size() >= 256 && std::isfinite(cellSize) && cellSize > 0;
+    QVector<BondCell> cells(atoms.size());
+    QHash<BondCell, QVector<int>> buckets;
+    if (useCells) {
+        for (int i : eligible) {
+            const auto &p = atoms[i].position;
+            const double x = std::floor(double(p.x()) / cellSize);
+            const double y = std::floor(double(p.y()) / cellSize);
+            const double z = std::floor(double(p.z()) / cellSize);
+            // Fall back to the original comparisons for nonfinite/extreme input.
+            constexpr double limit = 9.0e18;
+            if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) ||
+                std::abs(x) >= limit || std::abs(y) >= limit || std::abs(z) >= limit) {
+                useCells = false;
+                break;
+            }
+            cells[i] = {qint64(x), qint64(y), qint64(z)};
+            buckets[cells[i]].push_back(i);
+        }
+    }
+    if (useCells) {
+        QVector<int> neighbors;
+        for (int i : eligible) {
+            neighbors.clear();
+            const auto cell = cells[i];
+            for (int x = -1; x <= 1; ++x) for (int y = -1; y <= 1; ++y) for (int z = -1; z <= 1; ++z) {
+                const auto bucket = buckets.constFind({cell.x + x, cell.y + y, cell.z + z});
+                if (bucket == buckets.cend()) continue;
+                for (int j : bucket.value()) if (j > i) neighbors.push_back(j);
+            }
+            // Preserve pair order: selections and explicit overrides use bond indices.
+            std::sort(neighbors.begin(), neighbors.end());
+            for (int j : neighbors) appendPair(i, j);
+        }
+    } else {
+        for (int a = 0; a < eligible.size(); ++a)
+            for (int b = a + 1; b < eligible.size(); ++b) appendPair(eligible[a], eligible[b]);
     }
     if (preserveManual) {
         for (const Bond &old : previous) {
-            if (!old.manual || molecule.bondIndex(old.first, old.second) >= 0) continue;
-            if (old.first >= 0 && old.second >= 0 && old.first < molecule.atoms.size() &&
-                old.second < molecule.atoms.size()) molecule.bonds.push_back(old);
+            const auto key = bondKey(old.first, old.second);
+            if (!old.manual || added.contains(key)) continue;
+            if (old.first >= 0 && old.second >= 0 && old.first < atoms.size() && old.second < atoms.size()) {
+                molecule.bonds.push_back(old);
+                added.insert(key);
+            }
         }
     }
 }

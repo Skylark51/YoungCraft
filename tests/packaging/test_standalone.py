@@ -17,6 +17,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER = ROOT / "tools" / "create_standalone.ps1"
+HIDDEN_PROCESS = {"creationflags": subprocess.CREATE_NO_WINDOW, "stdin": subprocess.DEVNULL} if os.name == "nt" else {}
 CSC = Path(os.environ.get("WINDIR", "C:/Windows")) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
 
 
@@ -43,7 +44,7 @@ class Probe {
 ''', encoding="utf-8")
         cls.probe = cls.base / "Youngcraft.exe"
         subprocess.run([str(CSC), "/nologo", "/target:winexe", "/reference:System.Web.Extensions.dll",
-                        "/out:" + str(cls.probe), str(probe_source)], check=True, capture_output=True)
+                        "/out:" + str(cls.probe), str(probe_source)], check=True, capture_output=True, **HIDDEN_PROCESS)
         cls.native_bytes = cls.probe.read_bytes()
         cls.zip1, cls.exe1 = cls.build("version1")
         cls.zip2, cls.exe2 = cls.build("version2", updates={
@@ -91,9 +92,9 @@ class Probe {
     def compile(package, executable, check=True):
         env = {key: value for key, value in os.environ.items() if key.lower() != "psmodulepath"}
         # PowerShell 7's inherited module search path hides PS5 modules.
-        result = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
                                  str(BUILDER), "-PackageZip", str(package), "-OutputPath", str(executable)],
-                                capture_output=True, timeout=60, env=env)
+                                capture_output=True, timeout=60, env=env, **HIDDEN_PROCESS)
         if check and result.returncode:
             raise AssertionError(result.stdout.decode(errors="replace") + result.stderr.decode(errors="replace"))
         return result
@@ -105,7 +106,7 @@ class Probe {
 
     def invoke(self, executable, root, *options):
         return subprocess.run([str(executable), "--youngcraft-cache-root", str(root), *options],
-                              capture_output=True, encoding="utf-8", timeout=30)
+                              capture_output=True, encoding="utf-8", timeout=30, **HIDDEN_PROCESS)
 
     def extract(self, executable, root):
         result = self.invoke(executable, root, "--youngcraft-extract-only")
@@ -147,6 +148,20 @@ class Probe {
                 self.assertNotEqual(0, result.returncode)
                 self.assertIn("SHA256 mismatch", result.stderr)
                 self.assertEqual(b"corrupt", target.read_bytes())
+
+    def test_same_size_tampering_with_original_timestamp_is_rejected(self):
+        root = self.root("same-size")
+        cache = self.extract(self.exe1, root)
+        target = cache / "nested/data.bin"
+        original = target.stat()
+        data = bytearray(target.read_bytes())
+        data[len(data) // 2] ^= 1
+        target.write_bytes(data)
+        os.utime(target, ns=(original.st_atime_ns, original.st_mtime_ns))
+        result = self.invoke(self.exe1, root, "--youngcraft-verify-only")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("SHA256 mismatch", result.stderr)
+        self.assertEqual(data, target.read_bytes())
 
     def test_corrupt_embedded_zip_hash_rejected(self):
         damaged = self.root("damaged") / "damaged.exe"
@@ -190,7 +205,7 @@ class Probe {
     def test_concurrent_first_launch_publishes_one_cache(self):
         root = self.root("concurrent")
         commands = [str(self.exe1), "--youngcraft-cache-root", str(root), "--youngcraft-extract-only"]
-        children = [subprocess.Popen(commands, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(8)]
+        children = [subprocess.Popen(commands, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **HIDDEN_PROCESS) for _ in range(8)]
         outcomes = [child.communicate(timeout=30) for child in children]
         for child, (output, error) in zip(children, outcomes):
             self.assertEqual(0, child.returncode, error)
@@ -206,7 +221,7 @@ class Probe {
                      'literal"quote', 'slashes\\\\"quote', "--new-window", "--", "--youngcraft-extract-only"]
         env = dict(os.environ, YOUNGCRAFT_TEST_REPORT=str(report))
         result = subprocess.run([str(self.exe1), "--youngcraft-cache-root", str(root), *arguments],
-                                cwd=caller, env=env, capture_output=True, timeout=30)
+                                cwd=caller, env=env, capture_output=True, timeout=30, **HIDDEN_PROCESS)
         self.assertEqual(0, result.returncode, result.stderr)
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:

@@ -152,7 +152,8 @@ private:
         bool dragAtoms = false, bondEdit = false, geometryMode = false, drawingMode = false, resumeAnimation = false;
         QVector<int> geometrySelection;
     };
-    void saveDocumentState();
+    void saveDocumentState(bool suspendWork = true);
+    void finishFileLoad(QWidget *identity, const LoadedFile &loaded);
     void bindDocument(const std::shared_ptr<DocumentSession> &document);
     void activateDocument(int index);
     void closeDocument(int index);
@@ -242,6 +243,7 @@ private:
     QString m_mmField;
     QProcess *m_mmProcess = nullptr;
     QByteArray m_mmOutput;
+    QByteArray m_mmDeferredFallback;
     QByteArray m_mmStderr;
     QVector<QPointF> m_mmSeries;
     QVector<QVector3D> m_mmOriginalCoords;

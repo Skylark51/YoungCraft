@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Invoke-HiddenNative.ps1')
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ([string]::IsNullOrWhiteSpace($BuildDir)) { $BuildDir = Join-Path $ProjectRoot 'build-current' }
@@ -33,8 +34,10 @@ $qtRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $qtCmakeDir
 $windeployqt = Join-Path $qtRoot 'bin/windeployqt.exe'
 if (-not (Test-Path -LiteralPath $windeployqt)) { throw "windeployqt가 없습니다: $windeployqt" }
 
-& cmake --build $BuildDir --config Release --target Youngcraft
-if ($LASTEXITCODE -ne 0) { throw "Release 빌드 실패: $LASTEXITCODE" }
+$cmakeLine = Get-Content -LiteralPath $cache -Encoding UTF8 | Where-Object { $_ -match '^CMAKE_COMMAND:INTERNAL=' } | Select-Object -First 1
+$cmake = if ($cmakeLine) { ($cmakeLine -split '=', 2)[1] } else { 'cmake' }
+$buildExit = Invoke-YoungcraftNative -FilePath $cmake -Arguments @("--build", $BuildDir, "--config", "Release", "--target", "Youngcraft")
+if ($buildExit -ne 0) { throw "Release 빌드 실패: $buildExit" }
 $application = if ($ApplicationPath) {
     [IO.Path]::GetFullPath($ApplicationPath)
 } else {
@@ -47,9 +50,10 @@ $application = if ($ApplicationPath) {
 if (-not (Test-Path -LiteralPath $application)) { throw "실행 파일이 없습니다: $application" }
 
 if (-not $ReuseMmRuntime -and -not $MmRuntimeDir) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1') `
-        -ProjectRoot $ProjectRoot -Python $Python
-    if ($LASTEXITCODE -ne 0) { throw "MM runtime 빌드 실패: $LASTEXITCODE" }
+    $mmBuildExit = Invoke-YoungcraftNative -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -Arguments @(
+        '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
+        '-File', (Join-Path $ProjectRoot 'tools/build_mm_runtime.ps1'), '-ProjectRoot', $ProjectRoot, '-Python', $Python)
+    if ($mmBuildExit -ne 0) { throw "MM runtime 빌드 실패: $mmBuildExit" }
 }
 $mmSource = if ($MmRuntimeDir) { (Resolve-Path -LiteralPath $MmRuntimeDir).Path } else { Join-Path $ProjectRoot 'build-mm-runtime/YoungcraftMM' }
 if (-not (Test-Path -LiteralPath (Join-Path $mmSource 'YoungcraftMM.exe'))) {
@@ -66,12 +70,14 @@ try {
     if (-not (Test-Path -LiteralPath $askpass)) { throw 'SSH password helper is missing.' }
     Copy-Item -LiteralPath $askpass -Destination (Join-Path $stage 'YoungcraftSshAskpass.exe') -Force
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'resources/gaussian-remote.json') -Destination (Join-Path $stage 'youngcraft-server.json') -Force
-    & $windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage 'Youngcraft.exe')
-    if ($LASTEXITCODE -ne 0) { throw "windeployqt 실패: $LASTEXITCODE" }
+    $deployExit = Invoke-YoungcraftNative -FilePath $windeployqt -Arguments @("--release", "--compiler-runtime", "--no-translations", "--dir", $stage, (Join-Path $stage 'Youngcraft.exe'))
+    if ($deployExit -ne 0) { throw "windeployqt 실패: $deployExit" }
     # Some Qt SDKs do not discover MSVC's redistributables in windeployqt.
     # Use the permitted app-local CRT files so no VC installer is required.
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
-    $vsRoot = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio/Installer/vswhere.exe'
+    $vsRoot = ''
+    $vsExit = Invoke-YoungcraftNative -FilePath $vswhere -Arguments @('-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-property', 'installationPath') -OutputText ([ref]$vsRoot)
+    if ($vsExit -ne 0) { throw 'MSVC installation lookup failed.' }
     if (-not $vsRoot) { throw 'MSVC redistributable installation was not found.' }
     $redistRoot = Join-Path $vsRoot 'VC/Redist/MSVC'
     $crtDirectories = Get-ChildItem -LiteralPath $redistRoot -Directory | ForEach-Object {

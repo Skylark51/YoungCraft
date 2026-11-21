@@ -288,6 +288,7 @@ void MainWindow::runMMOptimization(const QString &field, int steps, bool retainB
     m_mmState = MMState::Starting;
     m_mmStepPending = false;
     m_mmOutput.clear();
+    m_mmDeferredFallback.clear();
     m_mmStderr.clear();
     m_mmSeries.clear();
     m_mmOriginalCoords.clear();
@@ -354,7 +355,7 @@ void MainWindow::runMMOptimization(const QString &field, int steps, bool retainB
     connect(process, &QProcess::finished, this, [this, process] {
         if (process != m_mmProcess) return;
         handleMMOutput();
-        if (process == m_mmProcess && m_mmState != MMState::Finished)
+        if (process == m_mmProcess && m_mmState != MMState::Finished && m_mmDeferredFallback.isEmpty())
             failMMOptimization(QStringLiteral("MM worker가 완료 응답 없이 종료되었습니다."));
     });
     process->start(program, arguments);
@@ -378,7 +379,12 @@ void MainWindow::handleMMOutput() {
         }
         const QJsonObject result = document.object();
         const QString type = result.value(QStringLiteral("type")).toString();
-        if (type == QStringLiteral("fallback") && result.value(QStringLiteral("method")).toString() == "GFN-FF" && m_mmState == MMState::Starting) {
+        if (type == QStringLiteral("fallback") && result.value(QStringLiteral("method")).toString() == "GFN-FF" && (m_mmState == MMState::Starting || m_mmState == MMState::Paused)) {
+            if (m_mmState == MMState::Paused) {
+                // Keep the pending handoff until Resume; the RDKit worker may exit.
+                m_mmDeferredFallback = line + '\n';
+                return;
+            }
             const auto request=QJsonDocument::fromJson(m_mmProcess->property("mmRequest").toByteArray()).object();
             QVector<GeometryConstraint> entries;
             for(const auto &value:request.value("constraints").toArray()) {
@@ -502,6 +508,7 @@ void MainWindow::stopMMOptimization(const QString &message) {
     QProcess *process = m_mmProcess;
     m_mmProcess = nullptr;
     m_mmStepPending = false;
+    m_mmDeferredFallback.clear();
     process->disconnect(this);
     connect(process, &QProcess::finished, this, [this] {
         if (!m_mmProcess && m_mmState == MMState::Stopping) m_mmState = MMState::Finished;

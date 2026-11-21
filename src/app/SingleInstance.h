@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
 #include <functional>
 #include <memory>
 
@@ -46,8 +47,12 @@ public:
                             if (error.error != QJsonParseError::NoError || !json.isObject()) { socket->abort(); return; }
                             QStringList requested;
                             for (const auto &path : json.object().value("paths").toArray()) requested.append(path.toString());
-                            if (openRequested) openRequested(requested, json.object().value("newWindow").toBool());
+                            // Acknowledge receipt before constructing document UIs.
                             socket->write("OK\n"); socket->flush(); socket->disconnectFromServer();
+                            const bool separate = json.object().value("newWindow").toBool();
+                            QTimer::singleShot(0, &m_server, [this, requested, separate] {
+                                if (openRequested) openRequested(requested, separate);
+                            });
                         };
                         QObject::connect(socket, &QLocalSocket::readyRead, socket, receive);
                         if (socket->bytesAvailable()) receive();

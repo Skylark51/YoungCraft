@@ -86,7 +86,7 @@ bool XtbRunner::start(const Molecule &initial,const XtbOptions &o,const QString 
     energy=gradient=gap=kNaN;convergence=nonconvergence=false;
     QString exe=QDir(runtime).absoluteFilePath("xtb.exe");
     const bool exactFix=std::any_of(o.constraints.cbegin(),o.constraints.cend(),[](const GeometryConstraint &c){return c.type=="fixed";});
-    if(exactFix&&!QFileInfo::exists(QDir(runtime).absoluteFilePath("gfnff/xtb.exe")))return fail(QStringLiteral("정밀 원자 고정을 지원하는 동봉 xTB runtime이 필요합니다 (gfnff/xtb.exe)."));
+    if(exactFix&&!QFileInfo::exists(QDir(runtime).absoluteFilePath("gfnff/xtb.exe")))return fail(QStringLiteral("정밀 원자 고정을 지원하는 동봉 xTB runtime이 필요합니다: %1").arg(QDir(runtime).absoluteFilePath("gfnff/xtb.exe")));
     // The bundled newer build supports GFN1/2 as well as GFN-FF and honors Cartesian fixing.
     if((o.method==0 || exactFix) && QFileInfo::exists(QDir(runtime).absoluteFilePath("gfnff/xtb.exe")))
         exe=QDir(runtime).absoluteFilePath("gfnff/xtb.exe");

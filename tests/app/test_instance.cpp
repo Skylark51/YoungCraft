@@ -9,6 +9,25 @@ using youngcraft::SingleInstance;
 class InstanceTest final : public QObject {
     Q_OBJECT
 private slots:
+    void acknowledgesBeforeOpeningSlowDocument() {
+        const QString key = "Youngcraft-test-" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QProcess host;
+        host.start(QCoreApplication::applicationFilePath(), {"--instance-helper", key, "initial"});
+        QVERIFY(host.waitForReadyRead(10000));
+        QCOMPARE(host.readAllStandardOutput().trimmed(), QByteArray("Primary"));
+        QElapsedTimer elapsed; elapsed.start();
+        QProcess client;
+        client.start(QCoreApplication::applicationFilePath(), {"--instance-helper", key, "slow"});
+        QVERIFY(client.waitForFinished(5000));
+        QCOMPARE(client.exitCode(), 0);
+        QCOMPARE(client.readAllStandardOutput().trimmed(), QByteArray("Forwarded"));
+        QVERIFY2(elapsed.elapsed() < 1000, "File handoff waited for document construction");
+        QProcess close;
+        close.start(QCoreApplication::applicationFilePath(), {"--instance-helper", key, "close"});
+        QVERIFY(close.waitForFinished(10000));
+        QVERIFY(host.waitForFinished(10000));
+        QVERIFY(host.readAllStandardOutput().contains("slow"));
+    }
     void simultaneousStartupElectsOnePrimary() {
         const QString key = "Youngcraft-test-" + QUuid::createUuid().toString(QUuid::WithoutBraces);
         QVector<std::shared_ptr<QProcess>> processes;
@@ -80,6 +99,7 @@ int main(int argc, char **argv) {
     if (args.value(1) == "--instance-helper") {
         SingleInstance instance;
         instance.openRequested = [&](const QStringList &paths, bool) {
+            if (paths.contains("slow")) QThread::msleep(1500);
             for (const auto &path : paths) std::cout << path.toUtf8().constData() << std::endl;
             if (paths.contains("close")) QTimer::singleShot(50, &app, &QCoreApplication::quit);
         };
