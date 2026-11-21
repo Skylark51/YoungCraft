@@ -66,7 +66,8 @@ void MoleculeView::setEditedMolecule(const Molecule &molecule) {
     m_molecule = molecule;
     recalculateBounds();
     if(m_hoverAtom>=0)m_hoverAtom=pickAtom(m_lastMouse);
-    if (wasEmpty) bestView();
+    // Keep the drawing scale and cursor placement when the first atoms are added.
+    if (wasEmpty && !m_drawingMode) bestView();
     emit geometryChanged();
     update();
     if(m_previewOverlay)m_previewOverlay->update();
@@ -259,8 +260,10 @@ QImage MoleculeView::image(bool transparent, bool viewportOnly) {
     // A queued widget repaint may still contain the preceding opaque frame.
     // Render capture flags synchronously before reading the framebuffer.
     makeCurrent();
+    m_framebufferCapture = true;
     paintGL();
     QImage captured = grabFramebuffer();
+    m_framebufferCapture = false;
     doneCurrent();
     m_transparentCapture = false;
     m_viewportOnlyCapture = false;

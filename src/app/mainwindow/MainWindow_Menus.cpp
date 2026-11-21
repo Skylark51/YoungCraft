@@ -231,16 +231,27 @@ void MainWindow::createMenus() {
         applyStyle(m_style);
     });
     QMenu *labels = view->addMenu(QStringLiteral("원자/결합 라벨"));
-    m_atomLabelsAction = labels->addAction(QStringLiteral("원자 번호"));
-    m_atomLabelsAction->setObjectName(QStringLiteral("ShowAtomNumbers"));
-    m_atomLabelsAction->setIconText(QStringLiteral("Atomic number"));
-    m_atomLabelsAction->setToolTip(QStringLiteral("모든 표시 원자의 구 중심에 번호 표시 · 다시 누르면 숨기기"));
-    m_atomLabelsAction->setCheckable(true);
-    m_atomLabelsAction->setChecked(m_style.showLabels);
-    connect(m_atomLabelsAction, &QAction::triggered, this, [this](bool checked) {
-        m_style.showLabels = checked;
-        applyStyle(m_style);
-    });
+    m_atomLabelsMenu = labels->addMenu(QStringLiteral("원자 라벨"));
+    m_atomLabelsMenu->setObjectName(QStringLiteral("AtomLabelsMenu"));
+    auto *atomLabelModes = new QActionGroup(m_atomLabelsMenu);
+    const auto addAtomLabelMode = [&](const char *name, const QString &text, bool numbers, bool symbols) {
+        auto *mode = m_atomLabelsMenu->addAction(text);
+        mode->setObjectName(QString::fromLatin1(name));
+        mode->setCheckable(true);
+        mode->setProperty("atomNumbers", numbers);
+        mode->setProperty("elementSymbols", symbols);
+        atomLabelModes->addAction(mode);
+        connect(mode, &QAction::triggered, this, [this, numbers, symbols] {
+            m_style.showLabels = numbers;
+            m_style.showElementSymbols = symbols;
+            applyStyle(m_style);
+        });
+    };
+    addAtomLabelMode("HideAtomLabels", QStringLiteral("숨기기"), false, false);
+    addAtomLabelMode("ShowAtomNumbers", QStringLiteral("원자 번호 (1)"), true, false);
+    addAtomLabelMode("ShowElementSymbols", QStringLiteral("원소 기호 (C)"), false, true);
+    addAtomLabelMode("ShowAtomSymbolsAndNumbers", QStringLiteral("원소 기호 + 번호 (C1)"), true, true);
+    updateAtomLabelMenu();
     auto *propertyLabels = add(labels, QStringLiteral("전하/스핀 밀도 표시"), {}, [this] { m_style.showProperties = !m_style.showProperties; applyStyle(m_style); }); propertyLabels->setCheckable(true); propertyLabels->setChecked(m_style.showProperties);
     m_geometryAction=add(view, QStringLiteral("구조 파라미터(거리/각/이면각) 표시"), {}, [this] { toggleGeometryMode(); });m_geometryAction->setCheckable(true);
     auto *vdw = add(view, QStringLiteral("반데르발스 구 표시"), {}, [this] { m_style.showVdwSpheres = !m_style.showVdwSpheres; applyStyle(m_style); if(m_style.showVdwSpheres)m_view->bestView(); }); vdw->setObjectName("ShowVdwSpheres"); vdw->setToolTip(QStringLiteral("원소별 반데르발스 반지름으로 공간 채움 표시 · 다시 누르면 기존 스타일 복원")); vdw->setCheckable(true); vdw->setChecked(m_style.showVdwSpheres);

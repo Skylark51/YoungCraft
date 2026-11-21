@@ -82,6 +82,7 @@ private slots:
     void showCrystalMode(int mode);
     void applyStyle(const RenderStyle &style);
     void choosePreset(const QString &name);
+    void updateAtomLabelMenu();
     void copyImage();
     void openReactionCapture();
     void openMechanismAnimation();
@@ -220,7 +221,7 @@ private:
     CalculationData m_data;
     bool attachResultStructure(const QString &path);
     RenderStyle m_style;
-    QAction *m_atomLabelsAction = nullptr;
+    QMenu *m_atomLabelsMenu = nullptr;
     QAction *m_syncViewsAction = nullptr;
     QMenu *m_analysisMenu = nullptr;
     QWidget *m_analysisShortcuts = nullptr;

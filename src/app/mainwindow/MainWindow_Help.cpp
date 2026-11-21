@@ -113,7 +113,7 @@ QVector<HelpTopic> helpTopics() {
     add(9,"구간 · 구조 · 재생","Stages, structures and playback","구조를 배치하고 구간 길이와 재생 범위를 지정할 수 있습니다.","You can arrange structures and set stage durations and playback ranges.");
     add(9,"카메라 · 강조 · 설명","Camera, emphasis and captions","장면별 시점과 강조 원자·설명을 조절할 수 있습니다.","You can adjust camera views, emphasized atoms and captions for each scene.");
     add(9,"프로젝트 · 영상 · PowerPoint","Projects, video and PowerPoint","제작 프로젝트를 저장하고 애니메이션과 PowerPoint로 내보낼 수 있습니다.","You can save animation projects and export animations and PowerPoint presentations.");
-    add(10,"표시 스타일 · 원자 번호","Display styles and atom numbers","표시 방식·원자 번호·원자와 결합 크기를 바꿀 수 있습니다.","You can change rendering styles, atom numbers, and atom and bond sizes.");
+    add(10,"표시 스타일 · 원자 라벨","Display styles and atom labels","표시 스타일과 원자·결합 크기를 조절할 수 있습니다. 구조 도구의 보기 탭에서 C1 아이콘을 눌러 번호, 원소 기호 또는 둘 다를 표시하세요.","Adjust rendering styles and atom and bond sizes. Use the C1 icon in the structure display tab to show atom numbers, element symbols, or both.");
     add(10,"수소 표시 · VdW","Hydrogen visibility and VdW","탄소에 결합한 수소를 숨기거나 반데르발스 구를 표시할 수 있습니다.","You can hide carbon-bound hydrogens or display van der Waals spheres.");
     add(10,"선택 원자 강조","Focus on selected atoms","주변 원자를 숨기거나 흐리게 표시하고 강조 상태를 복원할 수 있습니다.","You can hide or dim surrounding atoms and restore their display.");
     add(10,"뷰 동기화","Synchronize views","원자 수가 같은 탭의 회전·이동·확대 설정을 함께 바꿀 수 있습니다.","You can synchronize rotation, panning and zoom between tabs with equal atom counts.");

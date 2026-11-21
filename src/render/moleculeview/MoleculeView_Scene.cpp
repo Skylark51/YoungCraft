@@ -227,7 +227,7 @@ void MoleculeView::paintGL() {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     if (m_style.showVibrationVectors) drawVibrationVectors(vp);
-    drawLabels(vp);
+    if (m_capturePaintDevice || m_framebufferCapture) drawLabels(vp);
     drawGeometryMeasurements(vp);
     if (m_capturePaintDevice) drawDetailedAnalysis(vp);
     if (m_fragmentDisplay == FragmentDisplay::All && m_potentialGrid && m_style.showPositiveSurface) {

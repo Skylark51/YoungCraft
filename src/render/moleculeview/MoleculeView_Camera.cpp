@@ -52,8 +52,11 @@ void MoleculeView::bestView() {
     const float screenHalfExtent = qMax(halfExtent.y() + surfacePadding,
                                         (halfExtent.x() + surfacePadding) / aspect);
     const float fovRadians = qDegreesToRadians(qBound(20.0f, m_style.perspectiveFov, 70.0f));
-    m_distance = qMax(2.0f, halfExtent.z() + screenHalfExtent * 1.10f / qTan(fovRadians * 0.5f));
-    m_orthoScale = qMax(0.75f, screenHalfExtent * 1.12f);
+    const bool emptyCanvas = m_molecule.atoms.isEmpty() && !m_positiveSurface && !m_negativeSurface;
+    const float canvasScale = CameraState{}.orthoScale;
+    m_distance = emptyCanvas ? canvasScale / qTan(fovRadians * 0.5f)
+                             : qMax(2.0f, halfExtent.z() + screenHalfExtent * 1.10f / qTan(fovRadians * 0.5f));
+    m_orthoScale = emptyCanvas ? canvasScale : qMax(0.75f, screenHalfExtent * 1.12f);
     m_rotation = QQuaternion();
     update();
     if(m_previewOverlay)m_previewOverlay->update();

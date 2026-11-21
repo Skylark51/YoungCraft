@@ -27,6 +27,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMenu>
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSettings>
@@ -48,7 +49,7 @@ void MainWindow::openStyleEditor() {
     connect(dialog, &StyleEditorDialog::styleApplied, this, [this](const RenderStyle &style) {
         m_style = style;
         m_view->setStyle(style);
-        m_atomLabelsAction->setChecked(style.showLabels);
+        updateAtomLabelMenu();
     });
     connect(dialog, &StyleEditorDialog::styleSaved, this, [&committedStyle](const RenderStyle &style) {
         committedStyle = style;
@@ -60,16 +61,27 @@ void MainWindow::openStyleEditor() {
     });
     if (dialog->exec() == QDialog::Accepted) StyleManager::save(m_style);
     else { m_style = committedStyle; m_view->setStyle(m_style); }
-    m_atomLabelsAction->setChecked(m_style.showLabels);
+    updateAtomLabelMenu();
     dialog->deleteLater();
 }
 
 void MainWindow::applyStyle(const RenderStyle &style) {
     m_style = style;
     m_view->setStyle(m_style);
-    m_atomLabelsAction->setChecked(m_style.showLabels);
+    updateAtomLabelMenu();
     if(auto *vdw=findChild<QAction *>("ShowVdwSpheres"))vdw->setChecked(m_style.showVdwSpheres);
     StyleManager::save(m_style);
+}
+
+void MainWindow::updateAtomLabelMenu() {
+    if (!m_atomLabelsMenu) return;
+    for (auto *mode : m_atomLabelsMenu->actions()) {
+        if (mode->property("atomNumbers").toBool() != m_style.showLabels ||
+            mode->property("elementSymbols").toBool() != m_style.showElementSymbols) continue;
+        mode->setChecked(true);
+        m_atomLabelsMenu->menuAction()->setToolTip(QStringLiteral("원자 라벨 · %1").arg(mode->text()));
+        break;
+    }
 }
 
 void MainWindow::choosePreset(const QString &name) {
