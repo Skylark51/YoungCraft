@@ -10,6 +10,7 @@ on:
       - 'CMakeLists.txt'
       - 'tools/package_portable.ps1'
       - 'tools/PortableManifest.ps1'
+      - 'tools/Invoke-HiddenNative.ps1'
       - 'tools/build_mm_runtime.ps1'
       - 'tools/mm_optimize.py'
       - 'tools/requirements-mm.txt'
@@ -107,6 +108,8 @@ jobs:
       - name: Verify standalone launcher and frozen MM
         shell: pwsh
         run: |
+          python tests/packaging/test_process_input.py
+          if ($LASTEXITCODE -ne 0) { throw 'Worker input encoding verification failed' }
           python tests/packaging/test_manifest_paths.py
           if ($LASTEXITCODE -ne 0) { throw 'Portable manifest path verification failed' }
           python tests/packaging/test_standalone.py
