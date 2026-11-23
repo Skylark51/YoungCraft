@@ -141,6 +141,8 @@ void SmokeTest::uxClickMeasurements() {
     for(int i=0;i<2;++i){IRCPoint p;p.index=i+1;p.coordinate=i;p.relativeKcal=i;p.frameIndex=i;p.direction="Forward";data.ircPoints.append(p);}
     auto run=[&](const QString &id,const QString &start,const QString &goal,int tab,const std::function<void(MainWindow &)> &body) {
         MainWindow w;w.resize(1400,900);w.show();w.onFileLoaded(loaded);w.m_analysis->setCurrentTab(tab);w.m_animation->stop();
+        if(id==QStringLiteral("frame-select") && w.m_data.frames.size()>1)
+            w.showFrame(int(w.m_data.frames.size())-1);
         QTest::qWait(150);evidence.begin(id,start,goal);body(w);
         const bool ok=!QTest::currentTestFailed();
         if(ok && !evidence.capture(&w,id))QTest::qFail("Screenshot save failed",__FILE__,__LINE__);
@@ -185,7 +187,10 @@ void SmokeTest::uxClickMeasurements() {
         QApplication::clipboard()->clear();QVERIFY(uxAction(w,evidence,uxNamed(w,"CopyStructureImage")));
         QVERIFY(QApplication::clipboard()->mimeData()->hasFormat("image/png"));}))return;
     if(!run("frame-select","Geometry panel active, final frame selected","First frame applied to 3D view",0,[&](MainWindow &w){
+        QVERIFY(w.m_data.frames.size()>1);QCOMPARE(w.m_currentFrame,int(w.m_data.frames.size())-1);
+        QSignalSpy selected(w.m_analysis,&AnalysisPanel::frameRequested);
         QVERIFY(uxList(evidence,w.m_analysis->findChild<QListWidget *>("FrameList"),0));QCOMPARE(w.m_currentFrame,0);
+        QCOMPARE(selected.size(),1);
         QCOMPARE(w.m_view->molecule().atoms[0].position,w.m_data.frames[0].coordinates[0]);}))return;
     if(!run("imaginary-select-play","Frequency panel active, no vibration playing","Imaginary mode selected and playing",1,[&](MainWindow &w){
         QVERIFY(uxList(evidence,w.m_analysis->findChild<QListWidget *>("FrequencyList"),0));QCOMPARE(w.m_currentFrequency,0);QVERIFY(w.m_animation->isPlaying());w.m_animation->stop();}))return;
@@ -288,7 +293,7 @@ void SmokeTest::uxResponsiveLayouts() {
           {"viewport",QJsonArray{w.m_view->width(),w.m_view->height()}},{"issues",issues}};
         qInfo().noquote()<<"UX_LAYOUT"<<QString::fromUtf8(QJsonDocument(diagnostic).toJson(QJsonDocument::Compact));
         // Baseline defects are evidence, not a reason to lose before screenshots.
-        serious|=!issues.isEmpty() || w.width()>sizes[index].width()+2 || w.height()>sizes[index].height()+2;
+        serious|=!issues.isEmpty() || w.size()!=sizes[index];
     }
     QVERIFY(evidence.write("layout.json",QJsonObject{{"variant",evidence.variant},{"layouts",layouts},
       {"note","Client sizes are fixed for virtual layout captures beyond the physical runner screen; screen dimensions and DPR are recorded. Scroll content may extend beyond its viewport; every TD-DFT tool is checked for reachable visibility."}}));

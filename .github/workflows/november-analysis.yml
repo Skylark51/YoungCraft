@@ -141,9 +141,13 @@ jobs:
           New-Item -ItemType Directory -Path .build/ux-evidence/after -Force | Out-Null
           $env:YOUNGCRAFT_CHARGED_MM_WORKER = (Resolve-Path build/mm_runtime/YoungcraftMM.exe).Path
           ctest --test-dir build -C Release --output-on-failure --timeout 180 -R '^orbital_study$'
-          if ($LASTEXITCODE -ne 0) { throw 'Orbital regression failed' }
+            $orbitalExit = $LASTEXITCODE
+            if (Test-Path build/orbital-regression.txt) { Get-Content build/orbital-regression.txt }
           python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 --all
-          if ($LASTEXITCODE -ne 0) { throw 'GUI regressions failed; see per-case evidence' }
+            $guiExit = $LASTEXITCODE
+            if ($orbitalExit -ne 0 -or $guiExit -ne 0) {
+              throw "Regression failed (orbital=$orbitalExit, GUI=$guiExit); see per-case evidence"
+            }
       - name: Review layouts at 150 and 200 percent DPI
         if: always() && steps.build.outcome == 'success'
         shell: pwsh
@@ -165,6 +169,7 @@ jobs:
             gui-november-*.txt
             gui-november-summary.json
             build/Testing/Temporary/LastTest.log
+              build/orbital-regression.txt
             .build/november-corpus/provenance.json
             .build/ux-evidence/
   baseline-ux-evidence:
