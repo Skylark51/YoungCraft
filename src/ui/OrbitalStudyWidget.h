@@ -21,6 +21,8 @@ public:
     void setData(const CalculationData &data);
     void setView(MoleculeView *view);
     void startDefaultOrbital();
+    void showFrontierOrbital(bool lumo);
+    bool frontierAvailable(bool lumo) const;
     QSize minimumSizeHint() const override;
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -28,7 +30,10 @@ public:
 signals:
     void surfaceStyleChanged();
     void openRequested(const QString &path);
+    void frontierAvailabilityChanged(bool homoAvailable, bool lumoAvailable);
+    void statusChanged(const QString &message);
 private:
+    void setStatus(const QString &message);
     void updateResponsiveControls();
     QSplitter *m_columns = nullptr;
     void expandTable();
@@ -37,6 +42,7 @@ private:
     void showSurface(std::shared_ptr<const CubeGrid> surface, std::shared_ptr<const CubeGrid> potential);
     void exportTable();
     bool chooseFrontier(bool lumo);
+    int frontierRow(bool lumo) const;
     void updateGenerationButtons();
     QString orbitalSelectionKey(int row) const;
     QSet<QString> m_renderedSelections;

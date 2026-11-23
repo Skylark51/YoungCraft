@@ -4,6 +4,7 @@
 #include "ui/PlotWidget.h"
 #include "ui/TransitionAnalysisDialog.h"
 #include "ui/TransitionAnalysisIcon.h"
+#include "ui/SidebarFlowLayout.h"
 
 #include <QDoubleSpinBox>
 #include <QCheckBox>
@@ -72,11 +73,14 @@ QWidget *AnalysisPanel::makeTddftTab() {
     form->addRow(QStringLiteral("폭"), m_broadening);
     form->addRow(m_normalizeSpectrum);
     form->addRow(m_showSpectrumSticks);
-    auto *nto=new QPushButton(transitionAnalysisIcon(),QStringLiteral("NTO · Hole / Particle 분석"));
+    auto *actions=new QWidget(page);actions->setObjectName(QStringLiteral("TddftSelectionActions"));
+    auto *actionLayout=new SidebarFlowLayout(actions);
+    auto *nto=new QPushButton(transitionAnalysisIcon(),QStringLiteral("NTO 분석"));
     nto->setObjectName(QStringLiteral("TddftTransitionAnalysis"));
     nto->setToolTip(QStringLiteral("선택한 TD 상태의 NTO 쌍과 hole / particle 기여도 및 3D 분석"));
     connect(nto,&QPushButton::clicked,this,[this]{showTransitionAnalysis();});
-    form->addRow(nto);
+    actionLayout->addWidget(nto);
+    form->addRow(actions);
     layout->addLayout(form);
     m_tddftTable = new QTableWidget;
     m_tddftTable->setObjectName(QStringLiteral("TddftStatesTable"));
@@ -86,6 +90,7 @@ QWidget *AnalysisPanel::makeTddftTab() {
     m_tddftTable->horizontalHeader()->setSectionResizeMode(5,QHeaderView::ResizeToContents);
     m_tddftTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_tddftTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_tddftTable->setSelectionMode(QAbstractItemView::SingleSelection);
     layout->addWidget(m_tddftTable, 2);
     connect(m_broadening, qOverload<double>(&QDoubleSpinBox::valueChanged), this, [this](double value) {
         fillTddft();
@@ -98,16 +103,7 @@ QWidget *AnalysisPanel::makeTddftTab() {
     connect(m_normalizeSpectrum, &QCheckBox::toggled, this, [this] { fillTddft(); });
     connect(m_showSpectrumSticks, &QCheckBox::toggled, this, [this] { fillTddft(); });
     connect(m_tddftTable, &QTableWidget::currentCellChanged, this,
-            [this](int row, int, int, int) {
-        if (row < 0 || row >= m_data.excitedStates.size()) return;
-        const ExcitedState &state = m_data.excitedStates[row];
-        emit tddftStateInfoChanged(
-            QStringLiteral("선택 상태 %1  ·  %2 eV  ·  %3 nm  ·  f = %4")
-                .arg(state.label.isEmpty() ? QString::number(state.state) : state.label)
-                .arg(numberOrDash(state.energyEv, 4))
-                .arg(numberOrDash(state.wavelengthNm, 2))
-                .arg(numberOrDash(state.oscillatorStrength, 5)));
-    });
+            [this]{updateTddftSelection();});
     return page;
 }
 
@@ -186,8 +182,23 @@ void AnalysisPanel::fillTddft() {
     if (selectedRow >= 0 && selectedRow < m_tddftTable->rowCount())
         m_tddftTable->setCurrentCell(selectedRow, 0);
     emit tddftSpectrumChanged(spectrum, bars, summary);
+    updateTddftSelection();
+}
+
+void AnalysisPanel::updateTddftSelection() {
+    const int row=m_tddftTable->currentRow();
+    const int selected=row>=0?row:0;
+    const bool valid=selected<m_data.excitedStates.size();
     if(auto *button=findChild<QPushButton*>(QStringLiteral("TddftTransitionAnalysis")))
-        button->setEnabled(!m_data.excitedStates.isEmpty());
+        button->setEnabled(valid && (!m_data.excitedStates[selected].transitions.isEmpty()
+            || !m_data.excitedStates[selected].nativeNtoPairs.isEmpty()));
+    if(row<0 || !valid)return;
+    const auto &state=m_data.excitedStates[row];
+    emit tddftStateInfoChanged(
+        QStringLiteral("선택 상태 %1  ·  %2 eV  ·  %3 nm  ·  f = %4")
+            .arg(state.label.isEmpty()?QString::number(state.state):state.label)
+            .arg(numberOrDash(state.energyEv,4)).arg(numberOrDash(state.wavelengthNm,2))
+            .arg(numberOrDash(state.oscillatorStrength,5)));
 }
 
 void AnalysisPanel::showTransitionAnalysis(int row) {

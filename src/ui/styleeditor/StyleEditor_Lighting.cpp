@@ -1,4 +1,5 @@
 #include "ui/StyleEditorDialog.h"
+#include "ui/styleeditor/StyleColorButton.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -75,7 +76,7 @@ QWidget *StyleEditorDialog::makeScreenTab() {
     auto *appearance = new QGroupBox(QStringLiteral("화면"));
     auto *appearanceLayout = new QFormLayout(appearance);
     m_backgroundButton = new QPushButton(QStringLiteral("배경색 선택"));
-    m_backgroundButton->setStyleSheet(QStringLiteral("background: %1").arg(m_style.background.name()));
+    m_backgroundButton->setStyleSheet(styleColorButtonSheet(m_style.background));
     connect(m_backgroundButton, &QPushButton::clicked, this, &StyleEditorDialog::chooseBackground);
     m_shadows = new QCheckBox(QStringLiteral("그림자")); m_shadows->setChecked(m_style.shadows);
     m_monochrome = new QCheckBox(QStringLiteral("흑백")); m_monochrome->setChecked(m_style.monochrome);
@@ -117,7 +118,7 @@ void StyleEditorDialog::chooseBackground() {
     const QColor color = QColorDialog::getColor(m_style.background, this, QStringLiteral("배경색"));
     if (color.isValid()) {
         m_style.background = color;
-        m_backgroundButton->setStyleSheet(QStringLiteral("background: %1").arg(color.name()));
+        m_backgroundButton->setStyleSheet(styleColorButtonSheet(color));
         apply();
     }
 }

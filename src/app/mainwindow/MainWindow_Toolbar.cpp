@@ -179,8 +179,71 @@ void MainWindow::createToolBar() {
         action->setProperty("toolbarIconId", icon);
         toolbar->addAction(action);
     };
+    // The main half runs the common action immediately; the arrow exposes related routes.
+    // Keep the shared QAction menu-free so its original menu path and shortcut still run directly.
+    const auto addSplitButton = [toolbar](QAction *action, QMenu *menu, const char *name, int icon) {
+        action->setProperty("toolbarIconId", icon);
+        auto *button = new QToolButton(toolbar);
+        button->setObjectName(QString::fromLatin1(name));
+        button->setProperty("workflowSplit", true);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setDefaultAction(action);
+        button->setMenu(menu);
+        button->setPopupMode(QToolButton::MenuButtonPopup);
+        button->setFixedSize(sidebarButtonSize + 16, sidebarButtonSize);
+        button->setIconSize(QSize(sidebarIconSize, sidebarIconSize));
+        button->setFocusPolicy(Qt::StrongFocus);
+        button->setAccessibleName(action->text());
+        auto *wrapper = toolbar->addWidget(button);
+        // An overflow menu activates the QWidgetAction rather than its button.
+        QObject::connect(wrapper, &QAction::triggered, action, &QAction::trigger);
+        return button;
+    };
     addCommonAction("NewStructure", QStringLiteral("새 구조"), 0);
-    addCommonAction("OpenStructureFile", QStringLiteral("열기"), 1);
+    auto *openMenu = new QMenu(QStringLiteral("열기"), this);
+    openMenu->setObjectName(QStringLiteral("ToolbarOpenMenu"));
+    openMenu->setToolTipsVisible(true);
+    openMenu->addAction(findChild<QAction *>(QStringLiteral("OpenStructureFile")));
+    openMenu->addAction(findChild<QAction *>(QStringLiteral("OpenMultipleFiles")));
+    openMenu->addAction(findChild<QAction *>(QStringLiteral("OpenOrbitalFile")));
+    openMenu->addSection(QStringLiteral("최근 파일"));
+    auto *openButton = addSplitButton(findChild<QAction *>(QStringLiteral("OpenStructureFile")),
+        openMenu, "ToolbarOpenButton", 1);
+    openButton->setToolTip(QStringLiteral("파일 열기 (Ctrl+O) · 화살표: 여러 파일·오비탈·최근 파일"));
+    // Recent-file actions are also reused directly, saving a submenu step from the toolbar.
+    connect(openMenu, &QMenu::aboutToShow, this, [this, openMenu] {
+        for (auto *action : openMenu->actions())
+            if (action->property("toolbarRecentFile").toBool()) openMenu->removeAction(action);
+        for (auto *action : m_recentMenu->actions()) {
+            action->setProperty("toolbarRecentFile", true);
+            openMenu->addAction(action);
+        }
+    });
+    addCommonAction("ProjectLibraryAction", QStringLiteral("프로젝트"), 24);
+    auto *projectAction = findChild<QAction *>(QStringLiteral("ProjectLibraryAction"));
+    auto *projectButton = qobject_cast<QToolButton *>(toolbar->widgetForAction(projectAction));
+    projectButton->setObjectName(QStringLiteral("ToolbarProjectLibraryActionButton"));
+    projectButton->setProperty("workflowLabeled", true);
+    projectButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    projectButton->setFixedHeight(sidebarButtonSize);
+    projectButton->setIconSize(QSize(sidebarIconSize, sidebarIconSize));
+    projectButton->setAccessibleName(QStringLiteral("프로젝트"));
+    projectButton->setToolTip(QStringLiteral("프로젝트·반응 경로 관리 (Ctrl+Shift+P)"));
+    auto *libraryMenu = new QMenu(QStringLiteral("구조 라이브러리"), this);
+    libraryMenu->setObjectName(QStringLiteral("ToolbarLibraryMenu"));
+    auto *insertFragment = findChild<QAction *>(QStringLiteral("InsertFragmentAction"));
+    libraryMenu->addAction(insertFragment);
+    libraryMenu->addAction(QStringLiteral("BIOCC 리간드…"), this, [this] { openFragmentBrowser(true); })
+        ->setObjectName(QStringLiteral("OpenLabLigandsAction"));
+    libraryMenu->addAction(QStringLiteral("금속–리간드–산소 조합…"), this, &MainWindow::buildLabComplex)
+        ->setObjectName(QStringLiteral("BuildLabComplexAction"));
+    libraryMenu->addAction(findChild<QAction *>(QStringLiteral("ReplaceLigandTemplate")));
+    insertFragment->setIconText(QStringLiteral("라이브러리"));
+    auto *libraryButton = addSplitButton(insertFragment, libraryMenu, "ToolbarLibraryButton", 30);
+    libraryButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    libraryButton->setMinimumWidth(0);
+    libraryButton->setMaximumWidth(QWIDGETSIZE_MAX);
+    libraryButton->setToolTip(QStringLiteral("프래그먼트·리간드 라이브러리 · 화살표: 리간드 교체·금속 복합체"));
     toolbar->addSeparator();
     addCommonAction("MMOptimizationAction", QStringLiteral("MM 최적화"), 3);
     addCommonAction("QMOptimizationAction", QStringLiteral("xTB"), 22);
@@ -197,10 +260,16 @@ void MainWindow::createToolBar() {
         button->setPopupMode(QToolButton::InstantPopup);
         return action;
     };
-    auto *exportAction = addPopup(QStringLiteral("내보내기"), QStringLiteral("ToolbarExport"), 32);
-    auto *exportMenu = exportAction->menu();
+    auto *exportMenu = findChild<QMenu *>(QStringLiteral("ToolbarExportMenu"));
+    exportMenu->menuAction()->setObjectName(QStringLiteral("ToolbarExport"));
+    auto *saveImage = findChild<QAction *>(QStringLiteral("SaveImageDirect"));
+    auto *exportButton = addSplitButton(saveImage, exportMenu, "ToolbarExportButton", 32);
+    exportButton->setToolTip(QStringLiteral("그림 저장 (Ctrl+Q) · 화살표: 좌표·캡처·애니메이션·PowerPoint"));
     exportMenu->setToolTipsVisible(true);
+    exportMenu->addAction(findChild<QAction *>(QStringLiteral("CopyStructureImage")));
+    exportMenu->addSeparator();
     exportMenu->addAction(findChild<QAction *>(QStringLiteral("SaveStructureImage")));
+    exportMenu->addSeparator();
     exportMenu->addAction(findChild<QAction *>(QStringLiteral("OpenMultiCapture")));
     auto *ircCapture=findChild<QAction *>(QStringLiteral("CustomStructureCapture"));
     ircCapture->setText(QStringLiteral("IRC·TS 맞춤 캡처…"));
@@ -223,7 +292,12 @@ void MainWindow::createToolBar() {
             : QStringLiteral("IRC·TS 캡처 · %1").arg(reason));
     });
 
+    exportMenu->addSeparator();
     exportMenu->addAction(findChild<QAction *>("CopyTSAnimation"));
+    exportMenu->addAction(findChild<QAction *>("ExportAnimationAction"));
+    auto *mechanism = findChild<QAction *>("OpenMechanismAnimation");
+    mechanism->setText(QStringLiteral("애니메이션·PowerPoint 제작…"));
+    exportMenu->addAction(mechanism);
     auto *captureMenu=findChild<QMenu *>("EditCaptureMenu");
     for(auto *action:exportMenu->actions())captureMenu->removeAction(action);
     auto *editMenu=findChild<QMenu *>("EditMenu");editMenu->removeAction(captureMenu->menuAction());
@@ -356,8 +430,10 @@ void MainWindow::createToolBar() {
 
     for (auto *action : toolbar->actions()) {
         if (auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action))) {
+            if (button->property("workflowSplit").toBool() || button->property("workflowLabeled").toBool()) continue;
             sizeSidebarButton(button);
             button->setAccessibleName(action->iconText());
+            button->setObjectName(QStringLiteral("Toolbar%1Button").arg(action->objectName()));
         }
     }
 
@@ -380,14 +456,14 @@ void MainWindow::createToolBar() {
     addDisplayButton(m_atomFocusMenu->menuAction(), 17);
     addDisplayButton(m_syncViewsAction, 10);
 
-    if(auto *ligands=m_drawBar->findChild<QPushButton *>("LabLigandsButton"))ligands->setIcon(actionIcon(30));
+    if(auto *ligands=m_drawBar->findChild<QPushButton *>("LabLigandsButton"))
+        ligands->setIcon(uiIcon(UiIcon::Library, ligands));
     auto *tabs = m_structureTabs->tabBar();
     tabs->setExpanding(false);
     for (int tab = 0; tab < tabs->count(); ++tab) {
         const auto label = tabs->tabText(tab);
         tabs->setTabToolTip(tab, label);
         tabs->setAccessibleTabName(tab, label);
-        tabs->setTabText(tab, {});
     }
 
     auto *editPage = qobject_cast<QScrollArea *>(m_structureTabs->widget(1))->widget();
@@ -482,9 +558,31 @@ void MainWindow::createToolBar() {
     m_viewportEditMenu->addSeparator();
     m_viewportEditMenu->addAction(m_geometryAction);
     auto *insertMenu = new QMenu(QStringLiteral("fragments / ligands"), editPage);
-    insertMenu->addAction(QStringLiteral("fragments / ligands 삽입…"), this, [this] { openFragmentBrowser(); });
-    insertMenu->addAction(QStringLiteral("금속–ligand–산소 조합…"), this, &MainWindow::buildLabComplex);
+    insertMenu->addActions(libraryMenu->actions());
     addEditButton(insertMenu->menuAction(), 30);
+
+    const auto setOperationIcon = [this](const QString &name, UiIcon icon) {
+        if (auto *action = findChild<QAction *>(name))
+            action->setProperty("operationIcon", static_cast<int>(icon));
+    };
+    setOperationIcon(QStringLiteral("MMOptimizationAction"), UiIcon::Optimize);
+    setOperationIcon(QStringLiteral("QMOptimizationAction"), UiIcon::Calculate);
+    setOperationIcon(QStringLiteral("CopyStructureImage"), UiIcon::ImageCopy);
+    setOperationIcon(QStringLiteral("SaveImageDirect"), UiIcon::ImageSave);
+    setOperationIcon(QStringLiteral("ToolbarExport"), UiIcon::Export);
+    setOperationIcon(QStringLiteral("SaveXYZDirect"), UiIcon::Save);
+    setOperationIcon(QStringLiteral("InsertFragmentAction"), UiIcon::InsertFragment);
+    setOperationIcon(QStringLiteral("OpenLabLigandsAction"), UiIcon::Library);
+    setOperationIcon(QStringLiteral("BuildLabComplexAction"), UiIcon::InsertFragment);
+    setOperationIcon(QStringLiteral("ApplicationSettingsAction"), UiIcon::Style);
+    setOperationIcon(QStringLiteral("DrawCurrentStructure"), UiIcon::EditAtoms);
+    setOperationIcon(QStringLiteral("FreezeOptimizationCore"), UiIcon::Lock);
+    setOperationIcon(QStringLiteral("UnfreezeOptimizationCore"), UiIcon::Lock);
+    const QVector<UiIcon> analysisIcons{UiIcon::Geometry, UiIcon::Frequency, UiIcon::Scan,
+        UiIcon::Irc, UiIcon::Spectrum};
+    for (int i = 0; i < analysisIcons.size(); ++i)
+        setOperationIcon(QStringLiteral("AnalysisPanelTab%1").arg(i), analysisIcons[i]);
+    setOperationIcon(QStringLiteral("AnalysisPanelTab6"), UiIcon::Orbital);
 
     struct Theme { QString name, description, paper, surface, tint, ink, border; };
     const QVector<Theme> themes = {
@@ -524,7 +622,7 @@ void MainWindow::createToolBar() {
         action->setData(i);
         themeGroup->addAction(action);
     }
-    auto applyTheme = [this,themes,themeGroup](int index) {
+    auto applyTheme = [this,toolbar,themes,themeGroup](int index) {
         index = qBound(0, index, int(themes.size())-1);
         const auto &t=themes[index];
         setProperty("professorBackdrop", index == 6);
@@ -593,7 +691,7 @@ void MainWindow::createToolBar() {
             "QTabBar::tab { padding:6px 12px; color:%2; background:%4; border:1px solid %6; }"
             "QTabBar::tab:hover { background:%7; }"
             "QTabBar::tab:selected { background:%3; color:%5; border-color:%3; }"
-            "QTabWidget#StructureToolsTabs QTabBar::tab { width:30px; height:30px; padding:0;"
+            "QTabWidget#StructureToolsTabs QTabBar::tab { min-width:54px; height:30px; padding:0 6px;"
             " margin-right:4px; border:1px solid %6; border-radius:7px; background:%4; }"
             "QTabWidget#StructureToolsTabs QTabBar::tab:hover { border-color:%3; background:%7; }"
             "QTabWidget#StructureToolsTabs QTabBar::tab:selected { border-color:%3; background:%3; }"
@@ -603,8 +701,22 @@ void MainWindow::createToolBar() {
             "QToolTip { background:%4; color:%2; border:1px solid %6; padding:5px; }"
         ).arg(t.paper,text,t.ink,field,QStringLiteral("#ffffff"),border,t.tint));
         for (auto *action : findChildren<QAction *>()) {
+            const auto operation = action->property("operationIcon");
+            if (operation.isValid()) {
+                action->setIcon(uiIcon(static_cast<UiIcon>(operation.toInt()), this));
+                continue;
+            }
             const auto iconId = action->property("toolbarIconId");
             if (iconId.isValid()) action->setIcon(actionIcon(iconId.toInt(), QColor(t.ink)));
+        }
+        // Custom split widgets have their own toolbar actions. Keep their overflow
+        // and accessibility metadata aligned with the visible default operation.
+        for (auto *action : toolbar->actions()) {
+            auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
+            if (!button || !button->property("workflowSplit").toBool()) continue;
+            action->setIcon(button->icon());
+            action->setText(button->accessibleName());
+            action->setToolTip(button->toolTip());
         }
         for (int tab = 0; tab < m_structureTabs->count(); ++tab)
             m_structureTabs->setTabIcon(tab, actionIcon(tab == 0 ? 9 : tab == 1 ? 2 : 3, QColor(t.ink)));

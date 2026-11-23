@@ -1,1 +1,2 @@
 tools/build_xtb_runtime.sh text eol=lf
+tests/data/corpus-seed/CIF/*.cif -text

@@ -44,8 +44,9 @@ QWidget *AnalysisPanel::makeScanTab() {
     m_scanStatus->setWordWrap(true);
     outer->addWidget(m_scanStatus);
     auto *openGraph = new QPushButton(QStringLiteral("스캔 그래프..."));
-    makeSidebarIconButton(openGraph, QStyle::SP_FileDialogDetailedView);
+    makeSidebarIconButton(openGraph, UiIcon::Scan);
     openGraph->setObjectName(QStringLiteral("OpenScanGraph"));
+    openGraph->setEnabled(false);
     outer->addWidget(openGraph);
     connect(openGraph, &QPushButton::clicked, this, [this] {
         if (!m_scanResults) {
@@ -67,8 +68,19 @@ QWidget *AnalysisPanel::makeScanTab() {
     m_scanList = new QListWidget;
     m_scanList->setObjectName(QStringLiteral("ScanList"));
     layout->addWidget(m_scanList, 1);
+    m_scanPlot = new PlotWidget(page);
+    m_scanPlot->setObjectName(QStringLiteral("ScanEnergyPreview"));
+    m_scanPlot->setMinimumHeight(150);
+    m_scanPlot->setMaximumHeight(220);
+    m_scanPlot->hide();
+    m_scanPlot->setToolTip(QStringLiteral("스캔 지점을 선택하면 해당 구조를 표시합니다. 전체 그래프에서 최적화 이력과 내보내기를 확인할 수 있습니다."));
+    layout->addWidget(m_scanPlot);
     m_scanList->installEventFilter(this);
+    m_scanPlot->installEventFilter(this);
     connect(m_scanList, &QListWidget::currentRowChanged, this, [this](int row) { if (row >= 0) { setCurrentScanPoint(row); emit scanPointRequested(row); } });
+    connect(m_scanPlot, &PlotWidget::pointClicked, this, [this](int row) {
+        if (row >= 0 && row < m_data.scanPoints.size()) { setCurrentScanPoint(row); emit scanPointRequested(row); }
+    });
     return page;
 }
 
@@ -83,16 +95,25 @@ QWidget *AnalysisPanel::makeIrcTab() {
     layout->addWidget(m_ircPlot, 3);
     m_ircList->installEventFilter(this);
     m_ircPlot->installEventFilter(this);
-    connect(m_ircList, &QListWidget::currentRowChanged, this, [this](int row) { if (row >= 0) emit ircPointRequested(row); });
-    connect(m_ircPlot, &PlotWidget::pointClicked, this, &AnalysisPanel::ircPointRequested);
+    connect(m_ircList, &QListWidget::currentRowChanged, this, [this](int row) {
+        if (row >= 0) { setCurrentIrcPoint(row); emit ircPointRequested(row); }
+    });
+    connect(m_ircPlot, &PlotWidget::pointClicked, this, [this](int row) {
+        if (row >= 0 && row < m_data.ircPoints.size()) { setCurrentIrcPoint(row); emit ircPointRequested(row); }
+    });
     return page;
 }
 
 void AnalysisPanel::fillScanPlot() {
     const QSignalBlocker blocker(m_scanList);
     m_scanList->clear();
+    QVector<QPointF> series;
+    QVector<PlotWidget::HeatmapPoint> heatmap;
     for (int i = 0; i < m_data.scanPoints.size(); ++i) {
         const ScanPoint &point = m_data.scanPoints[i];
+        series.push_back({point.coordinate, point.relativeKcal});
+        if (m_data.scanDimensions == 2)
+            heatmap.push_back({point.coordinate, point.coordinate2, point.relativeKcal, i, point.energyHartree});
         if (m_data.format == QStringLiteral("GSM")) {
             m_scanList->addItem(QStringLiteral("노드 %1  |  ΔE %2 kcal/mol")
                                     .arg(point.index).arg(numberOrDash(point.relativeKcal, 2)));
@@ -113,6 +134,13 @@ void AnalysisPanel::fillScanPlot() {
             : QStringLiteral("E = %1 Hartree").arg(point.energyHartree, 0, 'f', 2));
     }
     m_scanStatus->setText(m_data.scanStatusText());
+    if (m_data.scanDimensions == 2)
+        m_scanPlot->setHeatmapSeries(heatmap, m_data.scanAxisLabel, m_data.scanAxisLabel2, QStringLiteral("ΔE\n(kcal mol⁻¹)"));
+    else
+        m_scanPlot->setScanSeries(series, m_data.scanAxisLabel, QStringLiteral("ΔE (kcal mol⁻¹)"));
+    m_scanPlot->setVisible(!series.isEmpty());
+    if (auto *button = findChild<QPushButton*>(QStringLiteral("OpenScanGraph")))
+        button->setEnabled(!series.isEmpty());
     if (m_scanResults) m_scanResults->setData(m_data, m_scanList->currentRow());
 }
 
@@ -120,6 +148,7 @@ void AnalysisPanel::setCurrentScanPoint(int index) {
     if (index < 0 || index >= m_data.scanPoints.size()) return;
     const QSignalBlocker blocker(m_scanList);
     m_scanList->setCurrentRow(index);
+    m_scanPlot->setSelectedPoint(index);
     if (m_scanResults) m_scanResults->setSelectedPoint(index);
 }
 

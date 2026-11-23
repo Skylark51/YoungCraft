@@ -75,11 +75,6 @@ void adaptiveButton(QPushButton *button,const QIcon &icon){
     button->setIcon(icon);button->setIconSize(QSize(sidebarIconSize,sidebarIconSize));
     button->setFixedSize(sidebarButtonSize,sidebarButtonSize);button->setText({});button->setProperty("sidebarButton",true);
 }
-QIcon letterIcon(const QString &letter){
-    QPixmap pix(36,36);pix.fill(Qt::transparent);QPainter painter(&pix);painter.scale(2,2);
-    painter.setPen(QColor("#446781"));QFont font=painter.font();font.setPixelSize(14);font.setBold(true);painter.setFont(font);
-    painter.drawText(QRect(0,0,18,18),Qt::AlignCenter,letter);painter.end();pix.setDevicePixelRatio(2);return QIcon(pix);
-}
 struct OrbitalPalette { const char *name; const char *positive; const char *negative; };
 const std::array<OrbitalPalette, 8> orbitalPalettes{{
     {"Classic · Blue / Red", "#3c6eeb", "#dc4141"},
@@ -127,23 +122,24 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
         const auto path=QFileDialog::getOpenFileName(this,QStringLiteral("Orbitals 파일"),{},"Checkpoint / cube (*.chk *.fchk *.fch *.cube *.cub);;Gaussian output (*.out *.log)");
         if(!path.isEmpty()) emit openRequested(path);
     });
-    auto *save=new QPushButton(QStringLiteral("변환된 FCHK 저장…"));save->setObjectName("SaveConvertedFchk");adaptiveButton(save,style()->standardIcon(QStyle::SP_DialogSaveButton));sourceFlow->addWidget(save);
+    auto *save=new QPushButton(QStringLiteral("변환된 FCHK 저장…"));save->setObjectName("SaveConvertedFchk");adaptiveButton(save,uiIcon(UiIcon::Save,this));sourceFlow->addWidget(save);
     connect(save,&QPushButton::clicked,this,[this] {
-        if(m_data.format!="FCHK") { m_status->setText(QStringLiteral("CHK 또는 FCHK를 먼저 여세요. CHK는 formchk로 자동 변환합니다.")); return; }
+        if(m_data.format!="FCHK") { setStatus(QStringLiteral("CHK 또는 FCHK를 먼저 여세요. CHK는 formchk로 자동 변환합니다.")); return; }
         const auto path=QFileDialog::getSaveFileName(this,QStringLiteral("FCHK 저장"),"orbitals.fchk","Formatted checkpoint (*.fchk)");
         if(path.isEmpty())return;
         QFile input(m_data.filePath); QSaveFile output(path);
-        if(!input.open(QIODevice::ReadOnly)||!output.open(QIODevice::WriteOnly)) {m_status->setText(QStringLiteral("FCHK 저장 파일을 열 수 없습니다."));return;}
+        if(!input.open(QIODevice::ReadOnly)||!output.open(QIODevice::WriteOnly)) {setStatus(QStringLiteral("FCHK 저장 파일을 열 수 없습니다."));return;}
         while(!input.atEnd()) { const auto bytes=input.read(1024*1024); if(bytes.isEmpty()&&input.error()!=QFile::NoError) {output.cancelWriting();break;} if(output.write(bytes)!=bytes.size()){output.cancelWriting();break;} }
-        m_status->setText(output.commit()?QStringLiteral("FCHK 저장 완료: ")+path:QStringLiteral("FCHK 저장 실패"));
+        setStatus(output.commit()?QStringLiteral("FCHK 저장 완료: ")+path:QStringLiteral("FCHK 저장 실패"));
     });
 
     m_homo=new QPushButton("HOMO");m_homo->setObjectName("ShowHomo");m_lumo=new QPushButton("LUMO");m_lumo->setObjectName("ShowLumo");
     m_generateMep=new QPushButton(QStringLiteral("MEP 생성"));m_generateMep->setObjectName("GenerateMep");
-    adaptiveButton(m_homo,letterIcon("H"));adaptiveButton(m_lumo,letterIcon("L"));adaptiveButton(m_generateMep,style()->standardIcon(QStyle::SP_DriveNetIcon));
+    adaptiveButton(m_homo,uiIcon(UiIcon::Orbital,this));adaptiveButton(m_lumo,uiIcon(UiIcon::Orbital,this));adaptiveButton(m_generateMep,uiIcon(UiIcon::Orbital,this));
+    for(auto *button:{m_homo,m_lumo,m_generateMep})button->setProperty("orbitalKeepLabel",true);
     sourceFlow->addWidget(m_homo);sourceFlow->addWidget(m_lumo);sourceFlow->addWidget(m_generateMep);
-    connect(m_homo,&QPushButton::clicked,this,[this]{if(chooseFrontier(false))generate(false);else m_status->setText(QStringLiteral("HOMO 궤도를 찾지 못했습니다."));});
-    connect(m_lumo,&QPushButton::clicked,this,[this]{if(chooseFrontier(true))generate(false);else m_status->setText(QStringLiteral("LUMO 궤도를 찾지 못했습니다."));});
+    connect(m_homo,&QPushButton::clicked,this,[this]{showFrontierOrbital(false);});
+    connect(m_lumo,&QPushButton::clicked,this,[this]{showFrontierOrbital(true);});
     connect(m_generateMep,&QPushButton::clicked,this,[this]{generate(true);});
     auto *remote=new QGroupBox(QStringLiteral("계산 서버 · 자동 연결"));
     remote->setObjectName("RemoteGaussianEnabled");remote->setCheckable(true);
@@ -186,7 +182,7 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     connect(remote,&QGroupBox::toggled,this,[this](bool checked){
         QSettings().setValue("orbitals/remoteEnabled",checked);
         GaussianConnection::instance()->connectNow(true);
-        m_status->setText(checked?QStringLiteral("서버 자동 연결을 사용합니다. CHK를 열면 HOMO를 자동 생성합니다."):QStringLiteral("로컬 Gaussian 실행을 선택했습니다."));
+        setStatus(checked?QStringLiteral("서버 자동 연결을 사용합니다. CHK를 열면 HOMO를 자동 생성합니다."):QStringLiteral("로컬 Gaussian 실행을 선택했습니다."));
     });
     layout->addWidget(remote);
     auto *toolGroup=new QGroupBox(QStringLiteral("로컬 Gaussian 도구 경로 (서버 실행 해제 시 사용)"));
@@ -201,13 +197,14 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     remoteForm->insertRow(remoteForm->rowCount()-1,toolGroup);
     m_tables=new QTabWidget; m_tables->setObjectName("OrbitalAnalysisTables");m_tables->setMinimumWidth(0);m_tables->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);m_tables->setUsesScrollButtons(true);m_tables->tabBar()->setExpanding(false);m_tables->setElideMode(Qt::ElideNone);m_tables->tabBar()->setStyleSheet("QTabBar::tab { padding:4px 5px; }");
     m_orbitals=table({"MO","Spin","Energy (eV)","Occupation","Frontier"});m_orbitals->setObjectName("OrbitalTable");
+    connect(m_orbitals,&QTableWidget::currentCellChanged,this,[this]{updateGenerationButtons();});
     const int widths[]={38,48,86,72,68};for(int col=0;col<5;++col)m_orbitals->setColumnWidth(col,widths[col]);
     connect(m_orbitals,&QTableWidget::cellClicked,this,[this](int row,int){if(m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
     connect(m_orbitals,&QTableWidget::cellDoubleClicked,this,[this](int row,int){if(!m_renderedSelections.contains(orbitalSelectionKey(row)))generate(false);});
     m_orbitals->setToolTip(QStringLiteral("처음에는 MO를 두 번 클릭하거나 생성 버튼을 누르세요. 이미 생성한 MO는 한 번 클릭하면 바로 표시합니다."));
     m_tables->addTab(m_orbitals,"FMO"); layout->addWidget(m_tables,1);
     auto *tableActions=new QWidget(this);tableActions->setObjectName("OrbitalTableActions");auto *frontier=new SidebarFlowLayout(tableActions);
-    auto *exportButton=new QPushButton(QStringLiteral("표 저장…"));exportButton->setObjectName("ExportOrbitalTable");adaptiveButton(exportButton,style()->standardIcon(QStyle::SP_DialogSaveButton));frontier->addWidget(exportButton);connect(exportButton,&QPushButton::clicked,this,&OrbitalStudyWidget::exportTable);
+    auto *exportButton=new QPushButton(QStringLiteral("표 저장…"));exportButton->setObjectName("ExportOrbitalTable");adaptiveButton(exportButton,uiIcon(UiIcon::Export,this));frontier->addWidget(exportButton);connect(exportButton,&QPushButton::clicked,this,&OrbitalStudyWidget::exportTable);
     auto *expand=new QPushButton(QStringLiteral("분석 표 확대"));expand->setObjectName("ExpandOrbitalTable");adaptiveButton(expand,style()->standardIcon(QStyle::SP_TitleBarMaxButton));frontier->addWidget(expand);connect(expand,&QPushButton::clicked,this,&OrbitalStudyWidget::expandTable);layout->addWidget(tableActions);
     auto *filter=new QLineEdit;filter->setObjectName("OrbitalTableFilter");filter->setPlaceholderText(QStringLiteral("분석 표 검색…"));filter->setToolTip(QStringLiteral("원자 / donor / acceptor 등 분석 표 검색"));layout->addWidget(filter);
     connect(filter,&QLineEdit::textChanged,this,[this](const QString &text){for(auto *t:m_tables->findChildren<QTableWidget*>())for(int r=0;r<t->rowCount();++r){bool found=text.isEmpty();for(int c=0;c<t->columnCount();++c)if(t->item(r,c))found|=t->item(r,c)->text().contains(text,Qt::CaseInsensitive);t->setRowHidden(r,!found);}});
@@ -216,16 +213,16 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     m_density=new QComboBox;m_density->addItems({"SCF","MP2","CI","QCI"});m_density->setToolTip(QStringLiteral("FCHK에 저장된 밀도 유형을 선택하세요. 없는 밀도는 cubegen이 오류를 보고합니다."));form->addRow(QStringLiteral("MEP 밀도"),m_density);
     controls->addLayout(form);
     auto *generationActions=new QWidget(this);generationActions->setObjectName("OrbitalGenerationActions");auto *actions=new SidebarFlowLayout(generationActions); m_generateMo=new QPushButton(QStringLiteral("선택 MO 표시 / 생성"));m_generateMo->setObjectName("GenerateMo");
-    adaptiveButton(m_generateMo,style()->standardIcon(QStyle::SP_MediaPlay));actions->addWidget(m_generateMo);controls->addWidget(generationActions);
+    adaptiveButton(m_generateMo,uiIcon(UiIcon::Orbital,this));actions->addWidget(m_generateMo);controls->addWidget(generationActions);
     connect(m_generateMo,&QPushButton::clicked,this,[this]{generate(false);});
-    auto *map=new QPushButton(QStringLiteral("현재 density cube에 potential cube 매핑…"));map->setObjectName("MapOrbitalPotential");adaptiveButton(map,style()->standardIcon(QStyle::SP_BrowserReload));actions->addWidget(map);
+    auto *map=new QPushButton(QStringLiteral("현재 density cube에 potential cube 매핑…"));map->setObjectName("MapOrbitalPotential");adaptiveButton(map,uiIcon(UiIcon::Apply,this));actions->addWidget(map);
     connect(map,&QPushButton::clicked,this,[this]{
-        if(!m_surface) {m_status->setText(QStringLiteral("전자밀도 cube 파일을 먼저 여세요."));return;}
+        if(!m_surface) {setStatus(QStringLiteral("전자밀도 cube 파일을 먼저 여세요."));return;}
         const auto f=QFileDialog::getOpenFileName(this,QStringLiteral("Potential cube"),{},"Cube (*.cube *.cub)");if(f.isEmpty())return;
-        auto potential=std::make_shared<CubeGrid>(CubeParser::parse(f));if(!potential->valid){m_status->setText(potential->error);return;}
-        if(potential->molecule.atoms.size()!=m_surface->molecule.atoms.size()){m_status->setText(QStringLiteral("두 cube의 molecule가 다릅니다."));return;}
-        for(int i=0;i<potential->molecule.atoms.size();++i)if(potential->molecule.atoms[i].atomicNumber!=m_surface->molecule.atoms[i].atomicNumber||(potential->molecule.atoms[i].position-m_surface->molecule.atoms[i].position).length()>0.001f){m_status->setText(QStringLiteral("두 cube의 원자/좌표가 일치하지 않습니다."));return;}
-        for(int x:{0,m_surface->nx-1})for(int y:{0,m_surface->ny-1})for(int z:{0,m_surface->nz-1})if(!std::isfinite(potential->sample(m_surface->origin+x*m_surface->axisX+y*m_surface->axisY+z*m_surface->axisZ))){m_status->setText(QStringLiteral("Potential 격자가 density 격자 전체를 포함해야 합니다."));return;}
+        auto potential=std::make_shared<CubeGrid>(CubeParser::parse(f));if(!potential->valid){setStatus(potential->error);return;}
+        if(potential->molecule.atoms.size()!=m_surface->molecule.atoms.size()){setStatus(QStringLiteral("두 cube의 molecule가 다릅니다."));return;}
+        for(int i=0;i<potential->molecule.atoms.size();++i)if(potential->molecule.atoms[i].atomicNumber!=m_surface->molecule.atoms[i].atomicNumber||(potential->molecule.atoms[i].position-m_surface->molecule.atoms[i].position).length()>0.001f){setStatus(QStringLiteral("두 cube의 원자/좌표가 일치하지 않습니다."));return;}
+        for(int x:{0,m_surface->nx-1})for(int y:{0,m_surface->ny-1})for(int z:{0,m_surface->nz-1})if(!std::isfinite(potential->sample(m_surface->origin+x*m_surface->axisX+y*m_surface->axisY+z*m_surface->axisZ))){setStatus(QStringLiteral("Potential 격자가 density 격자 전체를 포함해야 합니다."));return;}
         showSurface(m_surface,potential);
     });
     auto *surfaceGroup=new QGroupBox(QStringLiteral("Surfaces · 등가면 / 색상"));auto *surfaceForm=new QFormLayout(surfaceGroup);
@@ -266,9 +263,9 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
     for(auto *s:{m_opacity,m_min,m_max})connect(s,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[this]{applyStyle();});
     for(auto *b:{m_positive,m_negative})connect(b,&QCheckBox::toggled,this,[this]{applyStyle();});
     m_status=new QLabel(QStringLiteral("Gaussian formchk / cubegen 또는 기존 cube 파일을 사용합니다."));m_status->setObjectName("OrbitalStatus");m_status->setWordWrap(true);m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);layout->insertWidget(2,m_status);
-    m_cancel=new QPushButton(QStringLiteral("계산 취소"));m_cancel->setObjectName("CancelOrbitalCalculation");m_cancel->setEnabled(false);adaptiveButton(m_cancel,style()->standardIcon(QStyle::SP_MediaStop));sourceFlow->addWidget(m_cancel);connect(m_cancel,&QPushButton::clicked,m_runner,&GaussianTools::cancel);
-    connect(m_runner,&GaussianTools::status,m_status,&QLabel::setText);
-    connect(m_runner,&GaussianTools::failed,this,[this](const QString &message){m_status->setText(message);updateGenerationButtons();});
+    m_cancel=new QPushButton(QStringLiteral("계산 취소"));m_cancel->setObjectName("CancelOrbitalCalculation");m_cancel->setEnabled(false);adaptiveButton(m_cancel,uiIcon(UiIcon::Stop,this));sourceFlow->addWidget(m_cancel);connect(m_cancel,&QPushButton::clicked,m_runner,&GaussianTools::cancel);
+    connect(m_runner,&GaussianTools::status,this,&OrbitalStudyWidget::setStatus);
+    connect(m_runner,&GaussianTools::failed,this,[this](const QString &message){setStatus(message);updateGenerationButtons();});
     connect(m_runner,&GaussianTools::ready,this,[this](auto surface,auto potential){
         showSurface(surface,potential);
         if(m_runner->lastResultSource()=="generated" && QSettings().value("orbitals/remoteEnabled",false).toBool())
@@ -285,6 +282,10 @@ OrbitalStudyWidget::OrbitalStudyWidget(QWidget *parent) : QWidget(parent), m_run
         form->setRowWrapPolicy(QFormLayout::WrapLongRows);form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     }
     setData(CalculationData{});updateResponsiveControls();
+}
+void OrbitalStudyWidget::setStatus(const QString &message) {
+    m_status->setText(message);
+    emit statusChanged(message);
 }
 QSize OrbitalStudyWidget::minimumSizeHint() const { return QSize(0,QWidget::minimumSizeHint().height()); }
 void OrbitalStudyWidget::resizeEvent(QResizeEvent *event){
@@ -313,7 +314,8 @@ void OrbitalStudyWidget::updateResponsiveControls(){
     for(auto *button:findChildren<QPushButton*>())if(button->property("orbitalResponsiveButton").toBool()){
         const auto label=button->property("orbitalButtonLabel").toString();
         const int fullWidth=button->fontMetrics().horizontalAdvance(label)+sidebarIconSize+26;
-        const bool compact=narrow||fullWidth>qMax(32,button->parentWidget()->width()-16);
+        const bool compact=!button->property("orbitalKeepLabel").toBool()
+            && (narrow||fullWidth>qMax(32,button->parentWidget()->width()-16));
         const QSize target(compact?sidebarButtonSize:fullWidth,sidebarButtonSize);
         if(button->size()!=target)button->setFixedSize(target);
         button->setText(compact?QString():label);
@@ -325,7 +327,7 @@ void OrbitalStudyWidget::updateResponsiveControls(){
 }
 void OrbitalStudyWidget::expandTable(){
     auto *source=qobject_cast<QTableWidget*>(m_tables->currentWidget());
-    if(!source){m_status->setText(QStringLiteral("확대할 분석 표를 선택하세요."));return;}
+    if(!source){setStatus(QStringLiteral("확대할 분석 표를 선택하세요."));return;}
     auto *dialog=new QDialog(this);dialog->setObjectName("ExpandedOrbitalTableDialog");dialog->setProperty("solidWorkspace",true);dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle(QStringLiteral("분석 표 · ")+m_tables->tabText(m_tables->currentIndex()));dialog->resize(900,560);
     auto *layout=new QVBoxLayout(dialog);auto *copy=new QTableWidget(source->rowCount(),source->columnCount(),dialog);copy->setObjectName("ExpandedOrbitalTable");
@@ -382,36 +384,54 @@ void OrbitalStudyWidget::setData(const CalculationData &data) {
     if (data.format=="FCHK") {
         if (QSettings().value("orbitals/remoteEnabled",false).toBool()) {
             const auto error=GaussianRemoteSettings::load().error();
-            m_status->setText(error.isEmpty()
+            setStatus(error.isEmpty()
                 ? QStringLiteral("FCHK 읽기 완료. MO를 선택하고 ‘선택 MO 생성’ 또는 ‘MEP 생성’을 누르면 계산 서버에서 실행합니다.")
                 : QStringLiteral("서버 설정을 확인하세요: ")+error);
         } else {
-            m_status->setText(!GaussianTools::isAvailable("cubegen")
+            setStatus(!GaussianTools::isAvailable("cubegen")
                 ? QStringLiteral("FCHK를 읽었지만 Gaussian cubegen 실행 파일이 없어 MO / MEP를 생성할 수 없습니다. 로컬 Gaussian 도구 경로를 지정하거나 계산 서버 실행을 선택하세요.")
                 : data.orbitals.isEmpty()
                     ? QStringLiteral("구조를 읽었지만 MO 에너지 표가 없습니다. MEP 생성은 밀도 데이터가 있는 FCHK에서 사용할 수 있습니다.")
                     : QStringLiteral("FCHK 읽기 완료. HOMO / LUMO 또는 표의 MO를 선택한 뒤 ‘선택 MO 생성’을 누르세요. MEP는 ‘MEP 생성’을 누르세요."));
         }
     } else if (data.format!="CUBE") {
-        m_status->setText(QStringLiteral("MO / MEP 생성에는 FCHK가 필요합니다. CHK는 formchk로 변환하며, 등가면 생성에는 cubegen이 필요합니다. CHK / FCHK / cube 열기로 파일을 선택하세요."));
+        setStatus(QStringLiteral("MO / MEP 생성에는 FCHK가 필요합니다. CHK는 formchk로 변환하며, 등가면 생성에는 cubegen이 필요합니다. CHK / FCHK / cube 열기로 파일을 선택하세요."));
     }
     chooseFrontier(false);updateResponsiveControls();
 }
+int OrbitalStudyWidget::frontierRow(bool lumo) const {
+    if(m_orbitals->rowCount()==0)return -1;
+    const int selected=qMax(0,m_orbitals->currentRow());
+    const auto spin=m_orbitals->item(selected,1)->text();
+    for(int row=0;row<m_orbitals->rowCount();++row)
+        if(m_orbitals->item(row,1)->text()==spin&&m_orbitals->item(row,4)->text()==(lumo?"LUMO":"HOMO"))return row;
+    return -1;
+}
 bool OrbitalStudyWidget::chooseFrontier(bool lumo) {
-    QString spin="Alpha";if(m_orbitals->currentRow()>=0)spin=m_orbitals->item(m_orbitals->currentRow(),1)->text();
-    for(int r=0;r<m_orbitals->rowCount();++r)if(m_orbitals->item(r,1)->text()==spin&&m_orbitals->item(r,4)->text()==(lumo?"LUMO":"HOMO")){m_orbitals->selectRow(r);m_orbitals->scrollToItem(m_orbitals->item(r,0));return true;}
-    return false;
+    const int row=frontierRow(lumo);
+    if(row<0)return false;
+    m_tables->setCurrentWidget(m_orbitals);
+    if(auto *filter=findChild<QLineEdit*>("OrbitalTableFilter"))filter->clear();
+    m_orbitals->selectRow(row);m_orbitals->scrollToItem(m_orbitals->item(row,0));return true;
+}
+bool OrbitalStudyWidget::frontierAvailable(bool lumo) const {
+    return !m_runner->busy()&&m_data.format=="FCHK"&&frontierRow(lumo)>=0;
+}
+void OrbitalStudyWidget::showFrontierOrbital(bool lumo) {
+    if(!frontierAvailable(lumo))return;
+    if(chooseFrontier(lumo))generate(false);
 }
 void OrbitalStudyWidget::updateGenerationButtons() {
     const bool idle=!m_runner->busy(), formatted=m_data.format=="FCHK", mo=formatted&&!m_data.orbitals.isEmpty();
-    m_generateMo->setEnabled(idle&&mo);m_homo->setEnabled(idle&&mo);m_lumo->setEnabled(idle&&mo);
+    m_generateMo->setEnabled(idle&&mo);m_homo->setEnabled(frontierAvailable(false));m_lumo->setEnabled(frontierAvailable(true));
     m_generateMep->setEnabled(idle&&formatted);m_cancel->setEnabled(!idle);
+    emit frontierAvailabilityChanged(m_homo->isEnabled(),m_lumo->isEnabled());
 }
 void OrbitalStudyWidget::startDefaultOrbital() {
     if(m_data.format!="FCHK"||m_surface||m_runner->busy())return;
     if(!QSettings().value("orbitals/remoteEnabled",false).toBool()||!QSettings().value("orbitals/autoGenerateHomo",true).toBool())return;
     if(chooseFrontier(false))generate(false);
-    else m_status->setText(QStringLiteral("FCHK를 읽었지만 HOMO를 판별할 수 없습니다. MO 표에서 궤도를 선택하세요."));
+    else setStatus(QStringLiteral("FCHK를 읽었지만 HOMO를 판별할 수 없습니다. MO 표에서 궤도를 선택하세요."));
 }
 QString OrbitalStudyWidget::orbitalSelectionKey(int row) const {
     if(row<0 || row>=m_orbitals->rowCount())return {};
@@ -423,7 +443,7 @@ QString OrbitalStudyWidget::orbitalSelectionKey(int row) const {
 void OrbitalStudyWidget::generate(bool mep) {
     if(m_runner->busy())return;
     QString kind="MEP";
-    if(!mep){int r=m_orbitals->currentRow();if(r<0){m_status->setText(QStringLiteral("궤도를 선택하세요."));return;}kind=(m_orbitals->item(r,1)->text()=="Beta"?"BMO=":"AMO=")+m_orbitals->item(r,0)->text();}
+    if(!mep){int r=m_orbitals->currentRow();if(r<0){setStatus(QStringLiteral("궤도를 선택하세요."));return;}kind=(m_orbitals->item(r,1)->text()=="Beta"?"BMO=":"AMO=")+m_orbitals->item(r,0)->text();}
     m_homo->setEnabled(false);m_lumo->setEnabled(false);m_generateMo->setEnabled(false);m_generateMep->setEnabled(false);m_cancel->setEnabled(true);
     m_requestedRow=mep?-1:m_orbitals->currentRow();
     m_requestedSelection=mep?QString():orbitalSelectionKey(m_requestedRow);
@@ -436,7 +456,7 @@ void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std
     if(!m_requestedSelection.isEmpty())m_renderedSelections.insert(m_requestedSelection);
     if (!m_mep && m_requestedRow>=0 && m_requestedRow<m_orbitals->rowCount()) {
         auto *item=m_orbitals->item(m_requestedRow,0);
-        item->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+        item->setIcon(uiIcon(UiIcon::Apply,this));
         item->setToolTip(QStringLiteral("생성 결과 저장됨 · 같은 해상도로 다시 선택하면 재사용합니다."));
     }
     updateGenerationButtons();
@@ -447,22 +467,22 @@ void OrbitalStudyWidget::showSurface(std::shared_ptr<const CubeGrid> surface,std
         {"display_ms",double(displayTimer.nsecsElapsed())/1e6},{"mep",m_mep},
         {"background",m_view?m_view->style().background.name():QString()}});
     m_status->setToolTip(QStringLiteral("생성된 cube: %1\n%2").arg(m_surface->filePath,m_potential?m_potential->filePath:QString()));
-    m_status->setText(m_mep?QStringLiteral("MEP: 전자밀도 등가면에 정전기 퍼텐셜 매핑. 이미지 복사/저장으로 내보낼 수 있습니다."):QStringLiteral("MO 등가면 생성 완료. Isovalue와 위상 색상을 조절하고 이미지 복사/저장으로 내보내세요."));
-    if(m_runner->lastResultSource()=="memory")m_status->setText(QStringLiteral("저장된 오비탈 즉시 표시 · 재계산 없음"));
-    else if(m_runner->lastResultSource()=="disk")m_status->setText(QStringLiteral("디스크에 저장된 오비탈 불러오기 완료 · Gaussian 재계산 없음"));
+    setStatus(m_mep?QStringLiteral("MEP: 전자밀도 등가면에 정전기 퍼텐셜 매핑. 이미지 복사/저장으로 내보낼 수 있습니다."):QStringLiteral("MO 등가면 생성 완료. Isovalue와 위상 색상을 조절하고 이미지 복사/저장으로 내보내세요."));
+    if(m_runner->lastResultSource()=="memory")setStatus(QStringLiteral("저장된 오비탈 즉시 표시 · 재계산 없음"));
+    else if(m_runner->lastResultSource()=="disk")setStatus(QStringLiteral("디스크에 저장된 오비탈 불러오기 완료 · Gaussian 재계산 없음"));
 
 }
 void OrbitalStudyWidget::applyStyle() {
     if(!m_view)return;
-    if(m_mep && m_min->value()>=m_max->value()){m_status->setText(QStringLiteral("MEP min은 max보다 작아야 합니다."));return;}
+    if(m_mep && m_min->value()>=m_max->value()){setStatus(QStringLiteral("MEP min은 max보다 작아야 합니다."));return;}
     auto style=m_view->style();style.surfacePattern=SurfacePattern(m_surfacePattern->currentIndex());style.isoValue=float(m_iso->value());style.isoOpacity=float(m_opacity->value());style.showPositiveSurface=m_positive->isChecked();style.showNegativeSurface=!m_mep&&m_negative->isChecked();style.positiveSurfaceColor=m_plusColor;style.negativeSurfaceColor=m_minusColor;m_view->setStyle(style);emit surfaceStyleChanged();
     m_view->setPotentialGrid(m_potential,m_min->value(),m_max->value(),m_lowColor,m_highColor);
     m_legend->setText(m_mep?QStringLiteral("MEP %1 → %2 a.u. · %3 → 흰색 → %4\n회색: 격자 범위 밖").arg(m_min->value()).arg(m_max->value()).arg(m_lowColor.name(),m_highColor.name()):QStringLiteral("MO: + / − 위상 · isovalue %1 a.u.").arg(m_iso->value()));
 }
 void OrbitalStudyWidget::exportTable() {
-    auto *t=qobject_cast<QTableWidget*>(m_tables->currentWidget());if(!t){m_status->setText(QStringLiteral("저장할 분석 표를 선택하세요."));return;}
+    auto *t=qobject_cast<QTableWidget*>(m_tables->currentWidget());if(!t){setStatus(QStringLiteral("저장할 분석 표를 선택하세요."));return;}
     const auto path=QFileDialog::getSaveFileName(this,QStringLiteral("분석 표 저장"),"orbitals.tsv","TSV (*.tsv)");if(path.isEmpty())return;
     QByteArray bytes("\xef\xbb\xbf");for(int r=-1;r<t->rowCount();++r){if(r>=0&&t->isRowHidden(r))continue;QStringList fields;for(int c=0;c<t->columnCount();++c){auto *item=r<0?t->horizontalHeaderItem(c):t->item(r,c);fields<< (item?item->text():QString()).replace('\t',' ').replace('\n',' ');}bytes+=(fields.join('\t')+'\n').toUtf8();}
-    QSaveFile out(path);const bool ok=out.open(QIODevice::WriteOnly)&&out.write(bytes)==bytes.size()&&out.commit();m_status->setText(ok?QStringLiteral("분석 표 저장 완료"):QStringLiteral("분석 표 저장 실패"));
+    QSaveFile out(path);const bool ok=out.open(QIODevice::WriteOnly)&&out.write(bytes)==bytes.size()&&out.commit();setStatus(ok?QStringLiteral("분석 표 저장 완료"):QStringLiteral("분석 표 저장 실패"));
 }
 }

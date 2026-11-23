@@ -1,6 +1,5 @@
 #include "ui/SidebarButton.h"
 #include "app/MainWindow.h"
-#include <QPainter>
 #include "render/MoleculeView.h"
 #include "animation/AnimationController.h"
 #include <QComboBox>
@@ -12,6 +11,7 @@
 #include <QFormLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -59,34 +59,51 @@ void MainWindow::setupEditorControls(QGridLayout *tools) {
     auto *layout=qobject_cast<QVBoxLayout *>(m_drawBar->layout());
     auto *arm=new QPushButton(QStringLiteral("원자 / 결합 그리기"),m_drawBar);arm->setObjectName("ArmDrawingTool");arm->setCheckable(true);
     arm->setToolTip(QStringLiteral("원소 또는 그리기 도구를 선택한 뒤 캔버스에 그립니다. 모드 진입만으로는 그려지지 않습니다."));
-    makeSidebarIconButton(arm, QStyle::SP_FileDialogContentsView);
+    makeSidebarIconButton(arm, UiIcon::EditAtoms);
     tools->addWidget(arm, 0, 0);
     connect(arm,&QPushButton::clicked,m_drawBar,[view=m_view,element=m_drawElement](bool on){int z=atomicNumberFor(element->currentText());if(on&&z>0)view->setDrawingElement(z);else view->setDrawingArmed(false);});
     connect(m_view,&MoleculeView::drawingToolChanged,arm,&QPushButton::setChecked);
     auto *chain=new QPushButton(QStringLiteral("연속 결합"),m_drawBar);chain->setObjectName("ContinuousDrawingButton");
     chain->setCheckable(true);chain->setChecked(true);m_view->setChainDrawing(true);
     chain->setToolTip(QStringLiteral("클릭으로 사슬 연장 · 기존 원자 연결로 고리 닫기 · 30° 스냅 · Alt: 자유 배치 · Esc/우클릭: 사슬 끝내기"));
-    makeSidebarIconButton(chain, QStyle::SP_BrowserReload);
+    makeSidebarIconButton(chain, UiIcon::EditBonds);
     tools->addWidget(chain, 0, 1);
     connect(chain,&QPushButton::toggled,m_view,&MoleculeView::setChainDrawing);
     auto *newChain=new QPushButton(QStringLiteral("새 사슬 (Esc)"),m_drawBar);newChain->setObjectName("EndDrawingChainButton");
-    makeSidebarIconButton(newChain, QStyle::SP_FileDialogNewFolder);
+    makeSidebarIconButton(newChain, UiIcon::Reset);
     tools->addWidget(newChain, 0, 2);
     connect(newChain,&QPushButton::clicked,m_view,&MoleculeView::endDrawingChain);
-    auto *lab=new QPushButton(QStringLiteral("Lab Ligands…"),m_drawBar);lab->setObjectName("LabLigandsButton");
-    makeSidebarIconButton(lab, QStyle::SP_DirOpenIcon);
-    QPixmap ligandPix(32,32);ligandPix.fill(Qt::transparent);QPainter ligandPainter(&ligandPix);
-    ligandPainter.setRenderHint(QPainter::Antialiasing);ligandPainter.setPen(QPen(QColor("#376688"),2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
-    ligandPainter.drawPolyline(QPolygonF{{5,11},{12,7},{19,11},{19,20},{12,24},{5,20},{5,11}});
-    ligandPainter.drawLine(19,11,27,6);ligandPainter.drawLine(19,20,27,25);ligandPainter.end();lab->setIcon(QIcon(ligandPix));
+    auto *lab=new QPushButton(QStringLiteral("리간드 삽입…"),m_drawBar);lab->setObjectName("LabLigandsButton");
+    makeSidebarIconButton(lab, UiIcon::InsertFragment);
     tools->addWidget(lab, 0, 3);
 
-    auto *charge=new QSpinBox(m_drawBar);charge->setObjectName("DrawFormalCharge");charge->setRange(-4,4);charge->setPrefix("전하: ");layout->addWidget(charge);
+    auto *access = new QHBoxLayout;
+    access->setSpacing(4);
+    auto *fragments = new QPushButton(QStringLiteral("프래그먼트…"), m_drawBar);
+    fragments->setObjectName(QStringLiteral("DrawFragmentBrowserButton"));
+    fragments->setToolTip(QStringLiteral("프래그먼트를 선택해 구조에 삽입합니다."));
+    auto *transform = new QPushButton(QStringLiteral("이동·회전…"), m_drawBar);
+    transform->setObjectName(QStringLiteral("DrawTransformSelectionButton"));
+    transform->setToolTip(QStringLiteral("선택한 원자를 거리·각도로 이동하거나 회전합니다."));
+    for (auto *button : {fragments, transform}) {
+        button->setMinimumWidth(0);
+        button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        button->setAccessibleName(button->text());
+        access->addWidget(button, 1);
+    }
+    layout->addLayout(access);
+
+    auto *charge=new QSpinBox(m_drawBar);charge->setObjectName("DrawFormalCharge");charge->setRange(-4,4);charge->setPrefix("전하: ");
     auto *periodic=new QPushButton(QStringLiteral("주기율표"),m_drawBar);periodic->setObjectName("DrawPeriodicTable");
-    makeSidebarIconButton(periodic, QStyle::SP_FileDialogListView);
+    makeSidebarIconButton(periodic, UiIcon::PeriodicTable);
     tools->addWidget(periodic, 2, 0);
 
-    auto *recent=new QComboBox(m_drawBar);recent->setObjectName("DrawRecentElements");recent->addItem(QStringLiteral("최근 원소"));recent->addItems(QSettings().value("drawing/recentElements").toStringList());recent->setMaximumWidth(100);layout->addWidget(recent);
+    auto *recent=new QComboBox(m_drawBar);recent->setObjectName("DrawRecentElements");recent->addItem(QStringLiteral("최근 원소"));recent->addItems(QSettings().value("drawing/recentElements").toStringList());recent->setMaximumWidth(100);
+    auto *stateRow = new QHBoxLayout;
+    stateRow->setSpacing(4);
+    stateRow->addWidget(charge, 1);
+    stateRow->addWidget(recent, 1);
+    layout->addLayout(stateRow);
     connect(recent,&QComboBox::textActivated,m_drawElement,[selector=m_drawElement,view=m_view](const QString&s){int z=atomicNumberFor(s);if(z>0){selector->setCurrentText(s);view->setDrawingElement(z);}});
     auto *state=new QLabel(m_drawBar);state->setObjectName("DrawStateSummary");state->setWordWrap(true);layout->addWidget(state);
     auto refresh=[view=m_view,element=m_drawElement,order=m_drawBondOrder,autoH=m_autoHButton,charge,state]{DrawState s;s.element=atomicNumberFor(element->currentText());s.bondOrder=order->currentData().toDouble();s.formalCharge=charge->value();s.autoHydrogen=autoH->isChecked();view->setDrawingBondOrder(s.bondOrder);state->setText(QString("원소: %1 · 결합: %2 · 전하: %3 · 자동 수소: %4").arg(elementSymbol(s.element),s.bondOrder==0?"자동":QString::number(s.bondOrder)).arg(s.formalCharge).arg(s.autoHydrogen?"켜짐":"꺼짐")+(view->drawingArmed()?QStringLiteral(" · 그리기 준비"):QStringLiteral(" · 도구 선택 대기")));};
@@ -100,6 +117,10 @@ void MainWindow::setupEditorControls(QGridLayout *tools) {
 void MainWindow::connectEditorControls() {
     auto *lab=m_drawBar->findChild<QPushButton *>("LabLigandsButton");
     auto *periodic=m_drawBar->findChild<QPushButton *>("DrawPeriodicTable");
+    auto *fragments=m_drawBar->findChild<QPushButton *>("DrawFragmentBrowserButton");
+    auto *transform=m_drawBar->findChild<QPushButton *>("DrawTransformSelectionButton");
+    m_documentConnections.push_back(connect(fragments,&QPushButton::clicked,this,[this]{openFragmentBrowser();}));
+    m_documentConnections.push_back(connect(transform,&QPushButton::clicked,this,&MainWindow::manipulateSelection));
     m_documentConnections.push_back(connect(lab,&QPushButton::clicked,this,[this]{openFragmentBrowser(true);}));
     m_documentConnections.push_back(connect(periodic,&QPushButton::clicked,this,[this]{QDialog d(this);d.setWindowTitle(QStringLiteral("주기율표 — 원소 선택"));QGridLayout grid(&d);
         // Standard periodic-table rows, including separated lanthanide / actinide rows.
@@ -144,7 +165,10 @@ void MainWindow::changeSelectionElement(){
 }
 void MainWindow::manipulateSelection(){
     auto ids=m_view->selection().atoms;if(ids.isEmpty()&&m_view->selectedAtom()>=0)ids.insert(m_view->selectedAtom());if(ids.isEmpty()){setStatus(QStringLiteral("이동할 원자를 선택하세요."));return;}
-    QDialog d(this);d.setWindowTitle("선택 원자 이동 / 회전");QFormLayout form(&d);QDoubleSpinBox tx,ty,tz,rx,ry,rz;for(auto*b:{&tx,&ty,&tz}){b->setRange(-10000,10000);b->setDecimals(4);b->setSuffix(" Å");}for(auto*b:{&rx,&ry,&rz}){b->setRange(-360,360);b->setSuffix("°");}form.addRow("X축 이동",&tx);form.addRow("Y축 이동",&ty);form.addRow("Z축 이동",&tz);form.addRow("X축 회전",&rx);form.addRow("Y축 회전",&ry);form.addRow("Z축 회전",&rz);QComboBox center;center.addItems({"원점","molecule 중심","선택 원자 중심"});center.setCurrentIndex(2);form.addRow("회전 중심",&center);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
+    QDialog d(this);d.setObjectName(QStringLiteral("TransformSelectionDialog"));d.setWindowTitle("선택 원자 이동 / 회전");QFormLayout form(&d);QDoubleSpinBox tx,ty,tz,rx,ry,rz;for(auto*b:{&tx,&ty,&tz}){b->setRange(-10000,10000);b->setDecimals(4);b->setSuffix(" Å");}for(auto*b:{&rx,&ry,&rz}){b->setRange(-360,360);b->setSuffix("°");}
+    tx.setObjectName(QStringLiteral("TransformSelectionX"));ty.setObjectName(QStringLiteral("TransformSelectionY"));tz.setObjectName(QStringLiteral("TransformSelectionZ"));
+    rx.setObjectName(QStringLiteral("TransformSelectionRotationX"));ry.setObjectName(QStringLiteral("TransformSelectionRotationY"));rz.setObjectName(QStringLiteral("TransformSelectionRotationZ"));
+    form.addRow("X축 이동",&tx);form.addRow("Y축 이동",&ty);form.addRow("Z축 이동",&tz);form.addRow("X축 회전",&rx);form.addRow("Y축 회전",&ry);form.addRow("Z축 회전",&rz);QComboBox center;center.setObjectName(QStringLiteral("TransformSelectionCenter"));center.addItems({"원점","분자 중심","선택 원자 중심"});center.setCurrentIndex(2);form.addRow("회전 중심",&center);QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);buttons.setObjectName(QStringLiteral("TransformSelectionButtons"));buttons.button(QDialogButtonBox::Ok)->setText(QStringLiteral("확인"));buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));form.addRow(&buttons);connect(&buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(&buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return;
     auto edited=m_view->molecule();QVector3D c;if(center.currentIndex()==1){for(auto a:edited.atoms)c+=a.position;c/=qMax(1,int(edited.atoms.size()));}if(center.currentIndex()==2){for(int i:ids)c+=edited.atoms[i].position;c/=ids.size();}
     MoleculeEditController::transform(edited,ids,{float(tx.value()),float(ty.value()),float(tz.value())},{float(rx.value()),float(ry.value()),float(rz.value())},c);commitEditedMolecule(edited,false);
 }

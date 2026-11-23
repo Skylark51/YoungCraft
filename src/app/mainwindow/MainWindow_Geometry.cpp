@@ -69,7 +69,8 @@ void MainWindow::arrangeScanApproach() {
 }
 
 void MainWindow::toggleGeometryMode(){
-    if(!m_geometryMode) ensureEditableDocument();
+    // Measuring a calculation must not create a drawing document. The first
+    // successful edit creates its editable copy in applyGeometryMeasurement().
     m_geometryMode=!m_geometryMode;
     if(m_geometryAction)m_geometryAction->setChecked(m_geometryMode);
     if(m_geometryMode){if(m_bondEditMode){m_bondEditMode=false;m_firstBondAtom=-1;}m_animation->stop();m_workspace->setCurrentWidget(m_moleculeWorkspace);m_geometryBar->show();setStatus(QStringLiteral("구조 파라미터 편집: 원자를 순서대로 2–4개 선택하세요."),0);}else{clearGeometrySelection();m_geometryBar->hide();for(int i=0;i<3;++i)m_view->setMeasurementVisible(i,false);setStatus(QStringLiteral("구조 파라미터 편집 종료"));}
@@ -141,11 +142,15 @@ void MainWindow::applyGeometryMeasurement(int kind,double value){
     // Validate the transform before creating an editable copy of a calculation.
     const auto selection = m_geometrySelection;
     const bool firstSide = m_geometryBar->moveFirstSide();
+    const bool geometryMode = m_geometryMode;
+    const bool editExpanded = m_geometryBar->property("editExpanded").toBool();
     const bool copied = !m_currentFile.isEmpty() || !m_data.frames.isEmpty();
     const auto camera = m_view->cameraState();
     ensureEditableDocument();
     if (copied) {
         setDrawingMode(false);
+        if (m_geometryMode != geometryMode) toggleGeometryMode();
+        m_geometryBar->setProperty("editExpanded", editExpanded);
         m_view->setCameraState(camera);
         m_geometrySelection = selection;
         m_view->setGeometrySelection(selection);

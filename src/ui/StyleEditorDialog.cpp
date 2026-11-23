@@ -1,4 +1,5 @@
 #include "ui/StyleEditorDialog.h"
+#include "ui/styleeditor/StyleColorButton.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -9,6 +10,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -22,18 +24,31 @@ namespace youngcraft {
 StyleEditorDialog::StyleEditorDialog(const RenderStyle &style, const Molecule *molecule,
                                      int selectedAtom, QWidget *parent)
     : QDialog(parent), m_style(style), m_molecule(molecule), m_selectedAtom(selectedAtom) {
+    setObjectName(QStringLiteral("StyleEditorDialog"));
     setWindowTitle(QStringLiteral("표시 스타일 편집기"));
     resize(720, 520);
     auto *layout = new QVBoxLayout(this);
+    layout->addWidget(makePresetTab());
     auto *tabs = new QTabWidget;
-    tabs->addTab(makePresetTab(), QStringLiteral("프리셋"));
-    tabs->addTab(makeAtomTab(), QStringLiteral("원자"));
-    tabs->addTab(makeBondTab(), QStringLiteral("결합"));
-    tabs->addTab(makeCommonTab(), QStringLiteral("재질/조명"));
-    tabs->addTab(makeScreenTab(), QStringLiteral("화면"));
-    tabs->addTab(makeIsosurfaceTab(), QStringLiteral("등가면(Isosurface)"));
-    tabs->addTab(makeSimpleTab(QStringLiteral("원자·결합 라벨의 내용과 글꼴을 설정합니다.")), QStringLiteral("원자/결합 라벨"));
-    tabs->addTab(makeSimpleTab(QStringLiteral("거리·각도·이면각 표기의 단위와 정밀도를 설정합니다.")), QStringLiteral("구조 파라미터"));
+    tabs->setObjectName(QStringLiteral("StyleEditorTabs"));
+    auto addPage = [tabs](QWidget *page, const QString &title, const QString &name) {
+        page->setObjectName(name);
+        if (auto *form = qobject_cast<QFormLayout *>(page->layout())) {
+            form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+            form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+        }
+        auto *scroll = new QScrollArea;
+        scroll->setObjectName(name + QStringLiteral("Scroll"));
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setWidget(page);
+        tabs->addTab(scroll, title);
+    };
+    addPage(makeAtomTab(), QStringLiteral("원자·라벨"), QStringLiteral("StyleAtomsPage"));
+    addPage(makeBondTab(), QStringLiteral("결합"), QStringLiteral("StyleBondsPage"));
+    addPage(makeCommonTab(), QStringLiteral("조명"), QStringLiteral("StyleLightingPage"));
+    addPage(makeScreenTab(), QStringLiteral("화면"), QStringLiteral("StyleScreenPage"));
+    addPage(makeIsosurfaceTab(), QStringLiteral("등가면"), QStringLiteral("StyleIsosurfacePage"));
     auto *vectorTab = new QWidget;
     auto *vectorForm = new QFormLayout(vectorTab);
     m_vectorScale = new QDoubleSpinBox; m_vectorScale->setRange(0.05, 20); m_vectorScale->setValue(m_style.vectorScale);
@@ -41,9 +56,11 @@ StyleEditorDialog::StyleEditorDialog(const RenderStyle &style, const Molecule *m
     m_vectorThreshold = new QDoubleSpinBox; m_vectorThreshold->setRange(0, 1); m_vectorThreshold->setDecimals(4); m_vectorThreshold->setValue(m_style.vectorThreshold);
     vectorForm->addRow(QStringLiteral("벡터 크기"), m_vectorScale);
     vectorForm->addRow(QStringLiteral("벡터 두께"), m_vectorWidth);
-    vectorForm->addRow(QStringLiteral("숨김 threshold"), m_vectorThreshold);
-    tabs->addTab(vectorTab, QStringLiteral("벡터"));
-    tabs->addTab(makeSimpleTab(QStringLiteral("2D 구조 표시의 선 굵기와 라벨 규칙을 설정합니다.")), QStringLiteral("2D 스타일"));
+    m_vectorScale->setObjectName(QStringLiteral("StyleVectorScale"));
+    m_vectorWidth->setObjectName(QStringLiteral("StyleVectorWidth"));
+    m_vectorThreshold->setObjectName(QStringLiteral("StyleVectorThreshold"));
+    vectorForm->addRow(QStringLiteral("최소 표시 크기"), m_vectorThreshold);
+    addPage(vectorTab, QStringLiteral("벡터"), QStringLiteral("StyleVectorsPage"));
     layout->addWidget(tabs);
     auto *buttons = new QHBoxLayout;
     buttons->addStretch();
@@ -51,6 +68,13 @@ StyleEditorDialog::StyleEditorDialog(const RenderStyle &style, const Molecule *m
     auto *applyButton = new QPushButton(QStringLiteral("적용"));
     auto *saveButton = new QPushButton(QStringLiteral("저장"));
     auto *cancel = new QPushButton(QStringLiteral("취소"));
+    ok->setObjectName(QStringLiteral("StyleAccept"));
+    applyButton->setObjectName(QStringLiteral("StyleApply"));
+    saveButton->setObjectName(QStringLiteral("StyleSave"));
+    cancel->setObjectName(QStringLiteral("StyleCancel"));
+    ok->setToolTip(QStringLiteral("현재 스타일을 저장하고 닫습니다."));
+    saveButton->setToolTip(QStringLiteral("현재 스타일을 기본값으로 저장합니다."));
+    cancel->setToolTip(QStringLiteral("저장하지 않고 닫습니다."));
     buttons->addWidget(ok); buttons->addWidget(applyButton); buttons->addWidget(saveButton); buttons->addWidget(cancel);
     layout->addLayout(buttons);
     connect(ok, &QPushButton::clicked, this, [this]() { apply(); accept(); });
@@ -76,7 +100,23 @@ QWidget *StyleEditorDialog::makePresetTab() {
     m_presetCombo->addItems(StyleManager::presetNames());
     const QString canonical = StyleManager::canonicalPresetName(m_style.name);
     m_presetCombo->setCurrentText(m_presetCombo->findText(canonical) >= 0 ? canonical : QStringLiteral("사용자 지정"));
-    layout->addRow(QStringLiteral("스타일"), m_presetCombo);
+    auto *displayMode = new QComboBox(page);
+    displayMode->setObjectName(QStringLiteral("StyleDisplayMode"));
+    displayMode->addItem(QStringLiteral("공·막대"), int(DisplayMode::BallAndStick));
+    displayMode->addItem(QStringLiteral("막대"), int(DisplayMode::Stick));
+    displayMode->addItem(QStringLiteral("공간 채움 (CPK)"), int(DisplayMode::SpaceFilling));
+    displayMode->setCurrentIndex(displayMode->findData(int(m_style.displayMode)));
+    auto *row = new QHBoxLayout;
+    row->setContentsMargins(0, 0, 0, 0);
+    row->addWidget(m_presetCombo, 1);
+    row->addWidget(new QLabel(QStringLiteral("표시 방식"), page));
+    row->addWidget(displayMode, 1);
+    layout->addRow(QStringLiteral("프리셋"), row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    connect(displayMode, qOverload<int>(&QComboBox::currentIndexChanged), this, [this, displayMode] {
+        m_style.displayMode = DisplayMode(displayMode->currentData().toInt());
+        writeControls();
+    });
     connect(m_presetCombo, &QComboBox::currentTextChanged, this, [this](const QString &name) {
         if (name == QStringLiteral("사용자 지정")) m_style.name = name;
         else m_style = StyleManager::preset(name);
@@ -135,6 +175,10 @@ void StyleEditorDialog::writeControls() {
     const auto spin = [](QDoubleSpinBox *widget, float value) {
         if (widget) widget->setValue(value);
     };
+    if (auto *displayMode = findChild<QComboBox *>(QStringLiteral("StyleDisplayMode")))
+        displayMode->setCurrentIndex(displayMode->findData(int(m_style.displayMode)));
+    if (auto *labels = findChild<QComboBox *>(QStringLiteral("StyleAtomLabels")))
+        labels->setCurrentIndex((m_style.showLabels ? 1 : 0) | (m_style.showElementSymbols ? 2 : 0));
     spin(m_atomScale, m_style.atomScale);
     spin(m_spaceFillingScale, m_style.spaceFillingScale);
     const bool spaceFilling = m_style.displayMode == DisplayMode::SpaceFilling;
@@ -192,9 +236,9 @@ void StyleEditorDialog::writeControls() {
     if (m_showPositiveSurface) m_showPositiveSurface->setChecked(m_style.showPositiveSurface);
     if (m_showNegativeSurface) m_showNegativeSurface->setChecked(m_style.showNegativeSurface);
     if (m_backgroundButton) m_backgroundButton->setStyleSheet(
-        QStringLiteral("background: %1").arg(m_style.background.name()));
+        styleColorButtonSheet(m_style.background));
     if (m_bondColorButton) m_bondColorButton->setStyleSheet(
-        QStringLiteral("background: %1").arg(m_style.bondColor.name()));
+        styleColorButtonSheet(m_style.bondColor));
     refreshElementColorButton();
     for (int i = 0; i < children.size(); ++i) children[i]->blockSignals(previous[i]);
 }

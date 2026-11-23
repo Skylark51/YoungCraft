@@ -56,6 +56,7 @@ void MainWindow::createMenus() {
     };
 
     QMenu *file = menuBar()->addMenu(QStringLiteral("파일"));
+    file->setObjectName(QStringLiteral("FileMenu"));
     add(file, QStringLiteral("새 구조 그리기"), QKeySequence(QStringLiteral("Ctrl+N")), [this] { newDrawingDocument(); })
         ->setObjectName(QStringLiteral("NewStructure"));
     add(file, QStringLiteral("새로 비우기"), {}, [this] { clearDocument(); });
@@ -64,6 +65,7 @@ void MainWindow::createMenus() {
     add(file, QStringLiteral("프로젝트 · Reaction Pathway"), QKeySequence(QStringLiteral("Ctrl+Shift+P")),
         [this] { openProjectLibrary(); })->setObjectName(QStringLiteral("ProjectLibraryAction"));
     m_recentMenu = file->addMenu(QStringLiteral("최근 파일 다시 열기"));
+    m_recentMenu->setObjectName(QStringLiteral("RecentFilesMenu"));
     const QStringList recent = QSettings().value(QStringLiteral("recentFiles")).toStringList();
     for (const QString &path : recent) {
         if (QFileInfo::exists(path)) add(m_recentMenu, QFileInfo(path).fileName(), {}, [this, path] { openFile(path); });
@@ -71,7 +73,7 @@ void MainWindow::createMenus() {
     add(file, QStringLiteral("여러 파일 열기"), {}, [this] {
         const QStringList paths = QFileDialog::getOpenFileNames(this, QStringLiteral("여러 파일 열기"), {}, FileDispatcher::openFilter());
         for (const auto &path : paths) openFile(path);
-    });
+    })->setObjectName(QStringLiteral("OpenMultipleFiles"));
     auto *newWindow = add(file, QStringLiteral("새 창"), {}, [] {
         auto *window = new MainWindow;
         window->setAttribute(Qt::WA_DeleteOnClose);
@@ -90,6 +92,13 @@ void MainWindow::createMenus() {
     });
     add(file, QStringLiteral("저장… (그림 / XYZ)"), QKeySequence(QStringLiteral("Ctrl+S")), [this] { saveStructure(); })
         ->setObjectName(QStringLiteral("SaveStructureImage"));
+    auto *exports = file->addMenu(QStringLiteral("내보내기"));
+    exports->setObjectName(QStringLiteral("ToolbarExportMenu"));
+    exports->setToolTipsVisible(true);
+    add(exports, QStringLiteral("그림 저장…"), QKeySequence(QStringLiteral("Ctrl+Q")), [this] { saveImage(); })
+        ->setObjectName(QStringLiteral("SaveImageDirect"));
+    add(exports, QStringLiteral("XYZ 좌표 저장…"), {}, [this] { saveXYZ(); })
+        ->setObjectName(QStringLiteral("SaveXYZDirect"));
     add(file, QStringLiteral("여러 파일 저장"), {}, [this] { showToolMessage(QStringLiteral("여러 파일 저장"), QStringLiteral("현재 문서의 여러 객체 저장은 그림 내보내기 대화상자에서 순차적으로 지원할 예정입니다.")); });
     file->addSeparator();
     add(file, QStringLiteral("종료"), {}, [this] { close(); });
@@ -122,10 +131,12 @@ void MainWindow::createMenus() {
     capture->setObjectName(QStringLiteral("EditCaptureMenu"));
     auto *mechanism = add(capture, QStringLiteral("전체 메커니즘 애니메이션…"), {}, [this] { openMechanismAnimation(); });
     mechanism->setObjectName(QStringLiteral("OpenMechanismAnimation"));
+    mechanism->setToolTip(QStringLiteral("반응 경로 애니메이션 제작 · 발표용 장면에서 PowerPoint(.pptx) 내보내기"));
     // Reuse the action so every menu path shows Ctrl+N without duplicate registration.
     build->addAction(findChild<QAction *>(QStringLiteral("NewStructure")));
     add(build, QStringLiteral("원자 추가"), {}, [this] { if (!m_drawingMode) newDrawingDocument(m_view->molecule()); else setStatus(QStringLiteral("빈 곳을 클릭하여 원자를 추가하세요.")); });
-    add(build, QStringLiteral("Fragment 삽입..."), {}, [this] { openFragmentBrowser(); });
+    add(build, QStringLiteral("프래그먼트·리간드 라이브러리…"), {}, [this] { openFragmentBrowser(); })
+        ->setObjectName(QStringLiteral("InsertFragmentAction"));
     add(build, QStringLiteral("Complex 템플릿 적용..."), {}, [this] { buildLabComplex(); });
     add(bonds, QStringLiteral("결합 추가/삭제"), QKeySequence(QStringLiteral("Ctrl+B")), [this] { toggleSelectedBond(); });
     add(selection, QStringLiteral("전체 선택"), QKeySequence::SelectAll, [this] {
@@ -200,7 +211,7 @@ void MainWindow::createMenus() {
         m_structureDock->show();
         resizeDocks({m_explorerDock, m_structureDock}, {280, 208}, Qt::Horizontal);
         setStatus(QStringLiteral("기본 패널 배치를 복원했습니다"));
-    });
+    })->setObjectName(QStringLiteral("RestorePanelLayout"));
     view->addSeparator();
     auto *projectionGroup = new QActionGroup(this);
     projectionGroup->setExclusive(true);
@@ -220,7 +231,7 @@ void MainWindow::createMenus() {
     add(view, QStringLiteral("카메라 위치 직접 지정"), {}, [this] { showToolMessage(QStringLiteral("카메라 위치 직접 지정"), QStringLiteral("마우스 드래그와 휠로 카메라를 조정할 수 있습니다.")); });
     add(view, QStringLiteral("카메라 위치 클립보드 저장"), {}, [this] { m_view->saveCameraToClipboard(); setStatus(QStringLiteral("카메라 위치를 클립보드에 저장했습니다")); });
     add(view, QStringLiteral("카메라 위치 클립보드 복원"), {}, [this] { m_view->restoreCameraFromClipboard(); });
-    add(view, QStringLiteral("고해상도 그림 출력"), QKeySequence(QStringLiteral("Ctrl+Q")), [this] { saveImage(); });
+    view->addAction(findChild<QAction *>(QStringLiteral("SaveImageDirect")));
     auto *axes = add(view, QStringLiteral("축 표시"), {}, [this] { m_style.showAxes = !m_style.showAxes; applyStyle(m_style); }); axes->setCheckable(true); axes->setChecked(m_style.showAxes);
     auto *centerAxes = add(view, QStringLiteral("molecule 중심으로 축 이동"), {}, [this] { m_style.centerAxes = !m_style.centerAxes; applyStyle(m_style); }); centerAxes->setCheckable(true); centerAxes->setChecked(m_style.centerAxes);
     auto *showHydrogen = view->addAction(QStringLiteral("수소 표시"));
@@ -353,7 +364,8 @@ void MainWindow::createMenus() {
     add(tools, QStringLiteral("Z-matrix 생성"), {}, [this] { showZMatrix(); })->setObjectName("BuildZMatrix");
     add(tools, QStringLiteral("GED 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("GED 도구 기본 골격")); });
     add(tools, QStringLiteral("결정학 도구의 기본 골격"), {}, [this] { setStatus(QStringLiteral("결정학 도구 기본 골격")); });
-    add(tools, QStringLiteral("애니메이션 생성"), {}, [this] { exportAnimation(); });
+    add(tools, QStringLiteral("애니메이션 저장…"), {}, [this] { exportAnimation(); })
+        ->setObjectName(QStringLiteral("ExportAnimationAction"));
     add(tools, QStringLiteral("데이터 요약"), {}, [this] { showToolMessage(QStringLiteral("데이터 요약"), AnalysisEngine::summary(m_data)); });
     add(tools, QStringLiteral("계산 입력파일 구역 생성"), {}, [this] { createGaussianInput(); });
     add(tools, QStringLiteral("molecule fragment 추출기"), {}, [this] { extractStructureFragments(); });
@@ -386,7 +398,7 @@ void MainWindow::createMenus() {
         const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Orbitals"), {},
             QStringLiteral("Checkpoint / cube (*.chk *.fchk *.fch *.cube *.cub);;Gaussian output (*.out *.log)"));
         if (!path.isEmpty()) openFile(path);
-    });
+    })->setObjectName(QStringLiteral("OpenOrbitalFile"));
     auto *settingsAction=new QAction(QStringLiteral("환경설정"),this);
     settingsAction->setObjectName("ApplicationSettingsAction");
     connect(settingsAction,&QAction::triggered,this,&MainWindow::openStyleEditor);

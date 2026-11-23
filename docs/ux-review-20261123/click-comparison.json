@@ -1,0 +1,173 @@
+{
+  "scenarios": [
+    {
+      "scenario": "copy-image",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "PNG on clipboard"
+    },
+    {
+      "scenario": "fragment-library",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, display tools active",
+      "endpoint": "Fragment library displayed (insertion not measured)"
+    },
+    {
+      "scenario": "frame-select",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Geometry panel active, final frame selected",
+      "endpoint": "First frame applied to 3D view"
+    },
+    {
+      "scenario": "frequency-access",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Coordinates panel active",
+      "endpoint": "Frequency panel displayed"
+    },
+    {
+      "scenario": "imaginary-select-play",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Frequency panel active, no vibration playing",
+      "endpoint": "Imaginary mode selected and playing"
+    },
+    {
+      "scenario": "irc-point",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "IRC panel active",
+      "endpoint": "Second IRC point applies matching structure"
+    },
+    {
+      "scenario": "mm-options",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "MM options displayed (calculation separately tested)"
+    },
+    {
+      "scenario": "nto-access",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "TD-DFT panel active, transition coefficients loaded",
+      "endpoint": "NTO analysis dialog displayed"
+    },
+    {
+      "scenario": "open-file-picker",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "File picker displayed (file choice not measured)"
+    },
+    {
+      "scenario": "optimization-graph-select",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Corresponding analysis panel active; separate graph window closed",
+      "endpoint": "Second graph point selected and matching molecular coordinates applied"
+    },
+    {
+      "scenario": "orbital-access",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Orbital result panel active",
+      "endpoint": "Orbital manager displayed (HOMO generation separately tested)"
+    },
+    {
+      "scenario": "project-library",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "Project library displayed"
+    },
+    {
+      "scenario": "save-image-options",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "Image save picker displayed (file choice and save not measured)"
+    },
+    {
+      "scenario": "save-transparent-png",
+      "before": 7,
+      "after": 4,
+      "observed": true,
+      "start": "Loaded result; 1400x900 window; destination entered by keyboard",
+      "endpoint": "PNG written with transparent background, 512px long edge and 600 dpi metadata"
+    },
+    {
+      "scenario": "save-xyz-picker",
+      "before": 3,
+      "after": 2,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "XYZ save picker displayed (file choice and save not measured)"
+    },
+    {
+      "scenario": "scan-graph-select",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Corresponding analysis panel active; separate graph window closed",
+      "endpoint": "Second graph point selected and matching molecular coordinates applied"
+    },
+    {
+      "scenario": "scan-point",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Scan panel active",
+      "endpoint": "Second scan point applies matching structure"
+    },
+    {
+      "scenario": "style-atom-size",
+      "before": 2,
+      "after": 1,
+      "observed": true,
+      "start": "Style editor just opened at its default page",
+      "endpoint": "Atom size changed and live style update emitted"
+    },
+    {
+      "scenario": "style-preset-return",
+      "before": 4,
+      "after": 2,
+      "observed": true,
+      "start": "Atom settings active in an open style editor",
+      "endpoint": "Dark Studio preset applied with atom settings available again"
+    },
+    {
+      "scenario": "xtb-options",
+      "before": 1,
+      "after": 1,
+      "observed": true,
+      "start": "Loaded result, main window",
+      "endpoint": "xTB options displayed (calculation separately tested)"
+    }
+  ],
+  "missing_or_failed": [],
+  "baseline": "0753d1a",
+  "protocol": "Actual left mouse clicks; deterministic data setup and typing excluded; each row specifies its endpoint.",
+  "count": 20,
+  "before_total": 37,
+  "after_total": 25,
+  "before_mean": 1.85,
+  "after_mean": 1.25,
+  "reduction_percent": 32.432432432432435
+}
