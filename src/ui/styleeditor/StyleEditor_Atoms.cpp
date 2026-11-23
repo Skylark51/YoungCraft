@@ -39,6 +39,7 @@ QWidget *StyleEditorDialog::makeAtomTab() {
         m_atomScaleSlider->setValue(qRound(value * 100.0));
     });
     m_labelSize = new QDoubleSpinBox; m_labelSize->setRange(6, 40); m_labelSize->setValue(m_style.labelSize);
+    m_labelSize->setObjectName(QStringLiteral("StyleLabelSize"));
     layout->addRow(QStringLiteral("전체 원자 크기"), atomScaleControl);
     m_spaceFillingScale = new QDoubleSpinBox;
     m_spaceFillingScale->setObjectName(QStringLiteral("SpaceFillingScale"));
@@ -49,7 +50,20 @@ QWidget *StyleEditorDialog::makeAtomTab() {
     const bool spaceFilling = m_style.displayMode == DisplayMode::SpaceFilling;
     m_spaceFillingScale->setEnabled(spaceFilling);
     m_atomScale->setEnabled(!spaceFilling); m_atomScaleSlider->setEnabled(!spaceFilling);
-    layout->addRow(QStringLiteral("라벨 크기"), m_labelSize);
+    auto *labels = new QComboBox(page);
+    labels->setObjectName(QStringLiteral("StyleAtomLabels"));
+    labels->addItems({QStringLiteral("숨김"), QStringLiteral("원자 번호"),
+                     QStringLiteral("원소 기호"), QStringLiteral("원소 기호·번호")});
+    labels->setCurrentIndex((m_style.showLabels ? 1 : 0) | (m_style.showElementSymbols ? 2 : 0));
+    connect(labels, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int mode) {
+        m_style.showLabels = (mode & 1) != 0;
+        m_style.showElementSymbols = (mode & 2) != 0;
+    });
+    auto *labelRow = new QHBoxLayout;
+    labelRow->addWidget(labels, 1);
+    labelRow->addWidget(new QLabel(QStringLiteral("크기"), page));
+    labelRow->addWidget(m_labelSize);
+    layout->addRow(QStringLiteral("원자 라벨"), labelRow);
     m_element = new QComboBox;
     m_element->setObjectName(QStringLiteral("ElementSelector"));
     for (int number = 1; number <= 118; ++number)
@@ -58,11 +72,15 @@ QWidget *StyleEditorDialog::makeAtomTab() {
         ? m_molecule->atoms[m_selectedAtom].atomicNumber : 6;
     m_element->setCurrentIndex(m_element->findData(selectedElement));
     m_elementColorButton = new QPushButton(QStringLiteral("원소색 선택"));
+    m_elementColorButton->setObjectName(QStringLiteral("StyleElementColor"));
     connect(m_elementColorButton, &QPushButton::clicked, this, &StyleEditorDialog::chooseElementColor);
     connect(m_element, qOverload<int>(&QComboBox::currentIndexChanged),
             this, &StyleEditorDialog::refreshElementColorButton);
     refreshElementColorButton();
-    layout->addRow(QStringLiteral("원소"), m_element);
+    auto *elementRow = new QHBoxLayout;
+    elementRow->addWidget(m_element, 1);
+    elementRow->addWidget(m_elementColorButton);
+    layout->addRow(QStringLiteral("원소별 설정"), elementRow);
     m_elementRadiusSlider = new QSlider(Qt::Horizontal);
     m_elementRadiusSlider->setObjectName(QStringLiteral("ElementRadiusSlider"));
     m_elementRadiusSlider->setRange(25, 300);
@@ -88,7 +106,9 @@ QWidget *StyleEditorDialog::makeAtomTab() {
     });
     loadElementRadius(m_element->currentIndex());
     layout->addRow(QStringLiteral("선택 원소 크기"), elementRadiusControl);
-    auto *resetElementRadius = new QPushButton(QStringLiteral("선택 원소 크기 100% 복원"));
+    auto *resetElementRadius = new QPushButton(QStringLiteral("100%"));
+    resetElementRadius->setObjectName(QStringLiteral("StyleResetElementRadius"));
+    resetElementRadius->setToolTip(QStringLiteral("선택한 원소의 크기를 기본값으로 되돌립니다."));
     connect(resetElementRadius, &QPushButton::clicked, this, [this] {
         if (!m_element || m_element->currentIndex() < 0) return;
         m_style.elementRadiusScales.remove(m_element->currentData().toInt());
@@ -96,9 +116,9 @@ QWidget *StyleEditorDialog::makeAtomTab() {
         m_elementRadiusValue->setText(QStringLiteral("100%"));
         apply();
     });
-    layout->addRow(resetElementRadius);
-    layout->addRow(m_elementColorButton);
-    auto *resetElement = new QPushButton(QStringLiteral("선택 원소 기본값 복원"));
+    elementRadiusLayout->addWidget(resetElementRadius);
+    auto *resetElement = new QPushButton(QStringLiteral("선택 원소 초기화"));
+    resetElement->setObjectName(QStringLiteral("StyleResetElement"));
     connect(resetElement, &QPushButton::clicked, this, [this] {
         if (!m_element) return;
         const int number = m_element->currentData().toInt();
@@ -109,8 +129,8 @@ QWidget *StyleEditorDialog::makeAtomTab() {
         refreshElementColorButton();
         apply();
     });
-    layout->addRow(resetElement);
-    auto *resetAll = new QPushButton(QStringLiteral("모든 원소 CPK 초기화"));
+    auto *resetAll = new QPushButton(QStringLiteral("모든 원소 초기화"));
+    resetAll->setObjectName(QStringLiteral("StyleResetAllElements"));
     connect(resetAll, &QPushButton::clicked, this, [this] {
         m_style.elementColors.clear();
         m_style.elementRadiusScales.clear();
@@ -119,8 +139,12 @@ QWidget *StyleEditorDialog::makeAtomTab() {
         refreshElementColorButton();
         apply();
     });
-    layout->addRow(resetAll);
-    auto *selectedColor = new QPushButton(QStringLiteral("선택된 원자에만 색상 적용"));
+    auto *resetRow = new QHBoxLayout;
+    resetRow->addWidget(resetElement);
+    resetRow->addWidget(resetAll);
+    layout->addRow(QStringLiteral("색상·크기 복원"), resetRow);
+    auto *selectedColor = new QPushButton(QStringLiteral("선택 원자 색상…"));
+    selectedColor->setObjectName(QStringLiteral("StyleSelectedAtomColor"));
     selectedColor->setEnabled(m_selectedAtom >= 0);
     connect(selectedColor, &QPushButton::clicked, this, [this] {
         if (m_selectedAtom < 0) return;
