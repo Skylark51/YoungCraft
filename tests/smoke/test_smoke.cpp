@@ -115,6 +115,8 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void uxClickMeasurements();
+    void uxResponsiveLayouts();
     void nativeNtoSidebarWorkflow();
     void transitionAnalysisNumerics();
     void transitionAnalysisWorkflow();
@@ -5690,6 +5692,8 @@ void SmokeTest::nativeNtoSidebarWorkflow() {
     dialog=window.findChild<QDialog*>("TransitionAnalysisDialog");QVERIFY(dialog);dialog->close();
     window.m_analysis->setData({});window.m_data={};window.updatePanelActions();QVERIFY(shortcut->isHidden());
 }
+
+#include "ux_review_workflow.inc"
 
 int main(int argc, char **argv) {
     // Match the application's context contract before Qt creates shared contexts.
