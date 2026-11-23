@@ -1,4 +1,5 @@
 #include "ui/StyleEditorDialog.h"
+#include "ui/styleeditor/StyleColorButton.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -235,9 +236,9 @@ void StyleEditorDialog::writeControls() {
     if (m_showPositiveSurface) m_showPositiveSurface->setChecked(m_style.showPositiveSurface);
     if (m_showNegativeSurface) m_showNegativeSurface->setChecked(m_style.showNegativeSurface);
     if (m_backgroundButton) m_backgroundButton->setStyleSheet(
-        QStringLiteral("background: %1").arg(m_style.background.name()));
+        styleColorButtonSheet(m_style.background));
     if (m_bondColorButton) m_bondColorButton->setStyleSheet(
-        QStringLiteral("background: %1").arg(m_style.bondColor.name()));
+        styleColorButtonSheet(m_style.bondColor));
     refreshElementColorButton();
     for (int i = 0; i < children.size(); ++i) children[i]->blockSignals(previous[i]);
 }

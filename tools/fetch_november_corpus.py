@@ -17,17 +17,21 @@ for entry in entries:
     target = args.destination / entry["path"]
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
-        request = urllib.request.Request(entry["url"], headers={"User-Agent": "Youngcraft-validation/1.0"})
-        for attempt in range(4):
-            try:
-                with urllib.request.urlopen(request, timeout=60) as response:
-                    data = response.read()
-                break
-            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
-                if attempt == 3:
-                    raise
-                print(f"Retrying {entry['path']} after network interruption", flush=True)
-                time.sleep(2 * (attempt + 1))
+        seed = sources.parent / "corpus-seed" / entry["path"]
+        if seed.is_file():
+            data = seed.read_bytes()
+        else:
+            request = urllib.request.Request(entry["url"], headers={"User-Agent": "Youngcraft-validation/1.0"})
+            for attempt in range(4):
+                try:
+                    with urllib.request.urlopen(request, timeout=60) as response:
+                        data = response.read()
+                    break
+                except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
+                    if attempt == 3:
+                        raise
+                    print(f"Retrying {entry['path']} after network interruption", flush=True)
+                    time.sleep(2 * (attempt + 1))
         temporary = target.with_suffix(target.suffix + ".download")
         temporary.write_bytes(data)
         temporary.replace(target)

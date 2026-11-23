@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare actual MM worker validation
+        run: python -m pip install rdkit==2026.3.6
       - uses: actions/cache/restore@v4
         id: corpus_cache
         with:

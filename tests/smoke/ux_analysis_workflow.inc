@@ -89,7 +89,14 @@ void SmokeTest::uxAnalysisClickMeasurements() {
         auto *choices = preset->view();
         const auto item = preset->model()->index(row, 0);
         choices->scrollTo(item);
-        QVERIFY(evidence.click(choices->viewport(), "Dark Studio", choices->visualRect(item).center()));
+        QTest::qWait(50);
+        const auto choicePosition = choices->visualRect(item).center();
+        QTest::mouseMove(choices->viewport(), choicePosition);
+        QTest::qWait(50);
+        QVERIFY(evidence.click(choices->viewport(), "Dark Studio", choicePosition));
+        QTest::qWait(50);
+        qInfo() << "Preset mouse selection:" << preset->currentIndex() << preset->currentText();
+        QVERIFY(evidence.capture(&style, "preset-after-selection"));
         if (tabs->currentIndex() != atoms)
             QVERIFY(evidence.click(tabs->tabBar(), "return to atom settings", tabs->tabBar()->tabRect(atoms).center()));
         QCOMPARE(style.style().name, QStringLiteral("Dark Studio"));

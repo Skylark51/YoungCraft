@@ -1,4 +1,5 @@
 #include "ui/StyleEditorDialog.h"
+#include "ui/styleeditor/StyleColorButton.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -62,7 +63,7 @@ QWidget *StyleEditorDialog::makeBondTab() {
     layout->addRow(QStringLiteral("결합 색상 방식"), m_bondColorMode);
     m_bondColorButton = new QPushButton(QStringLiteral("결합 색상"));
     m_bondColorButton->setObjectName(QStringLiteral("StyleBondColor"));
-    m_bondColorButton->setStyleSheet(QStringLiteral("background: %1").arg(m_style.bondColor.name()));
+    m_bondColorButton->setStyleSheet(styleColorButtonSheet(m_style.bondColor));
     connect(m_bondColorButton, &QPushButton::clicked, this, &StyleEditorDialog::chooseBondColor);
     layout->addRow(QStringLiteral("단일 결합 색상"), m_bondColorButton);
     return page;
@@ -72,7 +73,7 @@ void StyleEditorDialog::chooseBondColor() {
     const QColor color = QColorDialog::getColor(m_style.bondColor, this, QStringLiteral("결합 색상"));
     if (!color.isValid()) return;
     m_style.bondColor = color;
-    m_bondColorButton->setStyleSheet(QStringLiteral("background: %1").arg(color.name()));
+    m_bondColorButton->setStyleSheet(styleColorButtonSheet(color));
     apply();
 }
 

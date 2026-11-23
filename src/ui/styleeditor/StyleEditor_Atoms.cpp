@@ -1,4 +1,5 @@
 #include "ui/StyleEditorDialog.h"
+#include "ui/styleeditor/StyleColorButton.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -173,7 +174,7 @@ void StyleEditorDialog::refreshElementColorButton() {
     if (!m_element || !m_elementColorButton || m_element->currentIndex() < 0) return;
     const int number = m_element->currentData().toInt();
     const QColor color = m_style.elementColors.value(number, elementColor(number));
-    m_elementColorButton->setStyleSheet(QStringLiteral("background: %1").arg(color.name()));
+    m_elementColorButton->setStyleSheet(styleColorButtonSheet(color));
 }
 
 } // namespace youngcraft
