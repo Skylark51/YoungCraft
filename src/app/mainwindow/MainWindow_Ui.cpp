@@ -167,7 +167,8 @@ void MainWindow::createUi() {
     m_structureDock->setFeatures(QDockWidget::DockWidgetClosable);
     m_structureDock->setMinimumWidth(188);
     m_structureDock->setMaximumWidth(360);
-    m_structureTabs = new CenteredIconTabs(m_structureDock);
+    m_structureTabs = new QTabWidget(m_structureDock);
+    m_structureTabs->setUsesScrollButtons(true);
     m_structureTabs->setIconSize(QSize(sidebarIconSize,sidebarIconSize));
     m_structureTabs->setObjectName(QStringLiteral("StructureToolsTabs"));
     auto *displayPage = new QWidget;
@@ -247,21 +248,22 @@ void MainWindow::createDocumentUi() {
     auto *measurementRow = new WorkspacePaper(m_moleculeWorkspace);
     measurementRow->setObjectName(QStringLiteral("WorkspaceMeasurementRow"));
     measurementRow->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
-    measurementRow->setFixedHeight(qMax(sidebarButtonSize+8,measurementRow->fontMetrics().height()*2+8));
+    measurementRow->setMinimumHeight(sidebarButtonSize + 8);
     auto *measurementLayout = new QHBoxLayout(measurementRow);
     measurementLayout->setContentsMargins(8, 4, 8, 4);
     m_measurementReadout = new QLabel(QStringLiteral("원자를 순서대로 클릭하세요: 2개 거리 · 3개 각도 · 4개 이면각"), measurementRow);
     m_measurementReadout->setObjectName(QStringLiteral("AtomMeasurementReadout"));
     m_measurementReadout->setWordWrap(true);
+    m_measurementReadout->setToolTip(QStringLiteral("원자를 순서대로 선택: 2개 거리 · 3개 각도 · 4개 이면각"));
     m_measurementReadout->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_measurementReadout->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *clearMeasurement = new QPushButton(QStringLiteral("측정 초기화"), measurementRow);
     clearMeasurement->setObjectName(QStringLiteral("ClearAtomMeasurement"));
     measurementLayout->addWidget(m_measurementReadout, 1);
-    makeSidebarIconButton(clearMeasurement, QStyle::SP_DialogResetButton);
+    makeSidebarIconButton(clearMeasurement, UiIcon::Reset);
     auto *editMeasurement = new QPushButton(QStringLiteral("거리 / 각도 / 이면각 편집"), measurementRow);
     editMeasurement->setObjectName("EditAtomMeasurement");
-    makeSidebarIconButton(editMeasurement, QStyle::SP_FileDialogDetailedView);
+    makeSidebarIconButton(editMeasurement, UiIcon::Measure);
     measurementLayout->addWidget(editMeasurement);
     connect(editMeasurement, &QPushButton::clicked, m_geometryBar, [bar=m_geometryBar] {
         const bool expanded=!bar->property("editExpanded").toBool();
@@ -270,14 +272,14 @@ void MainWindow::createDocumentUi() {
     measurementLayout->addWidget(clearMeasurement);
     auto *approach = new QPushButton(QStringLiteral("Scan용 구조 조정…"), measurementRow);
     approach->setObjectName(QStringLiteral("ScanApproachButton"));
-    makeSidebarIconButton(approach, QStyle::SP_ArrowForward);
+    makeSidebarIconButton(approach, UiIcon::Scan);
     measurementLayout->addWidget(approach);
     auto *frequencyControls=new QWidget(measurementRow);frequencyControls->setObjectName("ViewportFrequencyControls");
     auto *frequencyRow=new QHBoxLayout(frequencyControls);frequencyRow->setContentsMargins(0,0,0,0);
     auto *frequencyToggle=new QPushButton(QStringLiteral("진동 재개"),frequencyControls);frequencyToggle->setObjectName("ViewportFrequencyToggle");
     auto *frequencyRestore=new QPushButton(QStringLiteral("원래 구조"),frequencyControls);frequencyRestore->setObjectName("ViewportFrequencyRestore");
-    makeSidebarIconButton(frequencyToggle, QStyle::SP_MediaPlay);
-    makeSidebarIconButton(frequencyRestore, QStyle::SP_MediaStop);
+    makeSidebarIconButton(frequencyToggle, UiIcon::Play);
+    makeSidebarIconButton(frequencyRestore, UiIcon::Reset);
     frequencyRow->addWidget(frequencyToggle);frequencyRow->addWidget(frequencyRestore);measurementLayout->addWidget(frequencyControls);frequencyControls->hide();
 
     moleculeLayout->addWidget(measurementRow);
@@ -429,7 +431,7 @@ void MainWindow::createDocumentUi() {
 
     auto *replaceAtom = new QPushButton(QStringLiteral("선택 원자 → 현재 원소"), m_drawBar);
     replaceAtom->setObjectName(QStringLiteral("Document_replaceAtom"));
-    makeSidebarIconButton(replaceAtom, QStyle::SP_BrowserReload);
+    makeSidebarIconButton(replaceAtom, UiIcon::EditAtoms);
     drawTools->addWidget(replaceAtom, 1, 1);
 
     auto *deleteAtom = new QPushButton(QStringLiteral("선택 원자 삭제"), m_drawBar);
@@ -441,7 +443,7 @@ void MainWindow::createDocumentUi() {
     auto *finishDrawing = new QPushButton(QStringLiteral("그리기 종료"), m_drawBar);
     finishDrawing->setObjectName(QStringLiteral("Document_finishDrawing"));
 
-    makeSidebarIconButton(finishDrawing, QStyle::SP_DialogApplyButton);
+    makeSidebarIconButton(finishDrawing, UiIcon::Apply);
     drawTools->addWidget(finishDrawing, 1, 3);
     m_drawPanels->addWidget(m_drawBar);
     m_mmBar = new QWidget(m_moleculeWorkspace);
@@ -457,14 +459,14 @@ void MainWindow::createDocumentUi() {
     mmLayout->addWidget(m_mmProgress);
     m_mmPauseButton = new QPushButton(QStringLiteral("일시정지"), m_mmBar);
     m_mmPauseButton->setObjectName(QStringLiteral("MMPauseButton"));
-    makeSidebarIconButton(m_mmPauseButton, QStyle::SP_MediaPause);
+    makeSidebarIconButton(m_mmPauseButton, UiIcon::Pause);
     mmControls->addWidget(m_mmPauseButton);
     m_mmStopButton = new QPushButton(QStringLiteral("중단"), m_mmBar);
     m_mmStopButton->setObjectName(QStringLiteral("MMStopButton"));
-    makeSidebarIconButton(m_mmStopButton, QStyle::SP_MediaStop);
+    makeSidebarIconButton(m_mmStopButton, UiIcon::Stop);
     mmControls->addWidget(m_mmStopButton);
     m_mmRestoreButton = new QPushButton(QStringLiteral("시작 구조 복원"), m_mmBar);
-    makeSidebarIconButton(m_mmRestoreButton, QStyle::SP_DialogResetButton);
+    makeSidebarIconButton(m_mmRestoreButton, UiIcon::Reset);
     mmControls->addWidget(m_mmRestoreButton);
     mmControls->addStretch();
     m_mmPlot = new PlotWidget(m_mmBar);
@@ -510,12 +512,12 @@ void MainWindow::createDocumentUi() {
     auto *axisSettings=new QPushButton(QStringLiteral("축·범위·눈금 설정…"),m_tddftWorkspace);
     axisSettings->setObjectName(QStringLiteral("TddftAxisSettings"));
     connect(axisSettings,&QPushButton::clicked,m_tddftWorkspacePlot,&PlotWidget::showAxisSettings);
-    makeSidebarIconButton(axisSettings, QStyle::SP_FileDialogDetailedView);
+    makeSidebarIconButton(axisSettings, UiIcon::Style);
     spectrumButtons->addWidget(axisSettings);
     auto *autoAxes=new QPushButton(QStringLiteral("자동 범위"),m_tddftWorkspace);
     autoAxes->setObjectName(QStringLiteral("TddftAutoRange"));
     connect(autoAxes,&QPushButton::clicked,m_tddftWorkspacePlot,&PlotWidget::clearManualRange);
-    makeSidebarIconButton(autoAxes, QStyle::SP_DialogResetButton);
+    makeSidebarIconButton(autoAxes, UiIcon::Reset);
     spectrumButtons->addWidget(autoAxes);
     auto *sourceResult=new QPushButton(QStringLiteral("선택 전이 원문 위치"),m_tddftWorkspace);
     sourceResult->setObjectName(QStringLiteral("TddftShowSource"));
@@ -644,7 +646,7 @@ void MainWindow::connectDocumentUi() {
         if (m_mmState == MMState::Running || m_mmState == MMState::Starting) m_mmState = MMState::Paused;
         else if (m_mmState == MMState::Paused) m_mmState = m_mmField.isEmpty() ? MMState::Starting : MMState::Running;
         const bool paused = m_mmState == MMState::Paused;
-        setSidebarButtonIcon(m_mmPauseButton, paused ? QStyle::SP_MediaPlay : QStyle::SP_MediaPause,
+        setSidebarButtonIcon(m_mmPauseButton, paused ? UiIcon::Play : UiIcon::Pause,
                              paused ? QStringLiteral("재개") : QStringLiteral("일시정지"));
         if (!paused && !m_mmDeferredFallback.isEmpty()) {
             m_mmOutput.prepend(m_mmDeferredFallback);
@@ -837,9 +839,9 @@ void MainWindow::connectDocumentUi() {
         const bool frequency=m_animation->kind()==AnimationController::Kind::Frequency&&m_currentFrequency>=0;
         frequencyControls->setVisible(frequency);
         if (auto *play = m_analysis->findChild<QPushButton *>("FrequencyPlay"))
-            setSidebarButtonIcon(play, frequency && playing ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay,
+            setSidebarButtonIcon(play, frequency && playing ? UiIcon::Pause : UiIcon::Play,
                                  frequency && playing ? QStringLiteral("진동 일시정지") : QStringLiteral("진동 재생"));
-        setSidebarButtonIcon(frequencyToggle, playing ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay,
+        setSidebarButtonIcon(frequencyToggle, playing ? UiIcon::Pause : UiIcon::Play,
                              playing ? QStringLiteral("진동 일시정지") : QStringLiteral("진동 재개"));
         setStatus(playing ? QStringLiteral("애니메이션 재생 중") : QStringLiteral("애니메이션 일시정지"));
     }));
