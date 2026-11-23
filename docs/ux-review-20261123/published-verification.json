@@ -1,0 +1,8 @@
+{
+  "release": "v0.1.0-pathway-54",
+  "target": "0d7476bc30eede35670aaa1b0fa00fb871310f48",
+  "files": 211,
+  "issues": [],
+  "zip_sha256": "7e62f7b05afc706f645347cb5ebeb94cb121a980526ea3968401072f9d69469f",
+  "validated_rdkit_2026_3_6_binary_match": true
+}
