@@ -13,6 +13,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Invoke-HiddenNative.ps1')
+. (Join-Path $PSScriptRoot 'PortableManifest.ps1')
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ([string]::IsNullOrWhiteSpace($BuildDir)) { $BuildDir = Join-Path $ProjectRoot 'build-current' }
@@ -118,15 +119,7 @@ try {
 
     # The patcher verifies the payload before touching any installed files.
     # Paths in the manifest are normalized to '/' separators.
-    $fileRecords = @(
-        Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
-            [ordered]@{
-                path = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
-                sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-                size = $_.Length
-            }
-        }
-    )
+    $fileRecords = @(Get-YoungcraftPortableFileRecords -Root $stage)
     $packageInfo = [ordered]@{ schema = 1; files = $fileRecords }
     $packageInfo | ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding UTF8
