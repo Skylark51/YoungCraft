@@ -65,4 +65,36 @@ void SmokeTest::uxAnalysisClickMeasurements() {
         QVERIFY(evidence.capture(&style, "atom-size-style"));
         evidence.end(true); style.reject();
     }
+    {
+        StyleEditorDialog style(StyleManager::preset(QStringLiteral("Youngcraft Studio")));
+        style.resize(720, 520); style.show(); QTest::qWait(100);
+        auto *tabs = style.findChild<QTabWidget *>();
+        auto *preset = style.findChild<QComboBox *>("StylePreset");
+        QVERIFY(tabs); QVERIFY(preset);
+        int atoms = -1, presets = -1;
+        for (int i=0; i<tabs->count(); ++i) {
+            if (tabs->tabText(i).startsWith(QStringLiteral("원자"))) atoms=i;
+            if (tabs->widget(i)->isAncestorOf(preset)) presets=i;
+        }
+        QVERIFY(atoms >= 0);
+        tabs->setCurrentIndex(atoms); QTest::qWait(50);
+        evidence.begin("style-preset-return", "Atom settings active in an open style editor",
+                       "Dark Studio preset applied with atom settings available again");
+        if (!preset->isVisible()) {
+            QVERIFY(presets >= 0);
+            QVERIFY(evidence.click(tabs->tabBar(), "preset settings", tabs->tabBar()->tabRect(presets).center()));
+        }
+        const int row = preset->findText(QStringLiteral("Dark Studio")); QVERIFY(row >= 0);
+        QVERIFY(evidence.click(preset, "choose preset"));
+        auto *choices = preset->view();
+        const auto item = preset->model()->index(row, 0);
+        choices->scrollTo(item);
+        QVERIFY(evidence.click(choices->viewport(), "Dark Studio", choices->visualRect(item).center()));
+        if (tabs->currentIndex() != atoms)
+            QVERIFY(evidence.click(tabs->tabBar(), "return to atom settings", tabs->tabBar()->tabRect(atoms).center()));
+        QCOMPARE(style.style().name, QStringLiteral("Dark Studio"));
+        QCOMPARE(tabs->currentIndex(), atoms);
+        QVERIFY(evidence.capture(&style, "preset-in-atom-settings"));
+        evidence.end(true); style.reject();
+    }
 }
