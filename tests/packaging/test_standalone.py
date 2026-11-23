@@ -233,8 +233,8 @@ class Probe {
         else:
             self.fail("Native argument probe did not report")
         self.assertEqual(arguments, observed["args"])
-        self.assertEqual(str(caller), observed["cwd"])
-        self.assertEqual(str(caller / arguments[0]), observed["relative"])
+        self.assertEqual(caller.resolve(), Path(observed["cwd"]).resolve())
+        self.assertEqual((caller / arguments[0]).resolve(), Path(observed["relative"]).resolve())
 
     def test_custom_data_migrates_and_new_bundles_win_for_unchanged_files(self):
         root = self.root("upgrade")

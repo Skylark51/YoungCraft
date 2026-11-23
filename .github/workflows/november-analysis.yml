@@ -7,14 +7,48 @@ on:
         description: Run only the UX click and DPI review
         type: boolean
         default: false
+      native_ssh:
+        description: Run only the native OpenSSH and orbital fixture
+        type: boolean
+        default: false
 
 concurrency:
   group: november-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  native-ssh-fixture:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Build and verify native OpenSSH fixture
+        shell: pwsh
+        run: |
+          cmake -S . -B build-ssh -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build-ssh/dist
+          if ($LASTEXITCODE -ne 0) { throw 'SSH fixture configure failed' }
+          cmake --build build-ssh --target test_orbitals --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'SSH fixture build failed' }
+          ctest --test-dir build-ssh --output-on-failure --timeout 180 -R '^orbital_study$'
+          $fixtureExit = $LASTEXITCODE
+          if (Test-Path build-ssh/orbital-regression.txt) { Get-Content build-ssh/orbital-regression.txt }
+          if ($fixtureExit -ne 0) { throw 'Native OpenSSH fixture failed' }
+      - name: Upload native OpenSSH evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ssh-fixture-evidence
+          path: |
+            build-ssh/orbital-regression.txt
+            build-ssh/Testing/Temporary/LastTest.log
   windows-regression:
-    if: inputs.focused != true
+    if: inputs.focused != true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -173,7 +207,7 @@ jobs:
             .build/november-corpus/provenance.json
             .build/ux-evidence/
   baseline-ux-evidence:
-    if: inputs.focused != true
+    if: inputs.focused != true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -217,7 +251,7 @@ jobs:
           include-hidden-files: true
           path: .build/ux-evidence/
   focused-ux-review:
-    if: inputs.focused == true
+    if: inputs.focused == true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 30
     steps:

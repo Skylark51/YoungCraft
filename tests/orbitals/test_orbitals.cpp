@@ -19,6 +19,8 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QStandardPaths>
+#include <QLibraryInfo>
+#include <memory>
 using namespace youngcraft;
 static QByteArray fchk(bool beta=false) {
     QByteArray text="Fixture\nSP UHF STO-3G\nNumber of atoms                            I                1\nNumber of alpha electrons                  I                1\nNumber of beta electrons                   I                0\nAtomic numbers                             I   N=           1\n 1\nCurrent cartesian coordinates              R   N=           3\n 0.0 0.0 0.0\nAlpha Orbital Energies                      R   N=           3\n -0.5 0.1 0.4\n";
@@ -32,23 +34,39 @@ static QByteArray cube(bool mo=false) {
 class OrbitalTest : public QObject {
     Q_OBJECT
 private slots:
-    void passwordHelperUsesPrivateIpc() { exercisePasswordHelper(false); }
-    void passwordHelperWithWindowsOpenSsh() { exercisePasswordHelper(true); }
+    void passwordHelperUsesPrivateIpc() {
+        for (int attempt=0;attempt<256;++attempt) {
+            exercisePasswordHelper(false);
+            if (QTest::currentTestFailed()) return;
+        }
+    }
+    void passwordHelperWithWindowsOpenSsh() {
+        for (int attempt=0;attempt<8;++attempt) {
+            bool completed=false;
+            exercisePasswordHelper(true,&completed);
+            if (!completed || QTest::currentTestFailed()) return;
+        }
+    }
 private:
-    void exercisePasswordHelper(bool nativeOpenSsh) {
+    void exercisePasswordHelper(bool nativeOpenSsh, bool *completed=nullptr) {
         QLocalServer server;server.setSocketOptions(QLocalServer::UserAccessOption);
         const auto endpoint="Youngcraft-test-"+QUuid::createUuid().toString(QUuid::Id128);QVERIFY(server.listen(endpoint));
         const auto token=QUuid::createUuid().toString();
         QByteArray received;int requests=0;
         connect(&server,&QLocalServer::newConnection,this,[&]{
             auto *socket=server.nextPendingConnection();socket->setParent(&server);
-            connect(socket,&QLocalSocket::readyRead,this,[&,socket]{
-                received+=socket->readAll();if(!received.endsWith('\n'))return;
-                const auto request=QJsonDocument::fromJson(received).object();
+            const auto buffer=std::make_shared<QByteArray>();
+            const auto receive=[&,socket,buffer]{
+                *buffer+=socket->readAll();
+                if(!buffer->endsWith('\n') || socket->property("handled").toBool())return;
+                socket->setProperty("handled",true);received=*buffer;
+                const auto request=QJsonDocument::fromJson(*buffer).object();
                 QCOMPARE(request["token"].toString(),token);QCOMPARE(request["scope"].toString(),QString("fixture@host:22"));
                 QVERIFY(request["allowPrompt"].toBool());++requests;
                 socket->write(QJsonDocument(QJsonObject{{"ok",true},{"password","fixture-only-password"}}).toJson(QJsonDocument::Compact)+'\n');socket->flush();socket->disconnectFromServer();
-            });
+            };
+            connect(socket,&QLocalSocket::readyRead,this,receive);
+            if(socket->bytesAvailable())receive();
         });
         QProcess helper;auto env=QProcessEnvironment::systemEnvironment();
         env.insert("YOUNGCRAFT_SSH_BROKER",endpoint);env.insert("YOUNGCRAFT_SSH_TOKEN",token);
@@ -57,40 +75,66 @@ private:
         helper.setProcessEnvironment(env);
         helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{"fixture@host password:"});
         QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);
-        QCOMPARE(helper.exitCode(),0);QCOMPARE(requests,1);
-        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helper.readAllStandardError().isEmpty());
+        const auto helperError=helper.readAllStandardError();
+        const auto helperDiagnostic=QString("exit=%1; status=%2; broker requests=%3; stderr=%4")
+            .arg(helper.exitCode()).arg(int(helper.exitStatus())).arg(requests).arg(QString::fromUtf8(helperError));
+        QVERIFY2(helper.exitCode()==0,qPrintable(helperDiagnostic));QCOMPARE(requests,1);
+        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helperError.isEmpty());
         QVERIFY(!received.contains("fixture-only-password"));
 #ifdef Q_OS_WIN
         if (nativeOpenSsh) {
         // Exercise the actual Windows OpenSSH askpass launcher without using an account.
-        const auto keygen=QStandardPaths::findExecutable("ssh-keygen");
+        const auto systemKeygen=QDir(qEnvironmentVariable("SystemRoot","C:/Windows"))
+            .filePath("System32/OpenSSH/ssh-keygen.exe");
+        const auto keygen=QFileInfo::exists(systemKeygen)?systemKeygen:QStandardPaths::findExecutable("ssh-keygen");
         if (keygen.isEmpty()) QSKIP("Windows OpenSSH is not installed; private IPC is tested separately");
+        qInfo().noquote()<<"OpenSSH fixture executable:"<<keygen;
         QProcess probe; probe.start(keygen, {"-?"}); probe.closeWriteChannel();
         QVERIFY(probe.waitForFinished(10000));
         if (probe.exitCode() == 255 && probe.readAllStandardOutput().isEmpty() && probe.readAllStandardError().isEmpty())
             QSKIP("System ssh-keygen exits 255 without output even for -?; native OpenSSH integration unavailable on this PC");
         QTemporaryDir portable(QDir::tempPath()+QStringLiteral("/Youngcraft 한글 공백-XXXXXX"));QVERIFY(portable.isValid());
         QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",portable.filePath("YoungcraftSshAskpass.exe")));
+        for(const auto &module:{"Qt6Core","Qt6Network"}) {
+            const auto dll=QString::fromLatin1(module)+(QLibraryInfo::isDebugBuild()?QStringLiteral("d"):QString())+QStringLiteral(".dll");
+            QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+'/'+dll,portable.filePath(dll)));
+        }
+        // Match the actual portable layout and check the copied helper's IPC.
+        helper.setWorkingDirectory(portable.path());
+        helper.start(portable.filePath("YoungcraftSshAskpass.exe"),{"fixture@host password:"});
+        QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);
+        QCOMPARE(helper.exitCode(),0);QCOMPARE(requests,2);
+        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));
+        QVERIFY(helper.readAllStandardError().isEmpty());
         QProcess makeKey;
         makeKey.setWorkingDirectory(portable.path());
         makeKey.start(keygen,{"-q","-t","ed25519","-N","fixture-only-password","-f","fixture-key"});
         QVERIFY(makeKey.waitForFinished(10000));QCOMPARE(makeKey.exitCode(),0);
+        QProcess known;known.setWorkingDirectory(portable.path());
+        known.start(keygen,{"-y","-P","fixture-only-password","-f","fixture-key"});
+        QVERIFY(known.waitForFinished(10000));QCOMPARE(known.exitCode(),0);
+        const auto publicKey=known.readAllStandardOutput();QVERIFY(publicKey.startsWith("ssh-ed25519 "));
         auto sshEnv=env;sshEnv.insert("SSH_ASKPASS",".\\YoungcraftSshAskpass.exe");
         sshEnv.insert("SSH_ASKPASS_REQUIRE","force");sshEnv.insert("DISPLAY","Youngcraft");
         sshEnv.insert("PATH",QDir::toNativeSeparators(QCoreApplication::applicationDirPath())+';'+sshEnv.value("PATH"));
         received.clear();QProcess decrypt;decrypt.setWorkingDirectory(portable.path());decrypt.setProcessEnvironment(sshEnv);
         decrypt.start(keygen,{"-y","-f","fixture-key"});decrypt.closeWriteChannel();
         QTRY_VERIFY_WITH_TIMEOUT(decrypt.state()==QProcess::NotRunning,10000);
-        QVERIFY2(decrypt.exitCode()==0,qPrintable(QString::fromUtf8(decrypt.readAllStandardError())));
-        QVERIFY(decrypt.readAllStandardOutput().startsWith("ssh-ed25519 "));QCOMPARE(requests,2);
+        const auto diagnostic=QString("keygen=%1; exit=%2; status=%3; broker requests=%4; stderr=%5")
+            .arg(keygen).arg(decrypt.exitCode()).arg(int(decrypt.exitStatus())).arg(requests)
+            .arg(QString::fromUtf8(decrypt.readAllStandardError()));
+        QVERIFY2(decrypt.exitCode()==0,qPrintable(diagnostic));
+        QCOMPARE(decrypt.readAllStandardOutput(),publicKey);QCOMPARE(requests,3);
         }
 #else
         Q_UNUSED(nativeOpenSsh);
 #endif
         // Missing broker information must fail closed, with no credential output.
+        helper.setWorkingDirectory(QCoreApplication::applicationDirPath());
         env.remove("YOUNGCRAFT_SSH_TOKEN");helper.setProcessEnvironment(env);
         helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{});
         QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);QCOMPARE(helper.exitCode(),1);QVERIFY(helper.readAllStandardOutput().isEmpty());
+        if(completed)*completed=true;
     }
 private slots:
     void fchkOccupationsAndSpin() {
