@@ -265,6 +265,15 @@ void SmokeTest::uxResponsiveLayouts() {
           {"actual_width",w.width()},{"actual_height",w.height()},{"device_pixel_ratio",w.devicePixelRatioF()},
           {"screen_width",screen?screen->geometry().width():0},{"screen_height",screen?screen->geometry().height():0},
           {"viewport_width",w.m_view->width()},{"viewport_height",w.m_view->height()},{"issues",issues},{"controls",controls}});
+        // Keep a compact diagnostic in the Qt log as well as the artifact:
+        // requested 4K/DPI labels alone do not prove the native window accepted it.
+        const QJsonObject diagnostic{{"variant",evidence.variant},{"size",label},
+          {"requested",QJsonArray{sizes[index].width(),sizes[index].height()}},
+          {"actual",QJsonArray{w.width(),w.height()}},{"dpr",w.devicePixelRatioF()},
+          {"screen",QJsonArray{screen?screen->geometry().width():0,screen?screen->geometry().height():0}},
+          {"available",QJsonArray{screen?screen->availableGeometry().width():0,screen?screen->availableGeometry().height():0}},
+          {"viewport",QJsonArray{w.m_view->width(),w.m_view->height()}},{"issues",issues}};
+        qInfo().noquote()<<"UX_LAYOUT"<<QString::fromUtf8(QJsonDocument(diagnostic).toJson(QJsonDocument::Compact));
         // Baseline defects are evidence, not a reason to lose before screenshots.
         serious|=!issues.isEmpty() || w.width()>sizes[index].width()+2 || w.height()>sizes[index].height()+2;
     }

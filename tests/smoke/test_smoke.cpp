@@ -1096,12 +1096,22 @@ void SmokeTest::calculationDefaultPanels() {
     data.route="# hf/sto-3g title=frequency";
     window.onFileLoaded(loaded); QCOMPARE(window.m_analysis->currentTab(),0);
     auto *toolbar = window.findChild<QToolBar *>("MainToolBar"); QVERIFY(toolbar);
-    QStringList buttons;
-    for (auto *action : toolbar->actions()) if (!action->isSeparator()) buttons << action->iconText();
-    for (const auto &label : {QStringLiteral("새 구조"), QStringLiteral("열기"),
-        QStringLiteral("MM 최적화"), QStringLiteral("xTB"), QStringLiteral("이미지 복사"),
-        QStringLiteral("내보내기"), QStringLiteral("결과 패널"), QStringLiteral("구조 패널"), QStringLiteral("원문 보기")})
-        QVERIFY2(buttons.contains(label), qPrintable(label));
+    // Semantic labels may change; each required operation must still have a
+    // discoverable button bound to the same action, including split buttons.
+    for (const char *name : {"NewStructure", "OpenStructureFile", "MMOptimizationAction",
+             "QMOptimizationAction", "CopyStructureImage", "ToggleResultsSidebar",
+             "ToggleStructureSidebar", "ToggleOutputSource"}) {
+        auto *action=window.findChild<QAction *>(name);QVERIFY2(action,name);
+        auto *button=toolButtonForAction(toolbar,action);QVERIFY2(button,name);
+        QVERIFY2(!button->accessibleName().isEmpty(),name);
+        QVERIFY2(!button->toolTip().isEmpty() && !button->icon().isNull(),name);
+    }
+    auto *exportButton=window.findChild<QToolButton *>("ToolbarExportButton");
+    if(exportButton) {
+        QCOMPARE(exportButton->defaultAction(),window.findChild<QAction *>("SaveImageDirect"));
+        QVERIFY(exportButton->menu());
+        QCOMPARE(exportButton->menu()->menuAction(),window.findChild<QAction *>("ToolbarExport"));
+    } else QVERIFY(toolButtonForAction(toolbar,window.findChild<QAction *>("ToolbarExport")));
     auto *xyz = window.findChild<QAction *>("AnalysisPanelTab7");
     QVERIFY(xyz && toolButtonForAction(window.m_explorerDock, xyz));
 }
@@ -1408,9 +1418,15 @@ void SmokeTest::copiesTsAnimation() {
     auto *button = window->m_analysis->findChild<QPushButton *>("CopyFrequencyAnimation");
     QVERIFY(button);
     if (scenario == 3) {
+        // No applicable mode disables the action. A disabled button emits no
+        // request and must preserve both clipboard contents and current status.
+        QVERIFY(!button->isEnabled());
+        QSignalSpy requested(window->m_analysis,&AnalysisPanel::animationCopyRequested);
+        const auto status=window->m_statusLabel->text();
         button->click();
+        QCOMPARE(requested.count(),0);
         QCOMPARE(QApplication::clipboard()->text(), QString("unchanged clipboard"));
-        QVERIFY(window->m_statusLabel->text().contains(QStringLiteral("모드")));
+        QCOMPARE(window->m_statusLabel->text(),status);
         return;
     }
     FrequencyMode mode;
@@ -1853,10 +1869,22 @@ void SmokeTest::topPanelToolbarFollowsDocuments() {
     for (const auto *name : commonActions) {
         auto *action = w.findChild<QAction *>(name);
         QVERIFY(action);
-        auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
-        QVERIFY(button && !button->icon().isNull());
-        QCOMPARE(button->size(), QSize(32, 32));
-        QVERIFY(!button->accessibleName().isEmpty());
+        auto *button = toolButtonForAction(toolbar,action);
+        // The export split button defaults to image saving; ToolbarExport is
+        // its menu action and deliberately has no widgetForAction mapping.
+        if(QString::fromLatin1(name)=="ToolbarExport") {
+            if(auto *split=w.findChild<QToolButton *>("ToolbarExportButton")) {
+                button=split;
+                QCOMPARE(split->defaultAction(),w.findChild<QAction *>("SaveImageDirect"));
+                QVERIFY(split->menu());QCOMPARE(split->menu()->menuAction(),action);
+                QCOMPARE(split->popupMode(),QToolButton::MenuButtonPopup);
+            }
+        }
+        QVERIFY2(button && !button->icon().isNull(),name);
+        if(button->property("workflowSplit").toBool()) {
+            QCOMPARE(button->height(),32);QVERIFY(button->width()>=32);
+        } else QCOMPARE(button->size(), QSize(32, 32));
+        QVERIFY2(!button->accessibleName().isEmpty(),name);
     }
     QVERIFY(!w.findChild<QAction *>("MMOptimizationAction")->isEnabled());
     QVERIFY(!w.findChild<QAction *>("CopyStructureImage")->isEnabled());
@@ -1954,9 +1982,14 @@ void SmokeTest::topPanelToolbarFollowsDocuments() {
 }
 
 void SmokeTest::rectangularViewportPickingAndCapture(){
-    MainWindow window;window.resize(1700,850);window.show();
+    MainWindow window;window.show();
     Molecule molecule;molecule.atoms={{1,6,"C",{-4,0,0}},{2,8,"O",{4,0,0}}};
     window.newDrawingDocument(molecule);window.setDrawingMode(false);
+    // Explicit wide fixture: dock widths and the runner's 1280x720 desktop
+    // must not determine the viewport aspect under test.
+    window.m_explorerDock->hide();window.m_structureDock->hide();window.m_outputDock->hide();
+    const auto available=window.screen()->availableGeometry();
+    window.resize(qMin(1000,available.width()-32),qMin(500,available.height()-64));
     QTest::qWait(100);auto *view=window.m_view;
     QCOMPARE(view->geometry(),view->parentWidget()->rect());QVERIFY(view->width()>view->height()*1.3);
     for(bool perspective:{false,true}){
@@ -1979,7 +2012,11 @@ void SmokeTest::rectangularViewportPickingAndCapture(){
     }
     QTest::qWait(100);
     const auto path=qEnvironmentVariable("YOUNGCRAFT_FLEXIBLE_VIEWPORT_PREVIEW");if(!path.isEmpty())QVERIFY(window.grab().save(path));
-    window.resize(750,1050);QTest::qWait(100);QCOMPARE(view->geometry(),view->parentWidget()->rect());
+    // Explicit tall fixture: side tools reduce the canvas width without
+    // requesting a window taller than the remote desktop can display.
+    window.m_explorerDock->show();window.m_structureDock->show();
+    window.resize(820,qMin(640,available.height()-64));QTest::qWait(100);
+    QCOMPARE(view->geometry(),view->parentWidget()->rect());
     QVERIFY(view->height()>view->width());
 }
 
@@ -2349,7 +2386,24 @@ void SmokeTest::xtbCompactColumns(){
     for(int theme=0;theme<6;++theme){
         owner.findChild<QAction*>(QString("PastelTheme%1").arg(theme))->trigger();
         for(const QSize size:{QSize(960,720),QSize(860,620)}){
-            dialog->resize(size);QTest::qWait(35);QCOMPARE(dialog->size(),size);
+            dialog->resize(size);QTest::qWait(60);
+            const auto actualSize=dialog->size();
+            const auto available=dialog->screen()->availableGeometry();
+            const auto decoration=dialog->frameGeometry().size()-actualSize;
+            QVERIFY(available.contains(dialog->frameGeometry()));
+            QVERIFY(actualSize.width()<=size.width() && actualSize.height()<=size.height());
+            // Theme synchronization clamps the decorated window to the screen.
+            // On a screen with enough room the requested size must be retained.
+            const auto usable=available.adjusted(8,8,-8,-8).size();
+            if(size.width()+decoration.width()<=usable.width() && size.height()+decoration.height()<=usable.height())
+                QCOMPARE(actualSize,size);
+            for(const char *name:{"XtbPreserveFramework","XtbPreserveBonds"}) {
+                auto *box=dialog->findChild<QCheckBox *>(name);QVERIFY(box);
+                const bool original=box->isChecked();box->click();QTest::qWait(20);
+                QCOMPARE(box->isChecked(),!original);QCOMPARE(dialog->size(),actualSize);
+                box->click();QTest::qWait(20);QCOMPARE(box->isChecked(),original);
+                QCOMPARE(dialog->size(),actualSize);
+            }
             QVERIFY(left->mapTo(dialog,QPoint(left->width(),0)).x()<=right->mapTo(dialog,QPoint()).x());
             QCOMPARE(left->horizontalScrollBar()->maximum(),0);QCOMPARE(right->horizontalScrollBar()->maximum(),0);
             auto *actions=editor->findChild<QLayout *>("ConstraintActions");QVERIFY(actions);
@@ -2365,7 +2419,7 @@ void SmokeTest::xtbCompactColumns(){
             }
             auto *table=editor->findChild<QTableWidget*>("ConstraintTable");QVERIFY(plot->mapTo(dialog,QPoint()).x()>=right->mapTo(dialog,QPoint()).x());
             QVERIFY(plot->mapTo(dialog,QPoint()).y()>table->mapTo(dialog,table->rect().bottomLeft()).y());
-            if(size.height()>=700)QVERIFY(right->viewport()->rect().contains(plot->mapTo(right->viewport(),plot->rect().bottomRight())));
+            if(actualSize.height()>=700)QVERIFY(right->viewport()->rect().contains(plot->mapTo(right->viewport(),plot->rect().bottomRight())));
             if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+QString("/theme-%1-%2x%3.png").arg(theme).arg(size.width()).arg(size.height())));
         }
     }
@@ -4118,10 +4172,20 @@ void SmokeTest::sidebarIconFlowLayout(){
         checkFlow(displayFlow);
         auto *first=displayFlow->itemAt(0)->widget();auto *tabs=window.m_structureTabs->tabBar();
         QCOMPARE(first->mapTo(window.m_structureDock,QPoint()).x(),tabs->mapTo(window.m_structureDock,tabs->tabRect(0).topLeft()).x());
-        auto *centered=dynamic_cast<CenteredIconTabBar*>(tabs);QVERIFY(centered);
+        auto *centered=dynamic_cast<CenteredIconTabBar*>(tabs);
         for(int tab=0;tab<2;++tab){
-            QVERIFY(qAbs(centered->iconRect(tab).center().x()-centered->buttonRect(tab).center().x())<=1);
-            QVERIFY(qAbs(centered->iconRect(tab).center().y()-centered->buttonRect(tab).center().y())<=1);
+            if(centered) {
+                // Baseline icon-only tabs retain the original centering check.
+                QVERIFY(qAbs(centered->iconRect(tab).center().x()-centered->buttonRect(tab).center().x())<=1);
+                QVERIFY(qAbs(centered->iconRect(tab).center().y()-centered->buttonRect(tab).center().y())<=1);
+            } else {
+                // Current standard tabs expose purpose labels beside the icon.
+                const QString label=tab==0?QStringLiteral("표시"):QStringLiteral("편집");
+                QCOMPARE(tabs->tabText(tab),label);
+                QCOMPARE(tabs->accessibleTabName(tab),label);
+                QVERIFY(tabs->rect().contains(tabs->tabRect(tab)));
+                QVERIFY(tabs->tabRect(tab).width()>=tabs->fontMetrics().horizontalAdvance(label)+tabs->iconSize().width()+4);
+            }
             const auto pixels=window.m_structureTabs->tabIcon(tab).pixmap(QSize(18,18)).toImage();QRect bounds;
             for(int y=0;y<pixels.height();++y)for(int x=0;x<pixels.width();++x)if(qAlpha(pixels.pixel(x,y)))bounds=bounds.united(QRect(x,y,1,1));
             QVERIFY(!bounds.isEmpty());QVERIFY(qAbs(bounds.center().x()-pixels.rect().center().x())<=1);QVERIFY(qAbs(bounds.center().y()-pixels.rect().center().y())<=1);
