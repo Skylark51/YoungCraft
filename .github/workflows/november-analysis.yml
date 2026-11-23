@@ -7,6 +7,10 @@ on:
         description: Run only the UX click and DPI review
         type: boolean
         default: false
+      native_ssh:
+        description: Run only the native OpenSSH and orbital fixture
+        type: boolean
+        default: false
 
 concurrency:
   group: november-${{ github.ref }}
@@ -44,7 +48,7 @@ jobs:
             build-ssh/orbital-regression.txt
             build-ssh/Testing/Temporary/LastTest.log
   windows-regression:
-    if: inputs.focused != true
+    if: inputs.focused != true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -203,7 +207,7 @@ jobs:
             .build/november-corpus/provenance.json
             .build/ux-evidence/
   baseline-ux-evidence:
-    if: inputs.focused != true
+    if: inputs.focused != true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -247,7 +251,7 @@ jobs:
           include-hidden-files: true
           path: .build/ux-evidence/
   focused-ux-review:
-    if: inputs.focused == true
+    if: inputs.focused == true && inputs.native_ssh != true
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
