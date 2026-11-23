@@ -52,8 +52,9 @@ QWidget *AnalysisPanel::makeGeometryTab() {
     layout->addWidget(m_attachStructure);
     connect(m_attachStructure, &QPushButton::clicked, this, &AnalysisPanel::structureFileRequested);
     m_openOptimizationGraph = new QPushButton(QStringLiteral("최적화 그래프..."),page);
-    makeSidebarIconButton(m_openOptimizationGraph, QStyle::SP_FileDialogDetailedView);
+    makeSidebarIconButton(m_openOptimizationGraph, UiIcon::Spectrum);
     m_openOptimizationGraph->setObjectName("OpenOptimizationGraph");
+    m_openOptimizationGraph->setEnabled(false);
     layout->addWidget(m_openOptimizationGraph);
     m_optimizationResults=new QDialog(this);m_optimizationResults->setObjectName("OptimizationResultsDialog");
     m_optimizationResults->setWindowTitle(QStringLiteral("최적화 에너지 그래프"));m_optimizationResults->resize(900,600);
@@ -68,6 +69,13 @@ QWidget *AnalysisPanel::makeGeometryTab() {
     m_frameList = new QListWidget;
     m_frameList->setObjectName(QStringLiteral("FrameList"));
     layout->addWidget(m_frameList, 1);
+    m_framePreviewPlot = new PlotWidget(page);
+    m_framePreviewPlot->setObjectName(QStringLiteral("OptimizationEnergyPreview"));
+    m_framePreviewPlot->setMinimumHeight(130);
+    m_framePreviewPlot->setMaximumHeight(180);
+    m_framePreviewPlot->hide();
+    m_framePreviewPlot->setToolTip(QStringLiteral("에너지 점을 선택하면 해당 구조를 표시합니다. 전체 그래프에서 축과 내보내기를 설정할 수 있습니다."));
+    layout->addWidget(m_framePreviewPlot);
     auto *right = new QVBoxLayout;
     m_frameInfo = new QLabel;
     m_frameInfo->setWordWrap(true);
@@ -79,8 +87,10 @@ QWidget *AnalysisPanel::makeGeometryTab() {
     right->addWidget(m_frameSlider);
     auto *buttons = new QHBoxLayout;
     auto *play = new QPushButton(QStringLiteral("재생 / 일시정지"));
-    makeSidebarIconButton(play, QStyle::SP_MediaPlay);
+    play->setObjectName(QStringLiteral("GeometryPlay"));
+    makeSidebarIconButton(play, UiIcon::Play);
     auto *last = new QPushButton(QStringLiteral("최종 구조"));
+    last->setObjectName(QStringLiteral("GeometryLastFrame"));
     makeSidebarIconButton(last, QStyle::SP_MediaSkipForward);
     buttons->addWidget(play); buttons->addWidget(last);
     right->addLayout(buttons);
@@ -96,6 +106,11 @@ QWidget *AnalysisPanel::makeGeometryTab() {
         if (m_frameList->count()) { const int frame = m_frameList->count() - 1; setCurrentFrame(frame); emit frameRequested(frame); }
     });
     connect(m_framePlot, &PlotWidget::pointClicked, this, [this](int point) {
+        if (point >= 0 && point < m_energyFrames.size()) {
+            const int frame = m_energyFrames[point]; setCurrentFrame(frame); emit frameRequested(frame);
+        }
+    });
+    connect(m_framePreviewPlot, &PlotWidget::pointClicked, this, [this](int point) {
         if (point >= 0 && point < m_energyFrames.size()) {
             const int frame = m_energyFrames[point]; setCurrentFrame(frame); emit frameRequested(frame);
         }
@@ -120,6 +135,9 @@ void AnalysisPanel::fillFrameList() {
     for (const auto &frame : m_data.frames)
         if (std::isfinite(frame.metrics.energyHartree)) minimum = std::min(minimum, frame.metrics.energyHartree);
     m_frameSlider->setMaximum(qMax(0, m_data.frames.size() - 1));
+    m_frameSlider->setEnabled(m_data.frames.size() > 1);
+    for (const auto *name : {"GeometryPlay", "GeometryLastFrame"})
+        if (auto *button = findChild<QPushButton*>(name)) button->setEnabled(!m_data.frames.isEmpty());
     for (int i = 0; i < m_data.frames.size(); ++i) {
         const FrameMetrics &m = m_data.frames[i].metrics;
         if (std::isfinite(m.energyHartree)) {
@@ -134,6 +152,9 @@ void AnalysisPanel::fillFrameList() {
     if(series.isEmpty())m_optimizationResults->hide();
     m_framePlot->setVisible(!series.isEmpty());
     m_framePlot->setMarkers(series);
+    m_framePreviewPlot->setSeries(series, QStringLiteral("Optimization step"), QStringLiteral("ΔE (kcal mol⁻¹)"));
+    m_framePreviewPlot->setMarkers(series);
+    m_framePreviewPlot->setVisible(!series.isEmpty());
     m_frameInfo->clear();
     if (!m_data.frames.isEmpty()) setCurrentFrame(m_data.frames.size() - 1);
 }
@@ -161,6 +182,7 @@ void AnalysisPanel::setCurrentFrame(int index) {
     int point = m_energyFrames.indexOf(index);
 
     m_framePlot->setSelectedPoint(point);
+    m_framePreviewPlot->setSelectedPoint(point);
     m_framePlot->setToolTip(point >= 0 ? QStringLiteral("프레임 %1 | E = %2 Hartree")
         .arg(m_energyFrames[point] + 1).arg(m_data.frames[m_energyFrames[point]].metrics.energyHartree, 0, 'f', 9) : QString());
     const FrameMetrics &metrics = m_data.frames[index].metrics;

@@ -1,4 +1,5 @@
 #include "ui/SidebarButton.h"
+#include "ui/SidebarFlowLayout.h"
 #include "ui/AnalysisPanel.h"
 #include "ui/PlotWidget.h"
 #include <QCheckBox>
@@ -30,19 +31,29 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     auto *layout=new QVBoxLayout(page);
     layout->setContentsMargins(4,4,4,4);layout->setSpacing(6);
     auto *toolbar=new QWidget(page);toolbar->setObjectName("FrequencyToolbar");
-    auto *playback=new QHBoxLayout(toolbar);playback->setContentsMargins(0,0,0,0);playback->setSpacing(4);
-    const auto button=[&](const QString &name,const QString &label,QStyle::StandardPixmap icon){
+    auto *playback=new SidebarFlowLayout(toolbar);
+    const auto button=[&](const QString &name,const QString &label,const QIcon &icon){
         auto *result=new QPushButton(label,toolbar);result->setObjectName(name);
         makeSidebarIconButton(result,icon);playback->addWidget(result);return result;
     };
-    auto *play=button("FrequencyPlay",QStringLiteral("재생 / 일시정지"),QStyle::SP_MediaPlay);
-    auto *restore=button("FrequencyRestore",QStringLiteral("원래 구조"),QStyle::SP_MediaStop);
+    auto *play=button("FrequencyPlay",QStringLiteral("재생 / 일시정지"),uiIcon(UiIcon::Play,toolbar));
+    auto *restore=button("FrequencyRestore",QStringLiteral("원래 구조"),uiIcon(UiIcon::Reset,toolbar));
     restore->setToolTip(QStringLiteral("정지 · 원래 구조"));
-    auto *save=button("SaveFrequencyAnimation",QStringLiteral("애니메이션 저장"),QStyle::SP_DialogSaveButton);
-    save->setIcon(sidebarSaveIcon());
-    m_nextFrequencyPage=button("NextFrequencyPage",QStringLiteral("다음 진동수 5개"),QStyle::SP_MediaSkipForward);
-    auto *details=button("OpenFrequencyDetails",QStringLiteral("진동 상세 정보"),QStyle::SP_FileDialogDetailedView);
-    playback->addStretch();layout->addWidget(toolbar);
+    auto *save=button("SaveFrequencyAnimation",QStringLiteral("애니메이션 저장"),uiIcon(UiIcon::ImageSave,toolbar));
+    m_previousFrequencyPage=button("PreviousFrequencyPage",QStringLiteral("이전 진동수 5개"),style()->standardIcon(QStyle::SP_MediaSkipBackward));
+    m_nextFrequencyPage=button("NextFrequencyPage",QStringLiteral("다음 진동수 5개"),style()->standardIcon(QStyle::SP_MediaSkipForward));
+    auto *details=button("OpenFrequencyDetails",QStringLiteral("진동 상세 정보"),uiIcon(UiIcon::Spectrum,toolbar));
+    m_imaginaryFrequency=new QPushButton(uiIcon(UiIcon::Frequency,toolbar),QStringLiteral("허수 진동"),toolbar);
+    m_imaginaryFrequency->setObjectName("PlayImaginaryFrequency");
+    m_imaginaryFrequency->setToolTip(QStringLiteral("허수 진동을 선택하고 재생합니다. 여러 개면 차례로 선택합니다."));
+    m_imaginaryFrequency->setAccessibleName(QStringLiteral("허수 진동 재생"));
+    m_imaginaryFrequency->setFixedHeight(sidebarButtonSize);
+    m_imaginaryFrequency->hide();
+    playback->addWidget(m_imaginaryFrequency);
+    m_copyFrequencyAnimation=button("CopyFrequencyAnimation",QStringLiteral("진동 GIF 복사"),uiIcon(UiIcon::ImageCopy,toolbar));
+    m_copyFrequencyAnimation->setToolTip(QStringLiteral("선택한 진동을 투명 배경 GIF로 복사합니다."));
+    m_copyFrequencyAnimation->hide();
+    layout->addWidget(toolbar);
     m_frequencyPageLabel=new QLabel(page);m_frequencyPageLabel->setObjectName("FrequencyPageRange");
     layout->addWidget(m_frequencyPageLabel);
     m_frequencyList=new QListWidget(page);m_frequencyList->setObjectName("FrequencyList");
@@ -81,10 +92,6 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     m_frequencyDetailsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     detailLayout->addWidget(m_frequencyDetailsTable,2);
     m_frequencyPlot=new PlotWidget(m_frequencyDetails);detailLayout->addWidget(m_frequencyPlot,1);
-    m_copyFrequencyAnimation=new QPushButton(QStringLiteral("TS 애니메이션 복사"),m_frequencyDetails);
-    m_copyFrequencyAnimation->setObjectName("CopyFrequencyAnimation");
-    m_copyFrequencyAnimation->setToolTip(QStringLiteral("선택한 진동 모드를 투명 배경 GIF 애니메이션으로 복사합니다."));
-    detailLayout->addWidget(m_copyFrequencyAnimation);m_copyFrequencyAnimation->hide();
     auto *close=new QDialogButtonBox(QDialogButtonBox::Close,m_frequencyDetails);
     close->button(QDialogButtonBox::Close)->setText(QStringLiteral("닫기"));detailLayout->addWidget(close);
     connect(close,&QDialogButtonBox::rejected,m_frequencyDetails,&QDialog::hide);
@@ -94,6 +101,19 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     connect(m_nextFrequencyPage,&QPushButton::clicked,this,[this]{
         const int next=m_frequencyPage+frequencyPageSize>=m_data.frequencies.size()?0:m_frequencyPage+frequencyPageSize;
         updateFrequencyPage(next);m_frequencyList->setCurrentRow(next);
+    });
+    connect(m_previousFrequencyPage,&QPushButton::clicked,this,[this]{
+        const int previous=m_frequencyPage>0?m_frequencyPage-frequencyPageSize
+            :qMax(0,(int(m_data.frequencies.size())-1)/frequencyPageSize*frequencyPageSize);
+        updateFrequencyPage(previous);m_frequencyList->setCurrentRow(previous);
+    });
+    connect(m_imaginaryFrequency,&QPushButton::clicked,this,[this]{
+        const int total=int(m_data.frequencies.size());
+        for(int offset=1;offset<=total;++offset){
+            const int row=(m_frequencyList->currentRow()+offset)%total;
+            const auto &mode=m_data.frequencies[row];
+            if(mode.imaginary||mode.wavenumber<0){setCurrentFrequency(row);emit frequencyRequested(row);return;}
+        }
     });
     connect(m_frequencyDetailsTable,&QTableWidget::currentCellChanged,this,[this](int row,int,int,int){
         if(row>=0 && row<m_data.frequencies.size()){setCurrentFrequency(row);emit frequencyRequested(row);}
@@ -132,6 +152,8 @@ void AnalysisPanel::updateFrequencyPage(int first) {
     for(int i=0;i<total;++i)m_frequencyList->item(i)->setHidden(i<m_frequencyPage||i>=m_frequencyPage+frequencyPageSize);
     m_frequencyPageLabel->setText(total?QStringLiteral("%1–%2 / %3").arg(m_frequencyPage+1).arg(qMin(total,m_frequencyPage+frequencyPageSize)).arg(total):QStringLiteral("진동수 없음"));
     m_nextFrequencyPage->setEnabled(total>frequencyPageSize);
+    m_previousFrequencyPage->setEnabled(total>frequencyPageSize);
+    m_previousFrequencyPage->setToolTip(m_frequencyPage>0?QStringLiteral("이전 진동수 5개"):QStringLiteral("마지막 진동수 5개로 이동"));
     const bool wrap=m_frequencyPage+frequencyPageSize>=total;
     m_nextFrequencyPage->setToolTip(wrap?QStringLiteral("처음 진동수 5개로 돌아가기"):QStringLiteral("다음 진동수 5개"));
     m_frequencyList->scrollToTop();
@@ -151,6 +173,7 @@ void AnalysisPanel::fillFrequencyList() {
         bars.push_back({double(mode.number),mode.wavenumber});
     }
     m_copyFrequencyAnimation->setVisible(hasImaginary);
+    m_imaginaryFrequency->setVisible(hasImaginary);
     m_frequencyPlot->setSeries(bars,QStringLiteral("Normal mode"),QStringLiteral("Wavenumber (cm⁻¹)"));
     const bool available=!m_data.frequencies.isEmpty();
     for(auto *button:findChild<QWidget*>("FrequencyToolbar")->findChildren<QPushButton*>())button->setEnabled(available);

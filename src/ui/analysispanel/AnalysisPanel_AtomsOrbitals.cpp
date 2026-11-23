@@ -1,5 +1,7 @@
 #include "ui/OrbitalStudyWidget.h"
 #include "ui/AnalysisPanel.h"
+#include "ui/SidebarButton.h"
+#include "ui/SidebarFlowLayout.h"
 #include "compute/OrbitalDiagnostics.h"
 
 #include "analysis/AnalysisEngine.h"
@@ -58,11 +60,25 @@ QWidget *AnalysisPanel::makeAtomsTab() {
 QWidget *AnalysisPanel::makeOrbitalsTab() {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
-    auto *open = new QPushButton(QStringLiteral("오비탈 확인…"), page);
+    auto *open = new QPushButton(QStringLiteral("오비탈 · 표시 설정…"), page);
     open->setObjectName("OpenOrbitalWindow");
-    auto *help = new QLabel(QStringLiteral("별도 창에서 MO / MEP를 선택하고 관리합니다. 생성한 오비탈은 저장되어 다시 선택하면 재사용합니다."), page);
+    setSidebarButtonIcon(open,UiIcon::Orbital,open->text());
+    auto *quickActions = new QWidget(page);
+    quickActions->setObjectName(QStringLiteral("OrbitalQuickActions"));
+    auto *quickLayout = new SidebarFlowLayout(quickActions);
+    auto *homo = new QPushButton(QStringLiteral("HOMO"), quickActions);
+    homo->setObjectName(QStringLiteral("QuickShowHomo"));
+    setSidebarButtonIcon(homo,UiIcon::Orbital,homo->text());
+    homo->setToolTip(QStringLiteral("선택한 스핀의 HOMO를 표시합니다. 처음 표시할 때는 Gaussian으로 생성합니다."));
+    auto *lumo = new QPushButton(QStringLiteral("LUMO"), quickActions);
+    lumo->setObjectName(QStringLiteral("QuickShowLumo"));
+    setSidebarButtonIcon(lumo,UiIcon::Orbital,lumo->text());
+    lumo->setToolTip(QStringLiteral("선택한 스핀의 LUMO를 표시합니다. 처음 표시할 때는 Gaussian으로 생성합니다."));
+    homo->setFixedHeight(sidebarButtonSize);lumo->setFixedHeight(sidebarButtonSize);
+    quickLayout->addWidget(homo);quickLayout->addWidget(lumo);
+    auto *help = new QLabel(QStringLiteral("HOMO / LUMO를 바로 표시합니다. 다른 MO, MEP와 표시 설정은 오비탈 창에서 선택하세요."), page);
     help->setWordWrap(true);
-    layout->addWidget(open); layout->addWidget(help); layout->addStretch();
+    layout->addWidget(quickActions); layout->addWidget(open); layout->addWidget(help); layout->addStretch();
     auto *dialog = new QDialog(page, Qt::Window);
     dialog->setObjectName("OrbitalManagerWindow");
     dialog->setWindowTitle(QStringLiteral("영크래프트 · 오비탈 관리"));
@@ -76,6 +92,21 @@ QWidget *AnalysisPanel::makeOrbitalsTab() {
     dialogLayout->setSizeConstraint(QLayout::SetNoConstraint);
     m_orbitalStudy = new OrbitalStudyWidget(dialog);
     dialogLayout->addWidget(m_orbitalStudy);
+    connect(homo, &QPushButton::clicked, this, [this]{m_orbitalStudy->showFrontierOrbital(false);});
+    connect(lumo, &QPushButton::clicked, this, [this]{m_orbitalStudy->showFrontierOrbital(true);});
+    connect(m_orbitalStudy, &OrbitalStudyWidget::frontierAvailabilityChanged, this, [homo,lumo](bool occupied,bool virtualOrbital){
+        homo->setEnabled(occupied);lumo->setEnabled(virtualOrbital);
+    });
+    homo->setEnabled(m_orbitalStudy->frontierAvailable(false));
+    lumo->setEnabled(m_orbitalStudy->frontierAvailable(true));
+    auto *status = new QLabel(page);
+    status->setObjectName(QStringLiteral("OrbitalQuickStatus"));status->setWordWrap(true);
+    // Share progress and errors with the shortcuts even while the manager is closed.
+    if(auto *source=m_orbitalStudy->findChild<QLabel*>(QStringLiteral("OrbitalStatus"))){
+        status->setText(source->text());
+    }
+    connect(m_orbitalStudy, &OrbitalStudyWidget::statusChanged, status, &QLabel::setText);
+    layout->insertWidget(3,status);
     connect(open, &QPushButton::clicked, this, [page, dialog] {
         const bool first=!dialog->property("orbitalWindowPlaced").toBool();
         auto *screen = first ? page->window()->screen() : dialog->screen();

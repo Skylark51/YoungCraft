@@ -100,6 +100,7 @@ private:
     void fillScanPlot();
     void fillIrcPlot();
     void fillTddft();
+    void updateTddftSelection();
     void fillAtoms();
     void fillOrbitals();
 
@@ -118,6 +119,8 @@ private:
     QLabel *m_frequencyInfo = nullptr;
     QLabel *m_frequencyPageLabel = nullptr;
     QPushButton *m_nextFrequencyPage = nullptr;
+    QPushButton *m_previousFrequencyPage = nullptr;
+    QPushButton *m_imaginaryFrequency = nullptr;
     QDialog *m_frequencyDetails = nullptr;
     QTableWidget *m_frequencyDetailsTable = nullptr;
     int m_frequencyPage = 0;
@@ -135,10 +138,12 @@ private:
     QCheckBox *m_showSpectrumSticks = nullptr;
     PlotWidget *m_frequencyPlot = nullptr;
     PlotWidget *m_framePlot = nullptr;
+    PlotWidget *m_framePreviewPlot = nullptr;
     QDialog *m_optimizationResults = nullptr;
     QPushButton *m_openOptimizationGraph = nullptr;
     QVector<int> m_energyFrames;
     QLabel *m_scanStatus = nullptr;
+    PlotWidget *m_scanPlot = nullptr;
     ScanResultsDialog *m_scanResults = nullptr;
     PlotWidget *m_ircPlot = nullptr;
     QLabel *m_coordinateTitle = nullptr;
