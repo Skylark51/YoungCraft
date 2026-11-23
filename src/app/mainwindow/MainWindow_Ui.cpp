@@ -1,4 +1,5 @@
 #include "ui/SidebarButton.h"
+#include "ui/SidebarFlowLayout.h"
 #include "ui/TransitionAnalysisIcon.h"
 #include "app/MainWindow.h"
 #include "io/CrystalContacts.h"
@@ -480,8 +481,20 @@ void MainWindow::createDocumentUi() {
     m_workspace = new QStackedWidget(this);
     m_workspace->addWidget(m_moleculeWorkspace);
     m_tddftWorkspace = new QWidget(m_workspace);
-    auto *spectrumLayout = new QVBoxLayout(m_tddftWorkspace);
-    auto *spectrumTitle = new QLabel(QStringLiteral("자외선·가시광선 스펙트럼"), m_tddftWorkspace);
+    auto *spectrumOuter = new QVBoxLayout(m_tddftWorkspace);
+    spectrumOuter->setContentsMargins(0, 0, 0, 0);
+    auto *spectrumScroll = new QScrollArea(m_tddftWorkspace);
+    spectrumScroll->setObjectName(QStringLiteral("TddftWorkspaceScroll"));
+    spectrumScroll->setWidgetResizable(true);
+    spectrumScroll->setFrameShape(QFrame::NoFrame);
+    auto *spectrumContent = new WorkspacePaper(spectrumScroll);
+    auto *spectrumLayout = new QVBoxLayout(spectrumContent);
+    spectrumScroll->setWidget(spectrumContent);
+    spectrumContent->setAutoFillBackground(false);
+    spectrumScroll->viewport()->setAutoFillBackground(false);
+    spectrumOuter->addWidget(spectrumScroll);
+    auto *spectrumTitle = new QLabel(QStringLiteral("흡수 스펙트럼"), spectrumContent);
+    spectrumTitle->setWordWrap(true);
     QFont spectrumTitleFont = spectrumTitle->font();
     spectrumTitleFont.setPointSize(spectrumTitleFont.pointSize() + 3);
     spectrumTitleFont.setBold(true);
@@ -508,7 +521,9 @@ void MainWindow::createDocumentUi() {
     spectrumStyle.axisColor=spectrumStyle.tickColor=QColor("#252b31");
     m_tddftWorkspacePlot->setStyleOptions(spectrumStyle);
     m_tddftWorkspacePlot->setToolTip(QStringLiteral("실선: 선폭 확장 스펙트럼 · 회색 막대: 개별 전이의 진동자 세기. 정규화 시 각각의 최댓값을 1로 맞춥니다."));
-    auto *spectrumButtons = new QHBoxLayout;
+    auto *spectrumTools = new QWidget(spectrumContent);
+    spectrumTools->setObjectName(QStringLiteral("TddftSpectrumTools"));
+    auto *spectrumButtons = new SidebarFlowLayout(spectrumTools);
     auto *axisSettings=new QPushButton(QStringLiteral("축·범위·눈금 설정…"),m_tddftWorkspace);
     axisSettings->setObjectName(QStringLiteral("TddftAxisSettings"));
     connect(axisSettings,&QPushButton::clicked,m_tddftWorkspacePlot,&PlotWidget::showAxisSettings);
@@ -526,25 +541,24 @@ void MainWindow::createDocumentUi() {
     connect(sourceResult,&QPushButton::clicked,this,[this]{updateOutputSource("excited_states",qMax(0,m_analysis->findChild<QTableWidget*>("TddftStatesTable")->currentRow()),true);});
     auto *ntoAnalysis=new QPushButton(QStringLiteral("NTO 분석"),m_tddftWorkspace);
     ntoAnalysis->setObjectName(QStringLiteral("TddftNtoAnalysis"));
-    ntoAnalysis->setIcon(transitionAnalysisIcon());
+    makeSidebarIconButton(ntoAnalysis, transitionAnalysisIcon());
     ntoAnalysis->setToolTip(QStringLiteral("선택 상태의 NTO · Hole / Particle 분석"));
     spectrumButtons->addWidget(ntoAnalysis);
     connect(ntoAnalysis,&QPushButton::clicked,this,[this]{m_analysis->showTransitionAnalysis();});
 
-    spectrumButtons->addStretch();
     auto *saveSpectrum = new QPushButton(QStringLiteral("내보내기…"), m_tddftWorkspace);
     saveSpectrum->setObjectName(QStringLiteral("Document_saveSpectrum"));
     auto *copySpectrum = new QPushButton(QStringLiteral("그림 복사"), m_tddftWorkspace);
     copySpectrum->setObjectName(QStringLiteral("Document_copySpectrum"));
-    saveSpectrum->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    makeSidebarIconButton(saveSpectrum, UiIcon::ImageSave);
     saveSpectrum->setToolTip(QStringLiteral("현재 TD-DFT 그래프를 PNG 또는 PDF로 저장합니다. 크기·해상도·투명 배경을 설정할 수 있습니다."));
     spectrumButtons->addWidget(saveSpectrum);
-    copySpectrum->setIcon(sidebarCopyIcon());
+    makeSidebarIconButton(copySpectrum, UiIcon::ImageCopy);
     copySpectrum->setToolTip(QStringLiteral("현재 TD-DFT 그래프를 600 dpi 이미지로 클립보드에 복사합니다."));
     spectrumButtons->addWidget(copySpectrum);
     spectrumLayout->addWidget(spectrumTitle);
     spectrumLayout->addWidget(m_tddftWorkspaceInfo);
-    spectrumLayout->addLayout(spectrumButtons);
+    spectrumLayout->addWidget(spectrumTools);
     spectrumLayout->addWidget(m_tddftWorkspacePlot, 1);
 
     m_workspace->addWidget(m_tddftWorkspace);

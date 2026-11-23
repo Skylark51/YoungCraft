@@ -216,11 +216,16 @@ void SmokeTest::uxResponsiveLayouts() {
     const auto loaded=FileDispatcher::load("tests/data/mvp.out");QVERIFY(loaded.parseResult.success);
     QJsonArray layouts;bool serious=false;
     const qreal scale=qEnvironmentVariable("QT_SCALE_FACTOR","1").toDouble();
-    const QList<QSize> sizes{{820,640},{1400,900},{qRound(3840/scale),qRound(2160/scale)}};
+    QList<QSize> sizes{{820,640},{1400,900},{qRound(3840/scale),qRound(2160/scale)}};
+    QStringList sizeLabels{QStringLiteral("small"),QStringLiteral("normal"),QStringLiteral("4k")};
+    if(scale>=2){sizes.append(QSize(546,375));sizeLabels.append(QStringLiteral("compact"));}
     for(int index=0;index<sizes.size();++index) {
         QSettings().remove("window/geometry");QSettings().remove("window/sidebarPanelState");
-        MainWindow w;w.show();w.onFileLoaded(loaded);w.m_analysis->setCurrentTab(0);w.resize(sizes[index]);QTest::qWait(200);
-        const QString label=QStringList{"small","normal","4k"}[index];
+        MainWindow w;w.show();w.onFileLoaded(loaded);w.m_analysis->setCurrentTab(0);
+        // Fix the client size for virtual captures beyond the runner's physical
+        // screen. Ordinary resizable windows are covered by the full GUI suite.
+        w.setFixedSize(sizes[index]);QTest::qWait(200);
+        const QString label=sizeLabels[index];
         QJsonArray issues,controls;
         auto inspect=[&](QWidget *root,const QString &page) {
             auto buttons=root->findChildren<QAbstractButton *>();
@@ -252,6 +257,14 @@ void SmokeTest::uxResponsiveLayouts() {
         auto *toolbar=w.findChild<QToolBar *>("MainToolBar");QVERIFY(toolbar);QVERIFY(evidence.capture(toolbar,label+"-icons"));
         for(int tab:{1,2,3,4,5,6,7}) {
             w.m_analysis->setCurrentTab(tab);QTest::qWait(40);
+            if(tab==4)if(auto *scroll=w.findChild<QScrollArea*>(QStringLiteral("TddftWorkspaceScroll"))) {
+                for(const char *name:{"TddftAxisSettings","TddftAutoRange","TddftShowSource","TddftNtoAnalysis","Document_saveSpectrum","Document_copySpectrum"}) {
+                    auto *button=w.findChild<QPushButton*>(QString::fromLatin1(name));QVERIFY(button);
+                    scroll->ensureWidgetVisible(button);QCoreApplication::processEvents();
+                    QVERIFY2(button->visibleRegion().contains(button->rect().center()),name);
+                }
+                scroll->verticalScrollBar()->setValue(0);QCoreApplication::processEvents();
+            }
             const auto page="analysis-"+QString::number(tab);inspect(&w,page);
             QVERIFY(evidence.capture(&w,label+"-"+page));
         }
@@ -278,6 +291,6 @@ void SmokeTest::uxResponsiveLayouts() {
         serious|=!issues.isEmpty() || w.width()>sizes[index].width()+2 || w.height()>sizes[index].height()+2;
     }
     QVERIFY(evidence.write("layout.json",QJsonObject{{"variant",evidence.variant},{"layouts",layouts},
-      {"note","Scroll content may extend beyond its viewport; visible controls and sibling button geometry inspected. Full-window grabs may extend beyond remote screen; screen dimensions recorded."}}));
+      {"note","Client sizes are fixed for virtual layout captures beyond the physical runner screen; screen dimensions and DPR are recorded. Scroll content may extend beyond its viewport; every TD-DFT tool is checked for reachable visibility."}}));
     if(evidence.variant=="after")QVERIFY2(!serious,"Layout issues detected; inspect layout.json and PNGs");
 }
