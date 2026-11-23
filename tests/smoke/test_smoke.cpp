@@ -115,6 +115,9 @@ static QToolButton *toolButtonForAction(QWidget *parent, QAction *action) {
 class SmokeTest final : public QObject {
     Q_OBJECT
 private slots:
+    void uxPublicCalculationFiles();
+    void uxCompleteImageSave();
+    void uxAnalysisClickMeasurements();
     void uxClickMeasurements();
     void uxResponsiveLayouts();
     void nativeNtoSidebarWorkflow();
@@ -5699,6 +5702,9 @@ void SmokeTest::nativeNtoSidebarWorkflow() {
 }
 
 #include "ux_review_workflow.inc"
+#include "ux_public_corpus.inc"
+#include "ux_save_workflow.inc"
+#include "ux_analysis_workflow.inc"
 
 int main(int argc, char **argv) {
     // Match the application's context contract before Qt creates shared contexts.

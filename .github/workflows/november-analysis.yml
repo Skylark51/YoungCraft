@@ -103,6 +103,7 @@ jobs:
         env:
           YOUNGCRAFT_UX_VARIANT: after
           YOUNGCRAFT_UX_EVIDENCE: .build/ux-evidence/after
+          YOUNGCRAFT_NOVEMBER_CORPUS: .build/november-corpus
           YOUNGCRAFT_PPTX_TEST_OUTPUT: .build/ux-evidence/after/mechanism.pptx
           YOUNGCRAFT_PPTX_TEST_WIDTH: '640'
         run: |
@@ -152,7 +153,7 @@ jobs:
           git worktree add --detach baseline 0753d1a
           if ($LASTEXITCODE -ne 0) { throw 'Baseline checkout failed' }
           Copy-Item tests/smoke/test_smoke.cpp baseline/tests/smoke/test_smoke.cpp -Force
-          Copy-Item tests/smoke/ux_review_workflow.inc baseline/tests/smoke/ux_review_workflow.inc -Force
+          Copy-Item tests/smoke/ux_*.inc baseline/tests/smoke/ -Force
           cmake -S baseline -B baseline-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=baseline-build/dist
           if ($LASTEXITCODE -ne 0) { throw 'Baseline configure failed' }
           cmake --build baseline-build --target test_smoke --parallel 4
@@ -167,7 +168,7 @@ jobs:
           YOUNGCRAFT_UX_EVIDENCE: .build/ux-evidence/before
         run: |
           New-Item -ItemType Directory -Path .build/ux-evidence/before -Force | Out-Null
-          & ./baseline-build/test_smoke.exe uxClickMeasurements uxResponsiveLayouts -o '.build/ux-evidence/before/review.txt,txt'
+          & ./baseline-build/test_smoke.exe uxClickMeasurements uxResponsiveLayouts uxCompleteImageSave uxAnalysisClickMeasurements -o '.build/ux-evidence/before/review.txt,txt'
           if ($LASTEXITCODE -ne 0) { throw 'Baseline review failed' }
       - name: Upload baseline review
         if: always()

@@ -30,6 +30,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QComboBox>
@@ -181,27 +182,51 @@ void MainWindow::saveImage() {
     if (m_view->molecule().isEmpty()) { setStatus(QStringLiteral("저장할 구조가 없습니다")); return; }
     QString filters=QStringLiteral("PNG 그림 (*.png);;GIF 그림 (*.gif);;JPEG 그림 (*.jpg *.jpeg);;TIFF 그림 (*.tif *.tiff);;BMP 그림 (*.bmp)");
     if(QImageWriter::supportedImageFormats().contains("webp"))filters+=QStringLiteral(";;WebP 그림 (*.webp)");
-    QString selected=QStringLiteral("PNG 그림 (*.png)");
-    QString path=QFileDialog::getSaveFileName(this,QStringLiteral("그림 저장"),{},filters,&selected);
+    QFileDialog dialog(this, QStringLiteral("그림 저장"));
+    dialog.setObjectName(QStringLiteral("ImageSaveDialog"));
+    dialog.setOption(QFileDialog::DontUseNativeDialog);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setNameFilters(filters.split(QStringLiteral(";;")));
+    dialog.selectNameFilter(QStringLiteral("PNG 그림 (*.png)"));
+    dialog.setDefaultSuffix(QStringLiteral("png"));
+    auto *options = new QWidget(&dialog);
+    auto *form = new QFormLayout(options);
+    form->setContentsMargins(0, 4, 0, 0);
+    auto *longEdgeControl = new QSpinBox(options);
+    longEdgeControl->setObjectName(QStringLiteral("ImageSaveLongEdge"));
+    longEdgeControl->setRange(512, 8192);
+    longEdgeControl->setSingleStep(256);
+    longEdgeControl->setValue(3000);
+    longEdgeControl->setSuffix(QStringLiteral(" px"));
+    longEdgeControl->setToolTip(QStringLiteral("긴 변의 픽셀 수. GIF를 제외한 그림에는 600 dpi 정보를 포함합니다."));
+    auto *transparentControl = new QCheckBox(QStringLiteral("투명 배경"), options);
+    transparentControl->setObjectName(QStringLiteral("ImageSaveTransparent"));
+    transparentControl->setChecked(true);
+    transparentControl->setToolTip(QStringLiteral("PNG·GIF·TIFF·WebP에서 사용할 수 있습니다."));
+    form->addRow(QStringLiteral("그림 크기"), longEdgeControl);
+    form->addRow(transparentControl);
+    if (auto *grid = qobject_cast<QGridLayout *>(dialog.layout()))
+        grid->addWidget(options, grid->rowCount(), 0, 1, grid->columnCount());
+    else dialog.layout()->addWidget(options);
+    connect(&dialog, &QFileDialog::filterSelected, &dialog, [&](const QString &filter) {
+        const QString extension = filter.contains("TIFF") ? "tif" : filter.contains("JPEG") ? "jpg"
+            : filter.contains("GIF") ? "gif" : filter.contains("BMP") ? "bmp" : filter.contains("WebP") ? "webp" : "png";
+        dialog.setDefaultSuffix(extension);
+        transparentControl->setEnabled(extension != "jpg" && extension != "bmp");
+    });
+    if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty()) return;
+    const QString selected = dialog.selectedNameFilter();
+    QString path = dialog.selectedFiles().first();
     if (path.isEmpty()) return;
     if(QFileInfo(path).suffix().isEmpty()){
         const QString extension=selected.contains("TIFF")?"tif":selected.contains("JPEG")?"jpg":selected.contains("GIF")?"gif":selected.contains("BMP")?"bmp":selected.contains("WebP")?"webp":"png";
         path+=QStringLiteral(".")+extension;
     }
     const auto suffix=QFileInfo(path).suffix().toLower();
-    bool sizeAccepted = false;
-    const int longEdge = QInputDialog::getInt(this, QStringLiteral("그림 해상도"),
-        suffix=="gif"?QStringLiteral("긴 변의 픽셀 수"):QStringLiteral("긴 변의 픽셀 수 (600 dpi 정보 포함)"), 3000, 512, 8192, 256, &sizeAccepted);
-    if (!sizeAccepted) return;
-    bool transparent = false;
-    if (suffix=="png"||suffix=="gif"||suffix=="tif"||suffix=="tiff"||suffix=="webp") {
-        const auto answer = QMessageBox::question(this, QStringLiteral("투명 배경"),
-                                                   QStringLiteral("배경을 투명하게 저장할까요?"),
-                                                   QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
-                                                   QMessageBox::Yes);
-        if (answer == QMessageBox::Cancel) return;
-        transparent = answer == QMessageBox::Yes;
-    }
+    const int longEdge = longEdgeControl->value();
+    const bool transparent = transparentControl->isChecked() &&
+        (suffix=="png"||suffix=="gif"||suffix=="tif"||suffix=="tiff"||suffix=="webp");
     QString error;
     const auto pixels = m_view->size().scaled(longEdge, longEdge, Qt::KeepAspectRatio);
     const auto image = m_view->imageAtSize(pixels, transparent);

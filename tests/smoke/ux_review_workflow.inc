@@ -97,9 +97,14 @@ bool uxAction(MainWindow &window,UxEvidence &e,QAction *target) {
         if(!button->isVisible() || !button->isEnabled() || !button->defaultAction())continue;
         if(button->defaultAction()==target && button->popupMode()!=QToolButton::InstantPopup)
             return e.click(button,target->objectName(),QPoint(button->width()/3,button->height()/2));
-        auto path=uxMenuPath(button->defaultAction()->menu(),target);
+        auto *buttonMenu=button->menu();
+        if(!buttonMenu)buttonMenu=button->defaultAction()->menu();
+        auto path=uxMenuPath(buttonMenu,target);
         if(!path.isEmpty() && (best.isEmpty() || path.size()<best.size())) {
-            opener=button;point=button->rect().center();menu=button->defaultAction()->menu();best=path;
+            opener=button;
+            point=button->popupMode()==QToolButton::MenuButtonPopup
+                ? QPoint(button->width()-5,button->height()/2) : button->rect().center();
+            menu=buttonMenu;best=path;
         }
     }
     for(auto *root:window.menuBar()->actions()) {
