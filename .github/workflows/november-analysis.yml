@@ -2,6 +2,11 @@ name: November analysis and crystallography regression
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      focused:
+        description: Run only the UX click and DPI review
+        type: boolean
+        default: false
 
 concurrency:
   group: november-${{ github.ref }}
@@ -9,6 +14,7 @@ concurrency:
 
 jobs:
   windows-regression:
+    if: inputs.focused != true
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -23,7 +29,21 @@ jobs:
         with:
           python-version: '3.12'
       - name: Prepare actual MM worker validation
-        run: python -m pip install rdkit==2026.3.6
+        run: python -m pip install rdkit==2026.3.6 pyinstaller==6.22.3
+      - uses: actions/cache/restore@v4
+        id: mm_worker_cache
+        with:
+          path: .build/mm-runtime-ci/YoungcraftMM
+          key: win2022-mm-rdkit2026036-pyi6223-${{ hashFiles('tools/mm_optimize.py', 'tools/build_mm_runtime.ps1') }}
+      - name: Build actual MM worker for GUI tests
+        if: steps.mm_worker_cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./tools/build_mm_runtime.ps1 -OutputDir .build/mm-runtime-ci
+      - uses: actions/cache/save@v4
+        if: steps.mm_worker_cache.outputs.cache-hit != 'true'
+        with:
+          path: .build/mm-runtime-ci/YoungcraftMM
+          key: win2022-mm-rdkit2026036-pyi6223-${{ hashFiles('tools/mm_optimize.py', 'tools/build_mm_runtime.ps1') }}
       - uses: actions/cache/restore@v4
         id: corpus_cache
         with:
@@ -75,6 +95,15 @@ jobs:
           unzip -q mctc.zip
           cmake -S xtb-68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWITH_TBLITE=OFF -DWITH_CPCMX=OFF -DWITH_TESTS=OFF -DFETCHCONTENT_SOURCE_DIR_MCTC-LIB="$PWD/mctc-lib-0.6.1" -DBLAS_LIBRARIES=/ucrt64/lib/libopenblas.dll.a -DLAPACK_LIBRARIES=/ucrt64/lib/libopenblas.dll.a
           cmake --build build --parallel 4
+      - name: Stage calculation runtimes beside both GUI executables
+        shell: pwsh
+        run: |
+          foreach ($directory in @('build', 'build/dist')) {
+            $mm = Join-Path $directory 'mm_runtime'
+            New-Item -ItemType Directory -Path $mm -Force | Out-Null
+            Get-ChildItem -LiteralPath .build/mm-runtime-ci/YoungcraftMM -Force | Copy-Item -Destination $mm -Recurse -Force
+            Copy-Item -LiteralPath xtb_runtime -Destination (Join-Path $directory 'xtb_runtime') -Recurse -Force
+          }
           target="$GITHUB_WORKSPACE/xtb_runtime/gfnff"
           cp build/xtb.exe "$target/xtb.exe"
           for dll in libgcc_s_seh-1.dll libgfortran-5.dll libgomp-1.dll libopenblas.dll libquadmath-0.dll libwinpthread-1.dll libstdc++-6.dll; do cp "/ucrt64/bin/$dll" "$target/"; done
@@ -110,6 +139,7 @@ jobs:
           YOUNGCRAFT_PPTX_TEST_WIDTH: '640'
         run: |
           New-Item -ItemType Directory -Path .build/ux-evidence/after -Force | Out-Null
+          $env:YOUNGCRAFT_CHARGED_MM_WORKER = (Resolve-Path build/mm_runtime/YoungcraftMM.exe).Path
           ctest --test-dir build -C Release --output-on-failure --timeout 180 -R '^orbital_study$'
           if ($LASTEXITCODE -ne 0) { throw 'Orbital regression failed' }
           python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 --all
@@ -130,6 +160,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: november-regression-evidence
+          include-hidden-files: true
           path: |
             gui-november-*.txt
             gui-november-summary.json
@@ -137,6 +168,7 @@ jobs:
             .build/november-corpus/provenance.json
             .build/ux-evidence/
   baseline-ux-evidence:
+    if: inputs.focused != true
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -177,4 +209,49 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ux-baseline-evidence
+          include-hidden-files: true
+          path: .build/ux-evidence/
+  focused-ux-review:
+    if: inputs.focused == true
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Build UX review executable
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
+          if ($LASTEXITCODE -ne 0) { throw 'Review configure failed' }
+          cmake --build build --target test_smoke --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Review build failed' }
+      - name: Prepare verified Windows OpenGL
+        shell: pwsh
+        run: ./tools/prepare_ci_opengl.ps1
+      - name: Record clicks and all DPI layouts
+        shell: pwsh
+        run: |
+          $env:YOUNGCRAFT_UX_VARIANT = 'after'
+          $env:YOUNGCRAFT_UX_EVIDENCE = '.build/ux-evidence/after'
+          New-Item -ItemType Directory -Path .build/ux-evidence/after -Force | Out-Null
+          $reviewFailed = $false
+          & ./build/test_smoke.exe uxClickMeasurements uxCompleteImageSave uxAnalysisClickMeasurements -o '.build/ux-evidence/after/click-review.txt,txt'
+          if ($LASTEXITCODE -ne 0) { $reviewFailed = $true }
+          foreach ($scale in @('1', '1.5', '2')) {
+            $env:QT_SCALE_FACTOR = $scale
+            & ./build/test_smoke.exe uxResponsiveLayouts -o ".build/ux-evidence/after/layout-$scale.txt,txt"
+            if ($LASTEXITCODE -ne 0) { $reviewFailed = $true }
+          }
+          if ($reviewFailed) { throw 'Review failed; inspect every DPI log and image' }
+      - name: Upload UX review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-focused-evidence
+          include-hidden-files: true
           path: .build/ux-evidence/

@@ -194,7 +194,9 @@ void MainWindow::createToolBar() {
         button->setIconSize(QSize(sidebarIconSize, sidebarIconSize));
         button->setFocusPolicy(Qt::StrongFocus);
         button->setAccessibleName(action->text());
-        toolbar->addWidget(button);
+        auto *wrapper = toolbar->addWidget(button);
+        // An overflow menu activates the QWidgetAction rather than its button.
+        QObject::connect(wrapper, &QAction::triggered, action, &QAction::trigger);
         return button;
     };
     addCommonAction("NewStructure", QStringLiteral("새 구조"), 0);
