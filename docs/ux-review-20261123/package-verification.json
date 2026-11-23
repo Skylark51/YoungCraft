@@ -3,6 +3,8 @@
   "issues": [],
   "native_sha256": "bce59160172f6f4dcd4a0d9df0ca13a44dee9603d92efa42a0ff26f64bfdd6c6",
   "packaged_native_sha256": "bce59160172f6f4dcd4a0d9df0ca13a44dee9603d92efa42a0ff26f64bfdd6c6",
-  "zip_sha256": "a007300d96213da33365ddf1f6965260d8038957fd4849c23e85b10d0ace762f",
-  "mm_runtime_sha256": "5b89d235aa82ade39930521290e8ab345f05922cb73952394ec892248822545d"
+  "zip_sha256": "fe93c2b2a5d38e8601ae9ccab8b1cb1d7d8d29fdef6b90495a9f964784f097c2",
+  "mm_runtime_sha256": "5b89d235aa82ade39930521290e8ab345f05922cb73952394ec892248822545d",
+  "helper_sha256": "cf329fc8db213d8648f7776b925e00dae181eb5f65c4476ab4ddfefd8c4ed86b",
+  "packaged_helper_sha256": "cf329fc8db213d8648f7776b925e00dae181eb5f65c4476ab4ddfefd8c4ed86b"
 }
