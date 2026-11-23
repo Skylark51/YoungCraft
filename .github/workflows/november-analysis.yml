@@ -95,15 +95,6 @@ jobs:
           unzip -q mctc.zip
           cmake -S xtb-68fe777a02418471b9ddfc7a9ea24b4021d7bca2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWITH_TBLITE=OFF -DWITH_CPCMX=OFF -DWITH_TESTS=OFF -DFETCHCONTENT_SOURCE_DIR_MCTC-LIB="$PWD/mctc-lib-0.6.1" -DBLAS_LIBRARIES=/ucrt64/lib/libopenblas.dll.a -DLAPACK_LIBRARIES=/ucrt64/lib/libopenblas.dll.a
           cmake --build build --parallel 4
-      - name: Stage calculation runtimes beside both GUI executables
-        shell: pwsh
-        run: |
-          foreach ($directory in @('build', 'build/dist')) {
-            $mm = Join-Path $directory 'mm_runtime'
-            New-Item -ItemType Directory -Path $mm -Force | Out-Null
-            Get-ChildItem -LiteralPath .build/mm-runtime-ci/YoungcraftMM -Force | Copy-Item -Destination $mm -Recurse -Force
-            Copy-Item -LiteralPath xtb_runtime -Destination (Join-Path $directory 'xtb_runtime') -Recurse -Force
-          }
           target="$GITHUB_WORKSPACE/xtb_runtime/gfnff"
           cp build/xtb.exe "$target/xtb.exe"
           for dll in libgcc_s_seh-1.dll libgfortran-5.dll libgomp-1.dll libopenblas.dll libquadmath-0.dll libwinpthread-1.dll libstdc++-6.dll; do cp "/ucrt64/bin/$dll" "$target/"; done
@@ -117,6 +108,15 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=build/dist
           cmake --build build --parallel 4
+      - name: Stage calculation runtimes beside both GUI executables
+        shell: pwsh
+        run: |
+          foreach ($directory in @('build', 'build/dist')) {
+            $mm = Join-Path $directory 'mm_runtime'
+            New-Item -ItemType Directory -Path $mm -Force | Out-Null
+            Get-ChildItem -LiteralPath .build/mm-runtime-ci/YoungcraftMM -Force | Copy-Item -Destination $mm -Recurse -Force
+            Copy-Item -LiteralPath xtb_runtime -Destination (Join-Path $directory 'xtb_runtime') -Recurse -Force
+          }
       - name: Run console and calculation regressions
         shell: pwsh
         run: |
