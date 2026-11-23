@@ -1039,7 +1039,9 @@ void SmokeTest::tddftPublicationSpectrum() {
     if(const auto *mime=clipboard->mimeData())for(const auto &format:mime->formats())previous->setData(format,mime->data(format));
     const auto restoreClipboard=qScopeGuard([&]{clipboard->setMimeData(previous);});
     auto *copy=window.m_workspace->findChild<QPushButton*>("Document_copySpectrum");QVERIFY(copy);
-    QVERIFY(!copy->text().isEmpty());QVERIFY(copy->isVisible());copy->click();
+    QVERIFY(!copy->icon().isNull());
+    QVERIFY((copy->text()+copy->accessibleName()+copy->toolTip()).contains(QStringLiteral("복사")));
+    QVERIFY(copy->isVisible());copy->click();
     const auto copied=clipboard->image();QCOMPARE(copied.size(),image.size());
     QCOMPARE(copied.pixelColor(0,0).alpha(),0);
     QVERIFY(clipboard->mimeData()->hasFormat("image/png"));
@@ -1057,7 +1059,9 @@ void SmokeTest::tddftPublicationSpectrum() {
         dialog->reject();
     });
     auto *save=window.m_workspace->findChild<QPushButton*>("Document_saveSpectrum");QVERIFY(save);
-    QVERIFY(!save->text().isEmpty());QVERIFY(save->isVisible());save->click();
+    QVERIFY(!save->icon().isNull());
+    QVERIFY((save->text()+save->accessibleName()+save->toolTip()).contains(QStringLiteral("저장")));
+    QVERIFY(save->isVisible());save->click();
     // Rebinding a document must keep both graph actions connected.
     window.newDrawingDocument(data.molecule);window.m_documentTabs->setCurrentIndex(0);
     QCOMPARE(window.m_workspace->currentWidget(),window.m_tddftWorkspace);
