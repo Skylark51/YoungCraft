@@ -63,12 +63,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Prepare actual MM worker validation
-        run: python -m pip install rdkit==2026.3.6 pyinstaller==6.22.3
+        run: python -m pip install -r tools/requirements-mm.txt
       - uses: actions/cache/restore@v4
         id: mm_worker_cache
         with:
           path: .build/mm-runtime-ci/YoungcraftMM
-          key: win2022-mm-rdkit2026036-pyi6223-${{ hashFiles('tools/mm_optimize.py', 'tools/build_mm_runtime.ps1') }}
+          key: win2022-mm-${{ hashFiles('tools/requirements-mm.txt', 'tools/mm_optimize.py', 'tools/build_mm_runtime.ps1') }}
       - name: Build actual MM worker for GUI tests
         if: steps.mm_worker_cache.outputs.cache-hit != 'true'
         shell: pwsh
@@ -77,7 +77,7 @@ jobs:
         if: steps.mm_worker_cache.outputs.cache-hit != 'true'
         with:
           path: .build/mm-runtime-ci/YoungcraftMM
-          key: win2022-mm-rdkit2026036-pyi6223-${{ hashFiles('tools/mm_optimize.py', 'tools/build_mm_runtime.ps1') }}
+          key: ${{ steps.mm_worker_cache.outputs.cache-primary-key }}
       - uses: actions/cache/restore@v4
         id: corpus_cache
         with:
