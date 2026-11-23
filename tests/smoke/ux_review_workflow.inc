@@ -148,7 +148,8 @@ void SmokeTest::uxClickMeasurements() {
         QObject::connect(&watcher,&QTimer::timeout,&w,[&] {
             auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget());if(!dialog)return;
             if(dialog->objectName()=="SaveStructureChoice" && !choice.isEmpty()) {
-                evidence.click(dialog->findChild<QPushButton *>(choice),choice);return;
+                auto *button=dialog->findChild<QPushButton *>(choice);QVERIFY(button);
+                QTimer::singleShot(0,button,[&,button,choice]{evidence.click(button,choice);});return;
             }
             if((expected=="file-picker" && qobject_cast<QFileDialog *>(dialog)) || dialog->objectName()==expected ||
                (expected=="image-options" && qobject_cast<QFileDialog *>(dialog))) {
@@ -163,8 +164,16 @@ void SmokeTest::uxClickMeasurements() {
     };
     if(!run("open-file-picker","Loaded result, main window","File picker displayed (file choice not measured)",0,[&](MainWindow &w){modal(w,uxNamed(w,"OpenStructureFile"),"file-picker");}))return;
     if(!run("save-image-options","Loaded result, main window","Image save picker displayed (file choice and save not measured)",0,[&](MainWindow &w){
-        auto *action=uxNamed(w,"SaveImageDirect");if(!action)action=uxNamed(w,"SaveStructureImage");
+        auto *action=uxNamed(w,"SaveImageDirect");
+        // Baseline already offers View > high-resolution image (Ctrl+Q): use
+        // that shortest mouse path, not the longer export > format chooser.
+        if(!action)for(auto *candidate:w.findChildren<QAction *>())
+            if(candidate->shortcuts().contains(QKeySequence("Ctrl+Q"))){action=candidate;break;}
+        QVERIFY(action);
         modal(w,action,"image-options","SavePictureChoice");}))return;
+    if(!run("save-xyz-picker","Loaded result, main window","XYZ save picker displayed (file choice and save not measured)",0,[&](MainWindow &w){
+        auto *action=uxNamed(w,"SaveXYZDirect");if(!action)action=uxNamed(w,"SaveStructureImage");
+        modal(w,action,"file-picker","SaveXYZChoice");}))return;
     if(!run("project-library","Loaded result, main window","Project library displayed",0,[&](MainWindow &w){modal(w,uxNamed(w,"ProjectLibraryAction"),"ProjectLibraryDialog");}))return;
     if(!run("fragment-library","Loaded result, display tools active","Fragment library displayed (insertion not measured)",0,[&](MainWindow &w){modal(w,uxFragmentAction(w),"FragmentBrowser");}))return;
     if(!run("copy-image","Loaded result, main window","PNG on clipboard",0,[&](MainWindow &w){
@@ -190,6 +199,8 @@ void SmokeTest::uxClickMeasurements() {
         QVERIFY(evidence.click(w.m_analysis->findChild<QPushButton *>("OpenOrbitalWindow"),"OpenOrbitalWindow"));
         auto *dialog=w.findChild<QDialog *>("OrbitalManagerWindow");QVERIFY(dialog && dialog->isVisible());
         QVERIFY(evidence.capture(dialog,"orbital-manager"));dialog->close();}))return;
+    if(!run("xtb-options","Loaded result, main window","xTB options displayed (calculation separately tested)",0,[&](MainWindow &w){
+        QVERIFY(uxAction(w,evidence,uxNamed(w,"QMOptimizationAction")));auto *panel=w.findChild<XtbDialog *>();QVERIFY(panel && panel->isVisible());}))return;
     if(!run("mm-options","Loaded result, main window","MM options displayed (calculation separately tested)",0,[&](MainWindow &w){
         QVERIFY(uxAction(w,evidence,uxNamed(w,"MMOptimizationAction")));auto *panel=w.findChild<QWidget *>("MMOptimizationPanel");QVERIFY(panel && panel->isVisible());}))return;
 }
@@ -214,10 +225,16 @@ void SmokeTest::uxResponsiveLayouts() {
                 QString name=button->objectName();if(name.isEmpty())name=button->accessibleName();if(name.isEmpty())name=button->text();
                 controls.append(QJsonObject{{"page",page},{"name",name},{"x",rect.x()},{"y",rect.y()},
                   {"width",rect.width()},{"height",rect.height()},{"enabled",button->isEnabled()},
-                  {"tooltip",button->toolTip()},{"icon",!button->icon().isNull()}});
+                  {"tooltip",button->toolTip()},{"accessible_name",button->accessibleName()},{"icon",!button->icon().isNull()},
+                  {"partially_clipped",!button->visibleRegion().contains(button->rect())}});
                 bool scroll=false;for(auto *p=button->parentWidget();p && p!=root;p=p->parentWidget())if(qobject_cast<QAbstractScrollArea *>(p))scroll=true;
                 if(!root->rect().contains(rect) && !scroll)issues.append(QJsonObject{{"type","outside-window"},{"page",page},{"control",name}});
-                if(button->visibleRegion().isEmpty() && !scroll)issues.append(QJsonObject{{"type","not-reachable"},{"page",page},{"control",name}});
+                if(!button->visibleRegion().contains(button->rect()) && !scroll) {
+                    auto *bar=qobject_cast<QToolBar *>(button->parentWidget());
+                    auto *overflow=bar?bar->findChild<QToolButton *>("qt_toolbar_ext_button"):nullptr;
+                    if(!overflow || !overflow->isVisible())
+                        issues.append(QJsonObject{{"type","clipped-by-parent"},{"page",page},{"control",name}});
+                }
                 for(auto *other:buttons) {
                     if(other==button || !other->isVisible() || other->parentWidget()!=button->parentWidget())continue;
                     if(reinterpret_cast<quintptr>(other)<reinterpret_cast<quintptr>(button))continue;
@@ -228,6 +245,12 @@ void SmokeTest::uxResponsiveLayouts() {
         };
         inspect(&w,"main");QVERIFY(evidence.capture(&w,label+"-main"));
         auto *toolbar=w.findChild<QToolBar *>("MainToolBar");QVERIFY(toolbar);QVERIFY(evidence.capture(toolbar,label+"-icons"));
+        for(int tab:{1,2,3,4,5,6,7}) {
+            w.m_analysis->setCurrentTab(tab);QTest::qWait(40);
+            const auto page="analysis-"+QString::number(tab);inspect(&w,page);
+            QVERIFY(evidence.capture(&w,label+"-"+page));
+        }
+        w.m_analysis->setCurrentTab(0);
         auto *tabs=w.findChild<QTabWidget *>("StructureToolsTabs");QVERIFY(tabs);tabs->setCurrentIndex(1);w.setDrawingMode(true);QTest::qWait(100);
         inspect(&w,"editor");QVERIFY(evidence.capture(&w,label+"-editor"));
         StyleEditorDialog style(w.m_style,&w.m_data.molecule,-1,&w);style.show();style.resize(qMin(720,sizes[index].width()),qMin(520,sizes[index].height()));QTest::qWait(100);

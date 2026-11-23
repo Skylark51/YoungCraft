@@ -3992,10 +3992,12 @@ void SmokeTest::saveChoicesAndFormats(){
             if(dialog->objectName()=="SaveStructureChoice"){
                 visitedChoice=true;
                 if(!review.isEmpty())dialog->grab().save(review+"/save-choice.png");
-                auto *choice=dialog->findChild<QPushButton*>(xyz?"SaveXYZChoice":"SavePictureChoice");if(!choice){failed=true;dialog->reject();return;}choice->click();
+                auto *choice=dialog->findChild<QPushButton*>(xyz?"SaveXYZChoice":"SavePictureChoice");if(!choice){failed=true;dialog->reject();return;}QTimer::singleShot(0,choice,[choice]{choice->click();});
             }else if(auto *file=qobject_cast<QFileDialog*>(dialog)){
                 visitedFile=true;
                 if(!xyz){const auto filters=file->nameFilters().join(';');for(const char *extension:{"*.png","*.gif","*.jpg","*.tif","*.bmp"})if(!filters.contains(extension))failed=true;file->selectNameFilter("PNG 그림 (*.png)");}
+                if(auto *edge=file->findChild<QSpinBox *>("ImageSaveLongEdge"))edge->setValue(512);
+                if(auto *transparent=file->findChild<QCheckBox *>("ImageSaveTransparent"))transparent->setChecked(true);
                 file->selectFile(path);QMetaObject::invokeMethod(file,"accept",Qt::DirectConnection);
             }else if(auto *resolution=qobject_cast<QInputDialog*>(dialog)){resolution->setIntValue(512);resolution->accept();}
             else if(auto *question=qobject_cast<QMessageBox*>(dialog)){
@@ -4026,7 +4028,10 @@ void SmokeTest::frequencyPagingAndDetails(){
     window.m_analysis->setCurrentTab(1);QTest::qWait(80);QVERIFY(window.m_explorer->isHidden());QVERIFY(navigator->isChecked());
     auto *panel=window.m_analysis;auto *list=panel->findChild<QListWidget*>("FrequencyList");auto *next=panel->findChild<QPushButton*>("NextFrequencyPage");
     auto *details=panel->findChild<QPushButton*>("OpenFrequencyDetails");QVERIFY(list&&next&&details);
-    QCOMPARE(panel->findChild<QWidget*>("FrequencyToolbar")->findChildren<QPushButton*>().size(),5);
+    auto *frequencyToolbar=panel->findChild<QWidget*>("FrequencyToolbar");QVERIFY(frequencyToolbar);
+    // Assert required controls, not a historical count that rejects new direct actions.
+    for(const char *name:{"FrequencyPlay","FrequencyRestore","SaveFrequencyAnimation","NextFrequencyPage","OpenFrequencyDetails"})
+        QVERIFY2(frequencyToolbar->findChild<QPushButton*>(name),name);
     const auto verifyPage=[&](int first,int size){int visible=0;for(int i=0;i<list->count();++i){QCOMPARE(!list->item(i)->isHidden(),i>=first&&i<first+size);if(!list->item(i)->isHidden())++visible;}QCOMPARE(visible,size);};
     verifyPage(0,5);QCOMPARE(list->verticalScrollBarPolicy(),Qt::ScrollBarAlwaysOff);
     QSignalSpy requests(panel,&AnalysisPanel::frequencyRequested);

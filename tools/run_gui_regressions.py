@@ -21,7 +21,7 @@ def discover_tests(exe, timeout):
 def parse_log(log):
     skips = []
     for line in log.splitlines():
-        match = re.match(r"SKIP\s*:\s*(.*?)\s+(.*)", line)
+        match = re.match(r"SKIP\s*:\s*(\S+::[^()]+\([^)]*\))\s*(.*)", line)
         if match:
             skips.append({"case": match.group(1), "reason": match.group(2)})
     totals = re.findall(r"Totals:\s*(\d+) passed,\s*(\d+) failed,\s*(\d+) skipped", log)
@@ -54,6 +54,8 @@ def main(argv=None):
                          exit_code=result.returncode)
         except subprocess.TimeoutExpired:
             entry.update(status="timeout", exit_code=None, timeout_seconds=args.timeout)
+        except OSError as error:
+            entry.update(status="launch_error", exit_code=None, error=str(error))
         skips, totals = parse_log(output.read_text(encoding="utf-8", errors="replace"))
         entry.update(skips=skips, totals=totals)
         if entry["status"] == "passed":
