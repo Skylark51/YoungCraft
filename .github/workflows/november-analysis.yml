@@ -10,7 +10,7 @@ concurrency:
 jobs:
   windows-regression:
     runs-on: windows-2022
-    timeout-minutes: 50
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
@@ -92,27 +92,36 @@ jobs:
           $env:YOUNGCRAFT_NOVEMBER_CORPUS=(Resolve-Path '.build/november-corpus').Path
           ctest --test-dir build -C Release --output-on-failure --timeout 180 -E 'gui_smoke|orbital_study'
           if ($LASTEXITCODE -ne 0) { throw 'Console regression failed' }
-      # Run graphical checks on the remote runner, never on the user's desktop.
-      - name: Verify analysis interaction and existing rendering/editing
+      # Never launch these graphical checks on the user's desktop.
+      - name: Prepare verified Windows OpenGL
+        if: always() && steps.build.outcome == 'success'
+        shell: pwsh
+        run: ./tools/prepare_ci_opengl.ps1
+      - name: Verify all GUI workflows and orbital integration
+        if: always() && steps.build.outcome == 'success'
+        shell: pwsh
+        env:
+          YOUNGCRAFT_UX_VARIANT: after
+          YOUNGCRAFT_UX_EVIDENCE: .build/ux-evidence/after
+          YOUNGCRAFT_PPTX_TEST_OUTPUT: .build/ux-evidence/after/mechanism.pptx
+          YOUNGCRAFT_PPTX_TEST_WIDTH: '640'
+        run: |
+          New-Item -ItemType Directory -Path .build/ux-evidence/after -Force | Out-Null
+          ctest --test-dir build -C Release --output-on-failure --timeout 180 -R '^orbital_study$'
+          if ($LASTEXITCODE -ne 0) { throw 'Orbital regression failed' }
+          python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 --all
+          if ($LASTEXITCODE -ne 0) { throw 'GUI regressions failed; see per-case evidence' }
+      - name: Review layouts at 150 and 200 percent DPI
         if: always() && steps.build.outcome == 'success'
         shell: pwsh
         run: |
-          $softwareArchive = Join-Path $env:RUNNER_TEMP 'qt-opengl-software.7z'
-          $softwareDirectory = Join-Path $env:RUNNER_TEMP 'qt-opengl-software'
-          Invoke-WebRequest -Uri 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.6/mesa3d-26.2.6-release-mingw.7z' -OutFile $softwareArchive
-          if ((Get-FileHash -LiteralPath $softwareArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388') { throw 'Qt software OpenGL checksum mismatch' }
-          & 7z x $softwareArchive "-o$softwareDirectory" -y | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw 'Qt software OpenGL extraction failed' }
-          $softwareDll = Get-ChildItem -LiteralPath $softwareDirectory -Recurse -File -Filter opengl32.dll | Where-Object { $_.FullName -match '[\\/]x64[\\/]' } | Select-Object -First 1
-          if (-not $softwareDll) { throw 'Qt software OpenGL library missing' }
-          $env:PATH = $softwareDll.DirectoryName + ';' + $env:PATH
-          $env:GALLIUM_DRIVER = 'llvmpipe'
-          $env:QT_OPENGL = 'software'
-          $env:QT_OPENGL_DLL = $softwareDll.FullName
-          $env:QT_LOGGING_RULES = 'qt.qpa.gl=true'
-          $tests = @('linkedIrcAndTddftGeometrySelection', 'cifCoordinateEditAndSaveWorkflow', 'discreteSpectrumSelection', 'optimizationGraphWindow', 'optimizationGraphSynchronizes', 'scanArrowNavigation', 'scanOptimizationPoints', 'frequencyPagingAndDetails', 'frequencySelectionStartsAnimationAndShowsCoordinates', 'tddftPublicationSpectrum', 'documentsAreIndependent', 'projectLibraryOpensOnDemand', 'geometryEditPreservesCalculation', 'drawingModeCreatesAtomsAndBonds', 'rendersShadowAndTransparentCapture', 'detailedAnalysisOpensCompanionAndFocusesFragment')
-          python tools/run_gui_regressions.py --exe ./build/test_smoke.exe --timeout 120 @tests
-          if ($LASTEXITCODE -ne 0) { throw 'GUI regressions failed; see per-case logs and summary' }
+          foreach ($scale in @('1.5', '2')) {
+            $env:QT_SCALE_FACTOR = $scale
+            $env:YOUNGCRAFT_UX_VARIANT = 'after'
+            $env:YOUNGCRAFT_UX_EVIDENCE = ".build/ux-evidence/after-dpi-$scale"
+            & ./build/test_smoke.exe uxResponsiveLayouts -o ".build/ux-evidence/dpi-$scale.txt,txt"
+            if ($LASTEXITCODE -ne 0) { throw "Layout review failed at scale $scale" }
+          }
       - name: Upload regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -123,3 +132,46 @@ jobs:
             gui-november-summary.json
             build/Testing/Temporary/LastTest.log
             .build/november-corpus/provenance.json
+            .build/ux-evidence/
+  baseline-ux-evidence:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Build the unchanged baseline with the same review harness
+        shell: pwsh
+        run: |
+          git worktree add --detach baseline 0753d1a
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline checkout failed' }
+          Copy-Item tests/smoke/test_smoke.cpp baseline/tests/smoke/test_smoke.cpp -Force
+          Copy-Item tests/smoke/ux_review_workflow.inc baseline/tests/smoke/ux_review_workflow.inc -Force
+          cmake -S baseline -B baseline-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DYOUNGCRAFT_RUNTIME_OUTPUT_DIRECTORY=baseline-build/dist
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline configure failed' }
+          cmake --build baseline-build --target test_smoke --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline build failed' }
+      - name: Prepare verified Windows OpenGL
+        shell: pwsh
+        run: ./tools/prepare_ci_opengl.ps1
+      - name: Measure baseline clicks and capture screens
+        shell: pwsh
+        env:
+          YOUNGCRAFT_UX_VARIANT: before
+          YOUNGCRAFT_UX_EVIDENCE: .build/ux-evidence/before
+        run: |
+          New-Item -ItemType Directory -Path .build/ux-evidence/before -Force | Out-Null
+          & ./baseline-build/test_smoke.exe uxClickMeasurements uxResponsiveLayouts -o '.build/ux-evidence/before/review.txt,txt'
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline review failed' }
+      - name: Upload baseline review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-baseline-evidence
+          path: .build/ux-evidence/
