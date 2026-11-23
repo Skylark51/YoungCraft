@@ -567,6 +567,7 @@ void MainWindow::createToolBar() {
     setOperationIcon(QStringLiteral("QMOptimizationAction"), UiIcon::Calculate);
     setOperationIcon(QStringLiteral("CopyStructureImage"), UiIcon::ImageCopy);
     setOperationIcon(QStringLiteral("SaveImageDirect"), UiIcon::ImageSave);
+    setOperationIcon(QStringLiteral("ToolbarExport"), UiIcon::Export);
     setOperationIcon(QStringLiteral("SaveXYZDirect"), UiIcon::Save);
     setOperationIcon(QStringLiteral("InsertFragmentAction"), UiIcon::InsertFragment);
     setOperationIcon(QStringLiteral("OpenLabLigandsAction"), UiIcon::Library);
@@ -619,7 +620,7 @@ void MainWindow::createToolBar() {
         action->setData(i);
         themeGroup->addAction(action);
     }
-    auto applyTheme = [this,themes,themeGroup](int index) {
+    auto applyTheme = [this,toolbar,themes,themeGroup](int index) {
         index = qBound(0, index, int(themes.size())-1);
         const auto &t=themes[index];
         setProperty("professorBackdrop", index == 6);
@@ -705,6 +706,15 @@ void MainWindow::createToolBar() {
             }
             const auto iconId = action->property("toolbarIconId");
             if (iconId.isValid()) action->setIcon(actionIcon(iconId.toInt(), QColor(t.ink)));
+        }
+        // Custom split widgets have their own toolbar actions. Keep their overflow
+        // and accessibility metadata aligned with the visible default operation.
+        for (auto *action : toolbar->actions()) {
+            auto *button = qobject_cast<QToolButton *>(toolbar->widgetForAction(action));
+            if (!button || !button->property("workflowSplit").toBool()) continue;
+            action->setIcon(button->icon());
+            action->setText(button->accessibleName());
+            action->setToolTip(button->toolTip());
         }
         for (int tab = 0; tab < m_structureTabs->count(); ++tab)
             m_structureTabs->setTabIcon(tab, actionIcon(tab == 0 ? 9 : tab == 1 ? 2 : 3, QColor(t.ink)));
