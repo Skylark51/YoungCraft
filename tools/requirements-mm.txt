@@ -1,2 +1,3 @@
-rdkit>=2024.3
-pyinstaller>=6.0
+# Keep release builds aligned with the validated MM runtime and regressions.
+rdkit==2026.3.6
+pyinstaller==6.22.3
