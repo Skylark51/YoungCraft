@@ -29,3 +29,29 @@ function Invoke-YoungcraftNative {
         return $process.ExitCode
     } finally { $process.Dispose() }
 }
+
+# .NET Framework starts its stdin writer with the console encoding, including
+# a possible UTF-8 BOM. Newer .NET supports a process-specific encoding.
+function Start-YoungcraftUtf8Process {
+    param([Parameter(Mandatory=$true)][Diagnostics.Process]$Process)
+    $utf8 = New-Object Text.UTF8Encoding($false)
+    if ($Process.StartInfo.PSObject.Properties['StandardInputEncoding']) {
+        $Process.StartInfo.StandardInputEncoding = $utf8
+        return $Process.Start()
+    }
+    $previous = [Console]::InputEncoding
+    try {
+        [Console]::InputEncoding = $utf8
+        return $Process.Start()
+    } finally { [Console]::InputEncoding = $previous }
+}
+
+# Send precisely one UTF-8 line, including requests read from text files.
+function Write-YoungcraftProcessLine {
+    param([Parameter(Mandatory=$true)][Diagnostics.Process]$Process,
+          [Parameter(Mandatory=$true)][string]$Text)
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Text.TrimEnd([char[]]"`r`n") + "`n")
+    $stream = $Process.StandardInput.BaseStream
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush()
+}

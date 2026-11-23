@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param([string]$ProjectRoot = '', [string]$BuildDir = '')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Invoke-HiddenNative.ps1')
 if (-not $ProjectRoot) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if (-not $BuildDir) { $BuildDir = Join-Path $ProjectRoot 'build-current/Release' }
@@ -42,8 +43,8 @@ try {
     $worker.StartInfo = $workerInfo
     $steps = @()
     try {
-        $worker.Start() | Out-Null
-        $worker.StandardInput.WriteLine((Get-Content -LiteralPath (Join-Path $ProjectRoot 'tests/mm/portable-input.json') -Raw))
+        Start-YoungcraftUtf8Process -Process $worker | Out-Null
+        Write-YoungcraftProcessLine -Process $worker -Text (Get-Content -LiteralPath (Join-Path $ProjectRoot 'tests/mm/portable-input.json') -Raw -Encoding UTF8)
         while ($true) {
             $lineTask = $worker.StandardOutput.ReadLineAsync()
             if (-not $lineTask.Wait(10000)) { throw 'Portable MM worker response timed out.' }
@@ -52,7 +53,7 @@ try {
             if ($response.type -eq 'error') { throw "Portable MM worker failed: $($response.message)" }
             $steps += $response.iteration
             if ($response.type -eq 'done') { break }
-            $worker.StandardInput.WriteLine('chunk')
+            Write-YoungcraftProcessLine -Process $worker -Text 'chunk'
         }
         if ($response.iteration -ne 120 -or $response.converged) { throw 'Portable MM limit test did not reach 120 unconverged iterations.' }
         Add-Content -LiteralPath $report -Encoding UTF8 -Value "Portable MM worker: PASS; iterations: $($steps -join ','); external Python unavailable."
