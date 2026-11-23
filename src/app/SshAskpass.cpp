@@ -24,7 +24,10 @@ int main(int argc, char **argv) {
         {"scope",qEnvironmentVariable("YOUNGCRAFT_SSH_SCOPE")},
         {"prompt",app.arguments().mid(1).join(' ')},
         {"allowPrompt",qEnvironmentVariable("YOUNGCRAFT_SSH_ALLOW_PROMPT")=="1"}}).toJson(QJsonDocument::Compact)+'\n');
-    if(socket.bytesToWrite() && !socket.waitForBytesWritten(5000)) {
+    // Windows may report a peer close after a fast reply instead of a write
+    // notification. Read that reply if the request drained or data arrived.
+    if(socket.bytesToWrite() && !socket.waitForBytesWritten(5000)
+            && socket.bytesToWrite() && !socket.bytesAvailable()) {
         qWarning()<<"SSH askpass IPC write wait failed"<<socket.state()<<socket.bytesToWrite()<<socket.bytesAvailable();return 1;
     }
     QByteArray reply; QElapsedTimer timer;timer.start();

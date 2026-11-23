@@ -35,7 +35,7 @@ class OrbitalTest : public QObject {
     Q_OBJECT
 private slots:
     void passwordHelperUsesPrivateIpc() {
-        for (int attempt=0;attempt<32;++attempt) {
+        for (int attempt=0;attempt<256;++attempt) {
             exercisePasswordHelper(false);
             if (QTest::currentTestFailed()) return;
         }
