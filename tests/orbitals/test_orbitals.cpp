@@ -34,7 +34,12 @@ static QByteArray cube(bool mo=false) {
 class OrbitalTest : public QObject {
     Q_OBJECT
 private slots:
-    void passwordHelperUsesPrivateIpc() { exercisePasswordHelper(false); }
+    void passwordHelperUsesPrivateIpc() {
+        for (int attempt=0;attempt<32;++attempt) {
+            exercisePasswordHelper(false);
+            if (QTest::currentTestFailed()) return;
+        }
+    }
     void passwordHelperWithWindowsOpenSsh() {
         for (int attempt=0;attempt<8;++attempt) {
             bool completed=false;
@@ -70,8 +75,11 @@ private:
         helper.setProcessEnvironment(env);
         helper.start(QCoreApplication::applicationDirPath()+"/YoungcraftSshAskpass.exe",{"fixture@host password:"});
         QTRY_VERIFY_WITH_TIMEOUT(helper.state()==QProcess::NotRunning,10000);
-        QCOMPARE(helper.exitCode(),0);QCOMPARE(requests,1);
-        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helper.readAllStandardError().isEmpty());
+        const auto helperError=helper.readAllStandardError();
+        const auto helperDiagnostic=QString("exit=%1; status=%2; broker requests=%3; stderr=%4")
+            .arg(helper.exitCode()).arg(int(helper.exitStatus())).arg(requests).arg(QString::fromUtf8(helperError));
+        QVERIFY2(helper.exitCode()==0,qPrintable(helperDiagnostic));QCOMPARE(requests,1);
+        QCOMPARE(helper.readAllStandardOutput(),QByteArray("fixture-only-password\n"));QVERIFY(helperError.isEmpty());
         QVERIFY(!received.contains("fixture-only-password"));
 #ifdef Q_OS_WIN
         if (nativeOpenSsh) {
