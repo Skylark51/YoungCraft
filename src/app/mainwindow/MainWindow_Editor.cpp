@@ -8,6 +8,7 @@
 #include <QDoubleSpinBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDockWidget>
 #include <QFormLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
@@ -22,9 +23,26 @@
 #include <QSignalBlocker>
 #include <QTimer>
 #include <QStandardPaths>
+#include <QStackedWidget>
+#include <QTabWidget>
 #include <QUuid>
 
 namespace youngcraft {
+void MainWindow::activateDrawingTool() {
+    if (!m_drawingMode) setDrawingMode(true);
+    m_workspace->setCurrentWidget(m_moleculeWorkspace);
+    m_structureDock->show();
+    m_structureTabs->setCurrentIndex(1);
+    m_view->clearInsertionPreview();
+    m_view->setProperty("pendingFragment", QString());
+    m_view->setProperty("pendingCenter", 0);
+    const int element = atomicNumberFor(m_drawElement->currentText());
+    if (element > 0) m_view->setDrawingElement(element);
+    m_view->setFocus(Qt::ShortcutFocusReason);
+    setStatus(QStringLiteral("그리기 · 원소: %1 · 1/2/3: 결합 차수 · C/N/O…: 원소 · 우클릭 빈 곳: 선택 · Ctrl+E: 그리기 전환")
+                  .arg(m_drawElement->currentText()), 0);
+}
+
 void MainWindow::saveLigandTemplate(){
     const Molecule molecule=m_view->molecule();if(molecule.atoms.isEmpty())return;
     QDialog dialog(this);dialog.setWindowTitle(QStringLiteral("템플릿 저장"));QFormLayout form(&dialog);
@@ -57,25 +75,40 @@ void MainWindow::ensureEditableDocument() {
 }
 void MainWindow::setupEditorControls(QGridLayout *tools) {
     auto *layout=qobject_cast<QVBoxLayout *>(m_drawBar->layout());
-    auto *arm=new QPushButton(QStringLiteral("원자 / 결합 그리기"),m_drawBar);arm->setObjectName("ArmDrawingTool");arm->setCheckable(true);
-    arm->setToolTip(QStringLiteral("원소 또는 그리기 도구를 선택한 뒤 캔버스에 그립니다. 모드 진입만으로는 그려지지 않습니다."));
-    makeSidebarIconButton(arm, UiIcon::EditAtoms);
-    tools->addWidget(arm, 0, 0);
+    auto *modes = new QHBoxLayout;
+    modes->setSpacing(4);
+    layout->insertLayout(0, modes);
+    auto *select = new QPushButton(QStringLiteral("선택·회전"), m_drawBar);
+    select->setObjectName(QStringLiteral("SelectDrawingTool"));
+    select->setToolTip(QStringLiteral("원자를 선택하거나 화면을 회전합니다. 원소를 고르면 그리기로 돌아갑니다."));
+    select->setCheckable(true);
+    select->setChecked(true);
+    auto *arm=new QPushButton(QStringLiteral("그리기"),m_drawBar);arm->setObjectName("ArmDrawingTool");arm->setCheckable(true);
+    setSidebarButtonIcon(arm, UiIcon::EditAtoms, QStringLiteral("원자·결합 그리기"));
+    arm->setToolTip(QStringLiteral("현재 원소로 그리기 · Ctrl+E: 그리기 도구 열기 / 종료"));
+    for (auto *button : {select, arm}) {
+        button->setMinimumWidth(0);
+        button->setFixedHeight(sidebarButtonSize);
+        button->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        modes->addWidget(button, 1);
+    }
     connect(arm,&QPushButton::clicked,m_drawBar,[view=m_view,element=m_drawElement](bool on){int z=atomicNumberFor(element->currentText());if(on&&z>0)view->setDrawingElement(z);else view->setDrawingArmed(false);});
     connect(m_view,&MoleculeView::drawingToolChanged,arm,&QPushButton::setChecked);
+    connect(select, &QPushButton::clicked, m_view, [view=m_view] { view->setDrawingArmed(false); view->setFocus(); });
+    connect(m_view, &MoleculeView::drawingToolChanged, select, [select](bool armed) { select->setChecked(!armed); });
     auto *chain=new QPushButton(QStringLiteral("연속 결합"),m_drawBar);chain->setObjectName("ContinuousDrawingButton");
     chain->setCheckable(true);chain->setChecked(true);m_view->setChainDrawing(true);
     chain->setToolTip(QStringLiteral("클릭으로 사슬 연장 · 기존 원자 연결로 고리 닫기 · 30° 스냅 · Alt: 자유 배치 · Esc/우클릭: 사슬 끝내기"));
     makeSidebarIconButton(chain, UiIcon::EditBonds);
-    tools->addWidget(chain, 0, 1);
+    tools->addWidget(chain, 0, 0);
     connect(chain,&QPushButton::toggled,m_view,&MoleculeView::setChainDrawing);
     auto *newChain=new QPushButton(QStringLiteral("새 사슬 (Esc)"),m_drawBar);newChain->setObjectName("EndDrawingChainButton");
     makeSidebarIconButton(newChain, UiIcon::Reset);
-    tools->addWidget(newChain, 0, 2);
+    tools->addWidget(newChain, 0, 1);
     connect(newChain,&QPushButton::clicked,m_view,&MoleculeView::endDrawingChain);
     auto *lab=new QPushButton(QStringLiteral("리간드 삽입…"),m_drawBar);lab->setObjectName("LabLigandsButton");
     makeSidebarIconButton(lab, UiIcon::InsertFragment);
-    tools->addWidget(lab, 0, 3);
+    tools->addWidget(lab, 0, 2);
 
     auto *access = new QHBoxLayout;
     access->setSpacing(4);
@@ -96,7 +129,7 @@ void MainWindow::setupEditorControls(QGridLayout *tools) {
     auto *charge=new QSpinBox(m_drawBar);charge->setObjectName("DrawFormalCharge");charge->setRange(-4,4);charge->setPrefix("전하: ");
     auto *periodic=new QPushButton(QStringLiteral("주기율표"),m_drawBar);periodic->setObjectName("DrawPeriodicTable");
     makeSidebarIconButton(periodic, UiIcon::PeriodicTable);
-    tools->addWidget(periodic, 2, 0);
+    tools->addWidget(periodic, 0, 3);
 
     auto *recent=new QComboBox(m_drawBar);recent->setObjectName("DrawRecentElements");recent->addItem(QStringLiteral("최근 원소"));recent->addItems(QSettings().value("drawing/recentElements").toStringList());recent->setMaximumWidth(100);
     auto *stateRow = new QHBoxLayout;

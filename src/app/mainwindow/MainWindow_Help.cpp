@@ -52,7 +52,7 @@ QVector<HelpTopic> helpTopics() {
     add(1,"베스트 뷰","Best view","molecule 전체가 보이도록 화면을 맞출 수 있습니다.","You can fit the entire molecule into the viewport.","Enter","BestStructureView");
     add(1,"중앙 정렬","Center view","molecule을 화면 중앙에 배치할 수 있습니다.","You can center the molecule in the viewport.","Space","CenterStructureView");
     add(1,"회전 중심 갱신","Update rotation center","현재 원자를 기준으로 회전 중심을 갱신할 수 있습니다.","You can update the rotation center from the current atoms.","Num5");
-    add(2,"원자 · 결합 그리기","Draw atoms and bonds","원소를 고른 뒤 빈 곳을 클릭하거나 드래그해 원자와 결합을 만들 수 있습니다.","You can choose an element and click or drag to create atoms and bonds.");
+    add(2,"원자 · 결합 그리기","Draw atoms and bonds","상단 그리기 버튼이나 Ctrl+E로 도구를 열면 현재 원소로 바로 그릴 수 있습니다. 화살표에서 원소·결합을 바로 선택하고, 오른쪽 선택·회전 버튼으로 선택 모드에 돌아갑니다.","Use the top Draw button or Ctrl+E to open the tools and draw with the current element. The arrow offers element and bond presets; Select/rotate in the right panel returns to selection.","Ctrl+E","ToggleDrawingTools");
     add(2,"연속 그리기","Continuous drawing","빈 곳을 연속 클릭하여 사슬을 연장할 수 있습니다.","You can click empty space repeatedly to extend a chain.");
     add(2,"원소 단축키","Element shortcuts","원자 위에 커서를 놓고 c, n, o 등을 입력해 원소를 바꿀 수 있습니다.","You can hover over an atom and type c, n, o, or another element symbol to replace it.","C / N / O / …");
     add(2,"염소로 변경","Replace with chlorine","원자 위에서 c를 빠르게 두 번 누르거나 cl을 입력해 Cl로 바꿀 수 있습니다.","You can type c twice quickly, or type cl, over an atom to change it to Cl.","C, C / C, L");

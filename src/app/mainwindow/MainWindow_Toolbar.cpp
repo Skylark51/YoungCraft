@@ -11,6 +11,7 @@
 #include "ui/DialogThemeSync.h"
 
 #include <QActionGroup>
+#include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QDockWidget>
@@ -21,6 +22,7 @@
 #include <QPainterPath>
 #include <QScrollArea>
 #include <QSettings>
+#include <QStackedWidget>
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
@@ -41,6 +43,19 @@ public:
     explicit PatternToolBar(const QString &title,QWidget *parent):QToolBar(title,parent){}
     void setMotif(int motif) { m_motif=motif;setProperty("patternTemplate",motif);update(); }
 protected:
+    void resizeEvent(QResizeEvent *event) override {
+        QToolBar::resizeEvent(event);
+        const bool compact = width() < 1000;
+        for (auto *button : findChildren<QToolButton *>()) {
+            const auto compactWidth = button->property("compactToolbarWidth");
+            if (!compactWidth.isValid()) continue;
+            const auto style = compact ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon;
+            if (button->toolButtonStyle() == style) continue;
+            button->setToolButtonStyle(style);
+            button->setMinimumWidth(compact ? compactWidth.toInt() : 0);
+            button->setMaximumWidth(compact ? compactWidth.toInt() : QWIDGETSIZE_MAX);
+        }
+    }
     void paintEvent(QPaintEvent *event) override {
         QToolBar::paintEvent(event);
         if(m_motif<0)return;
@@ -200,6 +215,53 @@ void MainWindow::createToolBar() {
         return button;
     };
     addCommonAction("NewStructure", QStringLiteral("새 구조"), 0);
+    auto *drawing = new QAction(QStringLiteral("그리기 도구"), this);
+    drawing->setObjectName(QStringLiteral("ToggleDrawingTools"));
+    drawing->setIconText(QStringLiteral("그리기"));
+    drawing->setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
+    drawing->setAutoRepeat(false);
+    drawing->setCheckable(true);
+    drawing->setToolTip(QStringLiteral("그리기 (Ctrl+E) · 클릭하면 바로 그리기 · 화살표: 원소·결합·새 구조"));
+    connect(drawing, &QAction::triggered, this, [this](bool enabled) {
+        if (enabled || !m_structureDock->isVisible() || m_structureTabs->currentIndex() != 1 ||
+            m_workspace->currentWidget() != m_moleculeWorkspace) activateDrawingTool();
+        else setDrawingMode(false);
+    });
+    auto *drawingMenu = new QMenu(QStringLiteral("그리기 도구"), this);
+    drawingMenu->setObjectName(QStringLiteral("DrawingToolsMenu"));
+    drawingMenu->setToolTipsVisible(true);
+    drawingMenu->addAction(drawing);
+    drawingMenu->addAction(findChild<QAction *>(QStringLiteral("NewStructure")));
+    auto *selection = drawingMenu->addAction(QStringLiteral("선택·회전으로 전환"), this, [this] {
+        setDrawingMode(false);
+        m_view->setFocus();
+    });
+    selection->setObjectName(QStringLiteral("DrawingSelectMode"));
+    drawingMenu->addSection(QStringLiteral("바로 그리기 · 원소"));
+    for (const QString &symbol : {QStringLiteral("C"), QStringLiteral("N"), QStringLiteral("O"), QStringLiteral("H")}) {
+        auto *action = drawingMenu->addAction(symbol, this, [this, symbol] {
+            activateDrawingTool();
+            m_drawElement->setCurrentText(symbol);
+            m_view->setDrawingElement(atomicNumberFor(symbol));
+        });
+        action->setObjectName(QStringLiteral("DrawingElement_%1").arg(symbol));
+    }
+    drawingMenu->addSection(QStringLiteral("바로 그리기 · 결합"));
+    const QStringList bondNames{QStringLiteral("단일 결합"), QStringLiteral("이중 결합"),
+                               QStringLiteral("삼중 결합"), QStringLiteral("방향족 결합")};
+    for (int i = 0; i < bondNames.size(); ++i) {
+        auto *action = drawingMenu->addAction(bondNames[i], this, [this, i] {
+            activateDrawingTool();
+            m_drawBondOrder->setCurrentIndex(i);
+        });
+        action->setObjectName(QStringLiteral("DrawingBond_%1").arg(i + 1));
+    }
+    auto *drawingButton = addSplitButton(drawing, drawingMenu, "ToolbarDrawingButton", 2);
+    drawingButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    drawingButton->setFixedWidth(104);
+    drawingButton->setAccessibleName(QStringLiteral("그리기 도구"));
+    findChild<QMenu *>(QStringLiteral("EditMenu"))->insertAction(
+        findChild<QMenu *>(QStringLiteral("EditBuildMenu"))->menuAction(), drawing);
     auto *openMenu = new QMenu(QStringLiteral("열기"), this);
     openMenu->setObjectName(QStringLiteral("ToolbarOpenMenu"));
     openMenu->setToolTipsVisible(true);
@@ -224,6 +286,7 @@ void MainWindow::createToolBar() {
     auto *projectButton = qobject_cast<QToolButton *>(toolbar->widgetForAction(projectAction));
     projectButton->setObjectName(QStringLiteral("ToolbarProjectLibraryActionButton"));
     projectButton->setProperty("workflowLabeled", true);
+    projectButton->setProperty("compactToolbarWidth", sidebarButtonSize);
     projectButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     projectButton->setFixedHeight(sidebarButtonSize);
     projectButton->setIconSize(QSize(sidebarIconSize, sidebarIconSize));
@@ -241,6 +304,7 @@ void MainWindow::createToolBar() {
     insertFragment->setIconText(QStringLiteral("라이브러리"));
     auto *libraryButton = addSplitButton(insertFragment, libraryMenu, "ToolbarLibraryButton", 30);
     libraryButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    libraryButton->setProperty("compactToolbarWidth", sidebarButtonSize + 16);
     libraryButton->setMinimumWidth(0);
     libraryButton->setMaximumWidth(QWIDGETSIZE_MAX);
     libraryButton->setToolTip(QStringLiteral("프래그먼트·리간드 라이브러리 · 화살표: 리간드 교체·금속 복합체"));
@@ -576,6 +640,7 @@ void MainWindow::createToolBar() {
     setOperationIcon(QStringLiteral("BuildLabComplexAction"), UiIcon::InsertFragment);
     setOperationIcon(QStringLiteral("ApplicationSettingsAction"), UiIcon::Style);
     setOperationIcon(QStringLiteral("DrawCurrentStructure"), UiIcon::EditAtoms);
+    setOperationIcon(QStringLiteral("ToggleDrawingTools"), UiIcon::EditAtoms);
     setOperationIcon(QStringLiteral("FreezeOptimizationCore"), UiIcon::Lock);
     setOperationIcon(QStringLiteral("UnfreezeOptimizationCore"), UiIcon::Lock);
     const QVector<UiIcon> analysisIcons{UiIcon::Geometry, UiIcon::Frequency, UiIcon::Scan,
@@ -776,6 +841,8 @@ void MainWindow::updatePanelActions() {
     m_structureTabs->findChild<QAction *>(QStringLiteral("DrawCurrentStructure"))->setEnabled(
         hasStructure || !m_drawingMode);
     m_drawPanels->setVisible(m_drawingMode);
+    if (auto *drawing = findChild<QAction *>(QStringLiteral("ToggleDrawingTools")))
+        drawing->setChecked(m_drawingMode && m_view->drawingArmed());
     if(auto *vdw=findChild<QAction *>("ShowVdwSpheres"))vdw->setChecked(m_view->style().showVdwSpheres);
 
     const bool bondCentric = m_view->bondCentricMode();
