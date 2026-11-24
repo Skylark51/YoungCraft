@@ -111,7 +111,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
     const bool input = isTextInputFocused();
     if(!input && m_drawingMode && !(event->modifiers() & (Qt::ControlModifier|Qt::AltModifier|Qt::MetaModifier))) {
         if(event->key()==Qt::Key_Escape){m_view->endDrawingChain();m_view->setProperty("pendingFragment",QString());m_view->setProperty("pendingCenter",0);m_view->clearInsertionPreview();event->accept();return;}
-        if(event->key()>=Qt::Key_1&&event->key()<=Qt::Key_3){m_drawBondOrder->setCurrentIndex(m_drawBondOrder->findData(double(event->key()-Qt::Key_0)));event->accept();return;}
+        if(event->key()>=Qt::Key_1&&event->key()<=Qt::Key_3){m_drawBondOrder->setCurrentIndex(m_drawBondOrder->findData(double(event->key()-Qt::Key_0)));activateDrawingTool();event->accept();return;}
         if(!event->text().isEmpty()&&event->text()[0].isLetter()){
             qint64 now=QDateTime::currentMSecsSinceEpoch();QString buffer=m_drawBar->property("elementBuffer").toString();
             if(now-m_drawBar->property("elementBufferTime").toLongLong()>700||buffer.size()>=2)buffer.clear();
@@ -125,6 +125,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             if(z<1){candidate=event->text();z=atomicNumberFor(candidate);}
             if(z>0){
                 m_drawElement->setCurrentText(elementSymbol(z));
+                activateDrawingTool();
                 if(hovered>=0 && hovered<m_view->molecule().atoms.size()){
                     auto edited=m_view->molecule();
                     MoleculeEditController::replace(edited,{hovered},z,edited.atoms[hovered].formalCharge);

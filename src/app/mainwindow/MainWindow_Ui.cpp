@@ -408,12 +408,17 @@ void MainWindow::createDocumentUi() {
     bondPresets->setSpacing(4);
     for (int i = 0; i < 4; ++i) {
         auto *button = new QPushButton(i == 3 ? QStringLiteral("Ar") : QString::number(i + 1), m_drawBar);
+        button->setObjectName(QStringLiteral("QuickBond_%1").arg(i + 1));
+        button->setCheckable(true);
+        button->setChecked(i == 0);
         sizeSidebarButton(button);
         button->setToolTip(m_drawBondOrder->itemText(i));
         bondPresets->addWidget(button);
         connect(button, &QPushButton::clicked, m_drawBondOrder, [selector = m_drawBondOrder, i] {
             selector->setCurrentIndex(i);
         });
+        connect(m_drawBondOrder, qOverload<int>(&QComboBox::currentIndexChanged), button,
+                [button, i](int index) { button->setChecked(index == i); });
     }
     bondPresets->addStretch();
     m_autoHButton = new QPushButton(QStringLiteral("수소 자동 추가"), m_drawBar);
@@ -643,8 +648,13 @@ void MainWindow::connectDocumentUi() {
         for (QPushButton *button : quickButtons) button->setChecked(button->text() == symbol);
     }));
     m_documentConnections.push_back(connect(m_drawElement,&QComboBox::textActivated,this,[this](const QString &symbol){int z=atomicNumberFor(symbol);if(z>0)m_view->setDrawingElement(z);}));
-    for(auto *button:quickButtons)m_documentConnections.push_back(connect(button,&QPushButton::clicked,this,[this,button]{m_view->setDrawingElement(atomicNumberFor(button->text()));}));
-    m_documentConnections.push_back(connect(m_drawBondOrder,&QComboBox::activated,this,[this]{m_view->setDrawingElement(atomicNumberFor(m_drawElement->currentText()));}));
+    for(auto *button:quickButtons)m_documentConnections.push_back(connect(button,&QPushButton::clicked,this,[this]{activateDrawingTool();}));
+    for (auto *button : m_drawBar->findChildren<QPushButton *>())
+        if (button->objectName().startsWith(QStringLiteral("QuickBond_")))
+            m_documentConnections.push_back(connect(button, &QPushButton::clicked, this, &MainWindow::activateDrawingTool));
+    m_documentConnections.push_back(connect(m_drawBondOrder,&QComboBox::activated,this,&MainWindow::activateDrawingTool));
+    m_documentConnections.push_back(connect(m_view, &MoleculeView::drawingToolChanged, this,
+                                            [this](bool) { updatePanelActions(); }));
     m_documentConnections.push_back(connect(m_autoHButton, &QPushButton::toggled, this, [this](bool enabled) {
         if (enabled && !m_view->molecule().isEmpty())
             commitEditedMolecule(m_view->molecule(), true);

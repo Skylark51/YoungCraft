@@ -150,6 +150,8 @@ private slots:
     void toolbarCleanupAndMolecularInformation();
     void vdwAndIsometricView();
     void drawingBlankRightClickSelects();
+    void drawingToolsOneClickAndKeyboard();
+    void drawingToolsPreserveSourceAndFollowTabs();
     void directGeometryToolsAndFixedCore();
     void selectAllAndFragmentRotation();
     void optimizationGraphWindow();
@@ -335,6 +337,110 @@ void SmokeTest::drawingBlankRightClickSelects() {
     QMouseEvent move(QEvent::MouseMove,QPointF(60,50),QPointF(view->mapToGlobal(QPoint(60,50))),Qt::NoButton,Qt::RightButton,Qt::NoModifier);QApplication::sendEvent(view,&move);
     QTest::mouseRelease(view,Qt::RightButton,Qt::NoModifier,QPoint(60,50));
     QVERIFY(view->drawingArmed());QVERIFY(view->cameraState().rotation!=rotation);
+}
+
+void SmokeTest::drawingToolsOneClickAndKeyboard() {
+    MainWindow w; w.resize(1100,800); w.show(); w.activateWindow();
+    auto *button = w.findChild<QToolButton *>("ToolbarDrawingButton");
+    auto *drawing = w.findChild<QAction *>("ToggleDrawingTools");
+    QVERIFY(button && drawing && button->isVisible());
+    QCOMPARE(button->toolButtonStyle(), Qt::ToolButtonTextBesideIcon);
+    QCOMPARE(button->popupMode(), QToolButton::MenuButtonPopup);
+    QCOMPARE(drawing->shortcut(), QKeySequence(QStringLiteral("Ctrl+E")));
+    w.m_structureDock->hide();
+    QTest::mouseClick(button, Qt::LeftButton, Qt::NoModifier, QPoint(18,16));
+    QVERIFY(w.m_drawingMode && w.m_view->drawingArmed() && drawing->isChecked());
+    QVERIFY(w.m_structureDock->isVisible() && w.m_drawBar->isVisible());
+    QCOMPARE(w.m_structureTabs->currentIndex(), 1);
+    const int tabs = w.m_documentTabs->count();
+    auto *view = w.m_view;
+    QTest::mouseClick(view, Qt::LeftButton, Qt::NoModifier, QPoint(view->width()/2,view->height()/2));
+    QCOMPARE(view->molecule().atoms.size(), 1);
+    QTest::mouseClick(view, Qt::RightButton, Qt::NoModifier, QPoint(10,10));
+    QVERIFY(!view->drawingArmed() && !drawing->isChecked());
+    drawing->trigger();
+    QVERIFY(view->drawingArmed() && drawing->isChecked());
+    w.m_structureDock->hide();
+    drawing->trigger();
+    QVERIFY(w.m_structureDock->isVisible() && view->drawingArmed() && drawing->isChecked());
+    auto *select = w.m_drawBar->findChild<QPushButton *>("SelectDrawingTool");
+    auto *arm = w.m_drawBar->findChild<QPushButton *>("ArmDrawingTool");
+    auto *single = w.m_drawBar->findChild<QPushButton *>("QuickBond_1");
+    auto *doubleBond = w.m_drawBar->findChild<QPushButton *>("QuickBond_2");
+    QVERIFY(select && arm && single && doubleBond);
+    QVERIFY(!arm->text().isEmpty() && !select->text().isEmpty());
+    select->click();
+    QVERIFY(!view->drawingArmed() && select->isChecked() && !arm->isChecked());
+    QVERIFY(w.m_drawBar->isVisible());
+    doubleBond->click();
+    QVERIFY(view->drawingArmed() && doubleBond->isChecked() && !single->isChecked());
+    QCOMPARE(w.drawState().bondOrder, 2.0);
+    select->click();
+    QTest::keyClick(view, Qt::Key_C);
+    QVERIFY(view->drawingArmed()); // Reselecting the current element also resumes drawing.
+    select->click();
+    view->setProperty("pendingFragment", "old-fragment");
+    view->setTemplatePreview(0);
+    single->click();
+    QVERIFY(view->drawingArmed() && !view->m_insertPreview);
+    QVERIFY(view->property("pendingFragment").toString().isEmpty());
+    select->click();
+    QTest::keyClick(view, Qt::Key_3);
+    QVERIFY(view->drawingArmed());
+    QCOMPARE(w.drawState().bondOrder, 3.0);
+    QTest::qWait(30);
+    QTest::keyClick(view, Qt::Key_E, Qt::ControlModifier);
+    QVERIFY(!w.m_drawingMode && !drawing->isChecked());
+    QTest::keyClick(view, Qt::Key_E, Qt::ControlModifier);
+    QVERIFY(w.m_drawingMode && view->drawingArmed() && drawing->isChecked());
+    QCOMPARE(w.m_documentTabs->count(), tabs);
+    w.resize(820,640);
+    QTest::qWait(50);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->toolButtonStyle(), Qt::ToolButtonTextBesideIcon);
+    auto *toolbar = w.findChild<QToolBar *>("MainToolBar");
+    QVERIFY(toolbar->widgetForAction(w.m_outputDock->toggleViewAction())->isVisible());
+    const auto preview = qEnvironmentVariable("YOUNGCRAFT_DRAWING_PREVIEW");
+    if (!preview.isEmpty()) QVERIFY(w.grab().save(preview));
+}
+
+void SmokeTest::drawingToolsPreserveSourceAndFollowTabs() {
+    MainWindow w; w.resize(1100,800); w.show();
+    w.openFile(QFINDTESTDATA("tests/data/mvp.out"));
+    QTRY_VERIFY_WITH_TIMEOUT(w.m_workspace->property("loadFinished").toBool(), 15000);
+    QVERIFY(w.m_workspace->property("loadSuccess").toBool());
+    const auto original = w.m_activeDocument;
+    const int sourceTab = w.m_documentTabs->currentIndex();
+    const int tabCount = w.m_documentTabs->count();
+    const auto atoms = w.m_view->molecule().atoms;
+    const int frames = w.m_data.frames.size();
+    QVERIFY(frames > 0);
+    auto *drawing = w.findChild<QAction *>("ToggleDrawingTools");
+    auto *oxygen = w.findChild<QAction *>("DrawingElement_O");
+    auto *doubleBond = w.findChild<QAction *>("DrawingBond_2");
+    QVERIFY(drawing && oxygen && doubleBond);
+    oxygen->trigger();
+    QCOMPARE(w.m_documentTabs->count(), tabCount + 1);
+    QCOMPARE(w.drawState().element, 8);
+    QVERIFY(w.m_view->drawingArmed() && drawing->isChecked());
+    const int editTab = w.m_documentTabs->currentIndex();
+    doubleBond->trigger();
+    QCOMPARE(w.drawState().bondOrder, 2.0);
+    QCOMPARE(w.m_documentTabs->count(), tabCount + 1);
+    QTest::mouseClick(w.m_view, Qt::LeftButton, Qt::NoModifier, QPoint(25,25));
+    w.m_documentTabs->setCurrentIndex(sourceTab);
+    QVERIFY(!drawing->isChecked());
+    QCOMPARE(w.m_activeDocument, original);
+    QCOMPARE(w.m_data.frames.size(), frames);
+    QCOMPARE(w.m_view->molecule().atoms.size(), atoms.size());
+    for (int i=0; i<atoms.size(); ++i) {
+        QCOMPARE(w.m_view->molecule().atoms[i].atomicNumber, atoms[i].atomicNumber);
+        QCOMPARE(w.m_view->molecule().atoms[i].position, atoms[i].position);
+    }
+    w.m_documentTabs->setCurrentIndex(editTab);
+    QVERIFY(drawing->isChecked() && w.m_view->drawingArmed());
+    QCOMPARE(w.drawState().element, 8);
+    QCOMPARE(w.drawState().bondOrder, 2.0);
 }
 
 void SmokeTest::additionalInteractionRequests(){
@@ -1956,7 +2062,7 @@ void SmokeTest::topPanelToolbarFollowsDocuments() {
     w.resize(820, 640);
     QTRY_COMPARE(w.size(), QSize(820, 640));
     auto *bottomToggle = toolbar->widgetForAction(w.m_outputDock->toggleViewAction());
-    QVERIFY(bottomToggle && bottomToggle->isVisible());
+    QTRY_VERIFY(bottomToggle && bottomToggle->isVisible());
     QTest::mouseClick(bottomToggle, Qt::LeftButton);
     QTRY_VERIFY(w.m_outputDock->isVisible());
     QTRY_COMPARE(w.size(), QSize(820, 640));

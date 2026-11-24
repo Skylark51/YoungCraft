@@ -174,6 +174,7 @@ private:
     void syncEditedGeometry(const Molecule &molecule, const QString &warning);
     void newDrawingDocument(const Molecule &initial = {});
     void setDrawingMode(bool enabled);
+    void activateDrawingTool();
     void addDrawnAtom(const QVector3D &position, int bondFrom = -1);
     void commitEditedMolecule(const Molecule &molecule, bool topologyChanged, bool adjustHydrogens = true);
     DrawState drawState() const;
