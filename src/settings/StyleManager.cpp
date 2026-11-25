@@ -60,20 +60,20 @@ RenderStyle StyleManager::preset(const QString &requestedName) {
                                             qRound(c.blue() * 0.65 + 255 * 0.35)));
     }
     const QMap<int, QColor> pastel = {{1, QColor(246,248,252)}, {6, QColor(164,181,201)},
-        {7, QColor(130,169,234)}, {8, QColor(240,145,158)}, {9, QColor(146,213,176)},
-        {15, QColor(243,187,145)}, {16, QColor(245,220,145)}, {17, QColor(151,213,171)},
+        {7, QColor(130,169,234)}, {8, QColor(240,145,158)},
+        {15, QColor(243,187,145)}, {16, QColor(245,220,145)},
         {25, QColor(202,164,216)}, {26, QColor(225,171,136)}, {27, QColor(149,182,222)},
-        {29, QColor(219,177,145)}, {30, QColor(167,196,211)}, {35, QColor(209,157,145)},
+        {29, QColor(219,177,145)}, {30, QColor(167,196,211)},
         {53, QColor(193,158,221)}};
     for (auto it = pastel.cbegin(); it != pastel.cend(); ++it) style.elementColors.insert(it.key(), it.value());
+    // Keep the halides distinguishable and vanadium visible under Studio lighting.
+    for (const int z : {9, 17, 23, 35}) style.elementColors.insert(z, elementColor(z));
     if (name == QStringLiteral("Youngcraft Studio")) {
         style.elementColors.insert(1, QColor(250,250,250));
         style.elementColors.insert(6, QColor(12,12,12));
         style.elementColors.insert(7, QColor(0,0,255));
         style.elementColors.insert(8, QColor(255,0,0));
-        style.elementColors.insert(9, QColor(145,220,175));
         style.elementColors.insert(16, QColor(255,220,25));
-        style.elementColors.insert(17, QColor(155,220,165));
         style.elementColors.insert(25, QColor(185,55,245));
         style.elementColors.insert(26, QColor(255,160,30));
         style.elementColors.insert(27, QColor(140,65,225));
@@ -336,6 +336,24 @@ RenderStyle StyleManager::load() {
     settings.beginGroup(QStringLiteral("elementColors"));
     for (const QString &key : settings.childKeys()) style.elementColors.insert(key.toInt(), settings.value(key).value<QColor>());
     settings.endGroup();
+    // Migrate only old default entries; preserve explicit colors and every other
+    // saved rendering setting instead of resetting a user's complete Studio style.
+    if (hasSavedStyle &&
+        (presetName == QStringLiteral("Youngcraft Studio") || presetName == QStringLiteral("Dark Studio")) &&
+        settings.value(QStringLiteral("elementPaletteRevision"), 0).toInt() < 1) {
+        const QMap<int, QColor> legacy = {{9, QColor(145,220,175)}, {17, QColor(155,220,165)},
+                                        {23, QColor(197,197,200)}, {35, QColor(209,157,145)}};
+        settings.beginGroup(QStringLiteral("elementColors"));
+        for (auto it = legacy.cbegin(); it != legacy.cend(); ++it) {
+            if (style.elementColors.contains(it.key()) && style.elementColors.value(it.key()) == it.value()) {
+                const auto color = elementColor(it.key());
+                style.elementColors.insert(it.key(), color);
+                settings.setValue(QString::number(it.key()), color);
+            }
+        }
+        settings.endGroup();
+        settings.setValue(QStringLiteral("elementPaletteRevision"), 1);
+    }
     settings.beginGroup(QStringLiteral("elementRadiusScales"));
     for (const QString &key : settings.childKeys()) style.elementRadiusScales.insert(key.toInt(), settings.value(key).toFloat());
     settings.endGroup();
