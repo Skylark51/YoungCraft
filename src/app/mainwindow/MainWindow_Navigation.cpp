@@ -1,6 +1,7 @@
 #include "app/MainWindow.h"
 
 #include "analysis/AnalysisEngine.h"
+#include "analysis/FrequencyAssignment.h"
 #include "app/ParseWorker.h"
 #include "animation/AnimationController.h"
 #include "export/ImageExporter.h"
@@ -63,7 +64,14 @@ void MainWindow::populateExplorer() {
         auto *child = new QTreeWidgetItem({QStringLiteral("프레임 %1").arg(i + 1)}); child->setData(0, Qt::UserRole, QStringLiteral("frame")); child->setData(0, Qt::UserRole + 1, i); geometry->addChild(child);
     }
     auto *frequency = new QTreeWidgetItem({QStringLiteral("진동 (%1)").arg(m_data.frequencies.size())}); frequency->setData(0, Qt::UserRole, QStringLiteral("section")); frequency->setData(0, Qt::UserRole + 1, 1); root->addChild(frequency);
-    for (int i = 0; i < m_data.frequencies.size(); ++i) { auto *child = new QTreeWidgetItem({QStringLiteral("%1: %2 cm⁻¹").arg(i + 1).arg(m_data.frequencies[i].wavenumber)}); child->setData(0, Qt::UserRole, QStringLiteral("frequency")); child->setData(0, Qt::UserRole + 1, i); frequency->addChild(child); }
+    const auto annotations = frequencyAnnotations(m_data);
+    for (int i = 0; i < annotations.size(); ++i) {
+        auto *child = new QTreeWidgetItem({annotations[i].label});
+        child->setToolTip(0, annotations[i].tooltip);
+        child->setData(0, Qt::UserRole, QStringLiteral("frequency"));
+        child->setData(0, Qt::UserRole + 1, i);
+        frequency->addChild(child);
+    }
     auto *scan = new QTreeWidgetItem({(m_data.format == QStringLiteral("GSM")
         ? QStringLiteral("GSM 경로 (%1)") : QStringLiteral("퍼텐셜 에너지 스캔 (%1)"))
         .arg(m_data.scanPoints.size())}); scan->setData(0, Qt::UserRole, QStringLiteral("section")); scan->setData(0, Qt::UserRole + 1, 2); root->addChild(scan);
