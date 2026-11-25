@@ -4195,6 +4195,12 @@ void SmokeTest::frequencyPagingAndDetails(){
     window.m_analysis->setCurrentTab(1);QTest::qWait(80);QVERIFY(window.m_explorer->isHidden());QVERIFY(navigator->isChecked());
     auto *panel=window.m_analysis;auto *list=panel->findChild<QListWidget*>("FrequencyList");auto *next=panel->findChild<QPushButton*>("NextFrequencyPage");
     auto *details=panel->findChild<QPushButton*>("OpenFrequencyDetails");QVERIFY(list&&next&&details);
+    QCOMPARE(list->item(0)->text(),QStringLiteral("10.000 cm⁻¹ (C1–O2)"));
+    QVERIFY(list->item(0)->toolTip().contains(QStringLiteral("모드 1")));
+    window.populateExplorer();
+    auto *frequencyTree=window.m_explorer->topLevelItem(0)->child(1);QCOMPARE(frequencyTree->childCount(),12);
+    QCOMPARE(frequencyTree->child(0)->text(0),list->item(0)->text());
+    QCOMPARE(frequencyTree->child(0)->toolTip(0),list->item(0)->toolTip());
     auto *frequencyToolbar=panel->findChild<QWidget*>("FrequencyToolbar");QVERIFY(frequencyToolbar);
     // Assert required controls, not a historical count that rejects new direct actions.
     for(const char *name:{"FrequencyPlay","FrequencyRestore","SaveFrequencyAnimation","NextFrequencyPage","OpenFrequencyDetails"})
@@ -4213,7 +4219,8 @@ void SmokeTest::frequencyPagingAndDetails(){
     const QString capture=qEnvironmentVariable("YOUNGCRAFT_FREQUENCY_REVIEW");if(!capture.isEmpty())QDir().mkpath(capture);
     if(!capture.isEmpty())QVERIFY(window.grab().save(capture+"/frequency-page.png"));
     details->click();auto *dialog=panel->findChild<QDialog*>("FrequencyDetailsDialog");QVERIFY(dialog->isVisible());
-    auto *table=dialog->findChild<QTableWidget*>("FrequencyDetailsTable");QCOMPARE(table->rowCount(),12);QCOMPARE(table->columnCount(),5);
+    auto *table=dialog->findChild<QTableWidget*>("FrequencyDetailsTable");QCOMPARE(table->rowCount(),12);QCOMPARE(table->columnCount(),6);
+    QCOMPARE(table->item(0,5)->text(),QStringLiteral("C1–O2"));
     QCOMPARE(table->item(10,2)->text(),QString("10.2500 km/mol"));table->setCurrentCell(10,0);verifyPage(10,2);QCOMPARE(window.m_currentFrequency,10);
     if(!capture.isEmpty())QVERIFY(dialog->grab().save(capture+"/frequency-details.png"));
     dialog->hide();window.m_analysis->setCurrentTab(0);QVERIFY(window.m_explorer->isVisible());

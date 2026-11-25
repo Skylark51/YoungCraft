@@ -1,5 +1,6 @@
 add_library(youngcraft_analysis STATIC
     AnalysisEngine.cpp
+    FrequencyAssignment.cpp
     TransitionAnalysis.cpp
 )
 youngcraft_enable_warnings(youngcraft_analysis)

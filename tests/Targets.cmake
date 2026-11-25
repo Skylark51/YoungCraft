@@ -1,4 +1,12 @@
 qt_add_executable(test_mechanism tests/animation/test_mechanism.cpp)
+qt_add_executable(test_frequency_assignment tests/analysis/test_frequency_assignment.cpp)
+target_link_libraries(test_frequency_assignment PRIVATE youngcraft_analysis Qt6::Test)
+target_compile_options(test_frequency_assignment PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+add_test(NAME frequency_assignment COMMAND test_frequency_assignment)
+if(WIN32)
+    add_custom_command(TARGET test_frequency_assignment POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:test_frequency_assignment> $<TARGET_FILE_DIR:test_frequency_assignment> COMMAND_EXPAND_LISTS VERBATIM)
+endif()
 target_link_libraries(test_mechanism PRIVATE youngcraft_animation youngcraft_export youngcraft_io Qt6::Test)
 target_compile_options(test_mechanism PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 add_test(NAME mechanism_animation COMMAND test_mechanism)

@@ -1,6 +1,7 @@
 #include "ui/SidebarButton.h"
 #include "ui/SidebarFlowLayout.h"
 #include "ui/AnalysisPanel.h"
+#include "analysis/FrequencyAssignment.h"
 #include "ui/PlotWidget.h"
 #include <QCheckBox>
 #include <QDialog>
@@ -58,6 +59,7 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     layout->addWidget(m_frequencyPageLabel);
     m_frequencyList=new QListWidget(page);m_frequencyList->setObjectName("FrequencyList");
     m_frequencyList->setMinimumWidth(0);m_frequencyList->setUniformItemSizes(true);
+    m_frequencyList->setTextElideMode(Qt::ElideRight);
     m_frequencyList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_frequencyList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_frequencyList->setFixedHeight(frequencyPageSize*frequencyRowHeight+2);
@@ -80,16 +82,17 @@ QWidget *AnalysisPanel::makeFrequencyTab() {
     layout->addLayout(form);layout->addStretch();
 
     m_frequencyDetails=new QDialog(page);m_frequencyDetails->setObjectName("FrequencyDetailsDialog");
-    m_frequencyDetails->setWindowTitle(QStringLiteral("진동 상세 정보"));m_frequencyDetails->resize(760,600);
+    m_frequencyDetails->setWindowTitle(QStringLiteral("진동 상세 정보"));m_frequencyDetails->resize(940,600);
     auto *detailLayout=new QVBoxLayout(m_frequencyDetails);
     m_frequencyInfo=new QLabel(QStringLiteral("진동 모드를 선택하세요"),m_frequencyDetails);m_frequencyInfo->setWordWrap(true);
     detailLayout->addWidget(m_frequencyInfo);
-    m_frequencyDetailsTable=new QTableWidget(0,5,m_frequencyDetails);m_frequencyDetailsTable->setObjectName("FrequencyDetailsTable");
-    m_frequencyDetailsTable->setHorizontalHeaderLabels({QStringLiteral("모드"),QStringLiteral("파수 (cm⁻¹)"),QStringLiteral("IR 세기"),QStringLiteral("Raman 활성도"),QStringLiteral("상태")});
+    m_frequencyDetailsTable=new QTableWidget(0,6,m_frequencyDetails);m_frequencyDetailsTable->setObjectName("FrequencyDetailsTable");
+    m_frequencyDetailsTable->setHorizontalHeaderLabels({QStringLiteral("모드"),QStringLiteral("파수 (cm⁻¹)"),QStringLiteral("IR 세기"),QStringLiteral("Raman 활성도"),QStringLiteral("상태"),QStringLiteral("주요 진동 원자 (추정)")});
     m_frequencyDetailsTable->verticalHeader()->hide();
     m_frequencyDetailsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_frequencyDetailsTable->setSelectionBehavior(QAbstractItemView::SelectRows);m_frequencyDetailsTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_frequencyDetailsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_frequencyDetailsTable->horizontalHeader()->setSectionResizeMode(5,QHeaderView::ResizeToContents);
     detailLayout->addWidget(m_frequencyDetailsTable,2);
     m_frequencyPlot=new PlotWidget(m_frequencyDetails);detailLayout->addWidget(m_frequencyPlot,1);
     auto *close=new QDialogButtonBox(QDialogButtonBox::Close,m_frequencyDetails);
@@ -162,14 +165,16 @@ void AnalysisPanel::updateFrequencyPage(int first) {
 void AnalysisPanel::fillFrequencyList() {
     const QSignalBlocker listBlock(m_frequencyList),tableBlock(m_frequencyDetailsTable);
     m_frequencyList->clear();m_frequencyDetailsTable->setRowCount(int(m_data.frequencies.size()));
+    const auto annotations=frequencyAnnotations(m_data);
     bool hasImaginary=false;QVector<QPointF> bars;
     for(int row=0;row<m_data.frequencies.size();++row){
         const auto &mode=m_data.frequencies[row];const bool imaginary=mode.imaginary||mode.wavenumber<0;
         hasImaginary|=imaginary;
-        auto *entry=new QListWidgetItem(QStringLiteral("%1: %2 cm⁻¹%3").arg(mode.number).arg(numberOrDash(mode.wavenumber,3)).arg(imaginary?QStringLiteral(" [허수]"):QString()),m_frequencyList);
+        auto *entry=new QListWidgetItem(annotations[row].label,m_frequencyList);
+        entry->setToolTip(annotations[row].tooltip);
         entry->setSizeHint(QSize(0,frequencyRowHeight));
-        const QStringList values={QString::number(mode.number),numberOrDash(mode.wavenumber),(numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit),numberOrDash(mode.ramanActivity),imaginary?QStringLiteral("허수 진동"):QStringLiteral("정상 진동")};
-        for(int col=0;col<values.size();++col)m_frequencyDetailsTable->setItem(row,col,new QTableWidgetItem(values[col]));
+        const QStringList values={QString::number(mode.number),numberOrDash(mode.wavenumber),(numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit),numberOrDash(mode.ramanActivity),imaginary?QStringLiteral("허수 진동"):QStringLiteral("정상 진동"),annotations[row].atoms};
+        for(int col=0;col<values.size();++col){auto *item=new QTableWidgetItem(values[col]);item->setToolTip(annotations[row].tooltip);m_frequencyDetailsTable->setItem(row,col,item);}
         bars.push_back({double(mode.number),mode.wavenumber});
     }
     m_copyFrequencyAnimation->setVisible(hasImaginary);
@@ -188,8 +193,8 @@ void AnalysisPanel::setCurrentFrequency(int index) {
     if(index<m_frequencyPage||index>=m_frequencyPage+frequencyPageSize)updateFrequencyPage(index);
     m_frequencyList->setCurrentRow(index);m_frequencyDetailsTable->selectRow(index);
     const auto &mode=m_data.frequencies[index];
-    m_frequencyInfo->setText(QStringLiteral("모드 %1 · 파수: %2 cm⁻¹ · IR 세기: %3 · Raman 활성도: %4 · %5")
-        .arg(mode.number).arg(numberOrDash(mode.wavenumber)).arg((numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit)).arg(numberOrDash(mode.ramanActivity))
+    m_frequencyInfo->setText(QStringLiteral("%1 · 모드 %2 · IR 세기: %3 · Raman 활성도: %4 · %5")
+        .arg(m_frequencyList->item(index)->text()).arg(mode.number).arg((numberOrDash(mode.irIntensity) + QStringLiteral(" ") + mode.irIntensityUnit)).arg(numberOrDash(mode.ramanActivity))
         .arg(mode.imaginary||mode.wavenumber<0?QStringLiteral("허수 진동"):QStringLiteral("정상 진동")));
 }
 } // namespace youngcraft
